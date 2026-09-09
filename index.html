@@ -188,6 +188,36 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .pillselect{display:flex;flex-wrap:wrap;gap:5px}
 .pillselect span{font-size:11px;padding:4px 9px;border-radius:99px;cursor:pointer;border:1px solid var(--line2);color:var(--td);background:var(--bg2)}
 .pillselect span.on{border-color:var(--gold);color:var(--gold);background:var(--goldDim)}
+/* ===== GARDE / CALENDRIER ===== */
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.cal-dow span{text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--td)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-cell{aspect-ratio:1/1.05;border-radius:11px;border:1px solid var(--line);background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;transition:.12s;position:relative}
+.cal-cell:active{transform:scale(.94)}
+.cal-cell.blank{border-color:transparent;background:transparent;cursor:default}
+.cal-cell .dn{font-size:13px;font-weight:600;color:var(--tm)}
+.cal-cell.we .dn{color:var(--td)}
+.cal-cell.has{background:var(--goldDim);border-color:rgba(229,195,106,.45)}
+.cal-cell.has .dn{color:var(--tx)}
+.cal-cell .hb{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold)}
+.cal-cell.today{box-shadow:0 0 0 2px var(--blue) inset}
+.cal-cell.sel{box-shadow:0 0 0 2px var(--gold) inset;background:var(--card2)}
+.cal-cell.future{opacity:.55}
+.cal-panel{background:var(--card2);border:1px solid var(--gold);border-radius:14px;padding:13px;margin-top:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chips button{border:1px solid var(--line2);background:var(--bg2);color:var(--tx);border-radius:99px;padding:8px 13px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--mono)}
+.chips button:active{background:var(--goldDim);border-color:var(--gold)}
+.cost-line{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(36,44,66,.5);font-size:13px}
+.cost-line:last-child{border-bottom:none}
+.cost-line b{font-family:var(--mono);font-weight:600}
+.cost-line.tot{font-weight:600;font-size:14px}
+.cost-line small{display:block;font-size:10px;color:var(--td);font-weight:400}
+.prm{display:grid;grid-template-columns:1fr 104px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(36,44,66,.4)}
+.prm label{font-size:12px;color:var(--tm);line-height:1.3}
+.prm label small{display:block;font-size:10px;color:var(--td)}
+.nbtn{font-size:10px}
+.cal-cell.cp{background:var(--upDim);border-color:rgba(63,207,142,.45)}
+.cal-cell.cp .dn{color:var(--tx)}
 @media(min-width:640px){.hero .hv{font-size:44px}}
 </style>
 </head>
@@ -216,6 +246,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
   <div class="page" id="pg-home"></div>
   <div class="page" id="pg-budget"></div>
   <div class="page" id="pg-invest"></div>
+  <div class="page" id="pg-garde"></div>
   <div class="page" id="pg-more"></div>
 
   <div id="nav">
@@ -223,6 +254,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
     <button class="nbtn" data-pg="budget" onclick="go('budget')"><span class="ni">◔</span>Budget</button>
     <button class="nbtn-cta" onclick="wizStart()">⟳<span>MÀJ</span></button>
     <button class="nbtn" data-pg="invest" onclick="go('invest')"><span class="ni">◮</span>Invest</button>
+    <button class="nbtn" data-pg="garde" onclick="go('garde')"><span class="ni">◷</span>Garde</button>
     <button class="nbtn" data-pg="more" onclick="go('more')"><span class="ni">⋯</span>Plus</button>
   </div>
 </div>
@@ -271,7 +303,7 @@ function defKPI(){return[
 function defDB(){return{pin:'2502',bm:[defBM(2025,12)],im:[defIM(2025,12)],
 fiscal:[{id:1,l:"Déclaration revenus",s:"a_faire",d:"Juin",c:"Décla",n:"Crédit impôt + PER"}],
 deductibles:[],fp:{pas:7.5,perObj:2400,perStartY:2026,perStartM:1,perExcep:0},kpis:defKPI(),customCharts:[],
-gn:'Notes globales…'}}
+gn:'Notes globales…',garde:defGarde()}}
 
 /* ===== FIREBASE (identique v7 : mêmes données, zéro migration) ===== */
 let fdb=null;
@@ -286,21 +318,22 @@ else{el.textContent='…';el.style.color='var(--td)'}}
 /* ===== STORAGE (clé hft7 conservée) ===== */
 let DB,svT=null;
 function ensure(){if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;
-if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[]}
+if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];ensureGarde()}
 function load(){
 try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}
 ensure();
 if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
-  if(doc.exists&&doc.data().db){const c=doc.data().db;if((c._ts||0)>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));if(typeof RA==='function')RA()}}
+  if(doc.exists&&doc.data().db){const c=doc.data().db;if((c._ts||0)>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB))}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
-  sss('ok')}).catch(e=>sss('error'))}}
+  postLoad();sss('ok')}).catch(e=>{postLoad();sss('error')})}else postLoad()}
+function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
 function save(){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
 function s2c(){if(!fdb)return;sss('saving');const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).then(()=>sss('ok')).catch(e=>sss('error'))}
 function listenSync(){if(!fdb)return;fdb.collection('data').doc(DID).onSnapshot(doc=>{
 if(!doc.exists||!doc.data().db)return;const c=doc.data().db;
-if(c._ts&&c._ts>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));sss('ok');if(typeof RA==='function')RA()}},e=>{})}
+if(c._ts&&c._ts>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));migrateGarde();sss('ok');if(typeof RA==='function')RA()}},e=>{})}
 function xport(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{DB=JSON.parse(ev.target.result);ensure();save();location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
 
@@ -309,7 +342,7 @@ function gBM(y,m){return DB.bm.find(x=>x.y===y&&x.m===m)}
 function gOBM(y,m){let d=gBM(y,m);if(!d){d=defBM(y,m);
 const prev=[...DB.bm].filter(x=>(x.y*12+x.m)<(y*12+m)).sort((a,b)=>(b.y*12+b.m)-(a.y*12+a.m));
 if(prev.length&&prev[0].ch&&prev[0].ch.length)d.ch=JSON.parse(JSON.stringify(prev[0].ch));
-DB.bm.push(d);save()}return d}
+DB.bm.push(d);save();syncMonth(d)}return d}
 function gIM(y,m){return DB.im.find(x=>x.y===y&&x.m===m)}
 function gOIM(y,m){let d=gIM(y,m);if(!d){d=defIM(y,m);
 const prev=[...DB.im].filter(x=>(x.y*12+x.m)<(y*12+m)).sort((a,b)=>(b.y*12+b.m)-(a.y*12+a.m));
@@ -355,7 +388,7 @@ function go(p){PG=p;if(p==='more')SUB='hub';
 document.querySelectorAll('.nbtn').forEach(b=>b.classList.toggle('on',b.dataset.pg===p));
 document.querySelectorAll('.page').forEach(c=>c.classList.toggle('on',c.id==='pg-'+p));
 RA();window.scrollTo(0,0)}
-function RA(){if(PG==='home')rHome();if(PG==='budget')rBudget();if(PG==='invest')rInvest();if(PG==='more')rMore();
+function RA(){if(PG==='home')rHome();if(PG==='budget')rBudget();if(PG==='invest')rInvest();if(PG==='garde')rGarde();if(PG==='more')rMore();
 document.querySelectorAll('.page').forEach(c=>c.classList.toggle('on',c.id==='pg-'+PG))}
 function mkC(id,cfg){if(CHS[id]){CHS[id].destroy();delete CHS[id]}const c=document.getElementById(id);if(!c)return;
 Chart.defaults.color='#8891A8';Chart.defaults.borderColor='#242C42';Chart.defaults.font.family="'Outfit',sans-serif";Chart.defaults.font.size=10;
@@ -378,7 +411,8 @@ const fp=DB.fp;const perA=perAutoSum();const perT=perA+(fp.perExcep||0);
 const perP=fp.perObj>0?Math.min(100,Math.round(perT/fp.perObj*100)):0;
 const perR=Math.max(0,fp.perObj-perT);
 const now=new Date();const cy=now.getFullYear(),cm2=now.getMonth()+1;
-const curB=gBM(cy,cm2);
+const curB=gBM(cy,cm2);syncMonth(curB);
+const gh=gHours(cy,cm2);const gcost=gardeCost(cy,cm2);
 const stateTxt=!curB?'À démarrer':curB.cl?'Clôturé ✓':'En cours';
 const stateCls=!curB?'tag-gold':curB.cl?'tag-up':'chip';
 
@@ -409,6 +443,16 @@ el.innerHTML=`
       <span class="chip ${stateCls}">${stateTxt}</span>
     </div>
     <div style="font-size:12px;color:var(--td);margin-top:6px">Soldes, supports, versements et charges — guidé pas à pas.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-b" style="cursor:pointer" onclick="GSEL=todayKey();gY=${cy};gM=${cm2};go('garde')">
+    <div class="row rb">
+      <div><div class="eyebrow">Nounou · ${ML[cm2]}</div>
+        <div style="font-size:15px;font-weight:600;margin-top:2px"><span class="mono" style="color:var(--gold)">${f$(gh.h)} h</span> <span style="color:var(--td);font-weight:500;font-size:13px">· ${gh.days} jour${gh.days>1?'s':''}${gh.cp?' · '+gh.cp+' CP':''} · ${f$(Math.round(gcost.net))} € net</span></div></div>
+      <span class="chip ${DB.garde.hours[todayKey()]?'tag-up':'tag-gold'}">${DB.garde.hours[todayKey()]?'Aujourd\u2019hui ✓':'Saisir aujourd\u2019hui'}</span>
+    </div>
   </div>
 </div>
 
@@ -448,7 +492,7 @@ return'📍 App Boursorama'}
 function wizStart(){const n=new Date();wizStartFor(n.getFullYear(),n.getMonth()+1)}
 function wizStartFor(y,m){
 WZ.y=y;WZ.m=m;WZ.step=0;
-gOBM(y,m);const im=gOIM(y,m);
+gOBM(y,m);const im=gOIM(y,m);syncMonth(gBM(y,m));
 WZ.steps=[{t:'soldes'}];
 im.supports.forEach((s,i)=>WZ.steps.push({t:'sup',i}));
 WZ.steps.push({t:'contribs'},{t:'charges'},{t:'excep'},{t:'recap'});
@@ -544,7 +588,7 @@ const fi=body.querySelector('.wiz-input');if(fi&&st.t!=='recap')setTimeout(()=>f
 
 function wzContribsHtml(im){return im.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOIM(WZ.y,WZ.m).contribs.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucun versement</div>'}
 function wzAddContrib(){const l=document.getElementById('wzc-l').value.trim();if(!l)return;gOIM(WZ.y,WZ.m).contribs.push({l,v:+document.getElementById('wzc-v').value||0});save();wizRender()}
-function wzChargesHtml(cm){return cm.ch.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
+function wzChargesHtml(cm){return cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
 function wzAddCharge(){const l=document.getElementById('wzch-l').value.trim();if(!l)return;gOBM(WZ.y,WZ.m).ch.push({l,v:+document.getElementById('wzch-v').value||0});save();wizRender()}
 function wzExcepHtml(cm){return cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:14px">'+d.l+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ex.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Rien pour l\u2019instant — c\u2019est bon signe</div>'}
 function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();const v=+document.getElementById('wze-v').value;if(!l||!v)return;gOBM(WZ.y,WZ.m).ex.push({l,v});save();wizRender()}
@@ -561,7 +605,7 @@ return `<div class="mtools">
 
 function rBudget(){
 const el=document.getElementById('pg-budget');
-const cm=gBM(bY,bM)||defBM(bY,bM);const exists=!!gBM(bY,bM);
+const cm=gBM(bY,bM)||defBM(bY,bM);const exists=!!gBM(bY,bM);if(exists)syncMonth(cm);
 const pv=pM(bY,bM);const pvD=gBM(pv.y,pv.m);
 const dav=pvD?(pvD.sav||0):0;const dap=pvD?(pvD.sap||0):0;
 const tCh=cm.ch.reduce((s,c)=>s+c.v,0);const inv=invT4M(bY,bM);
@@ -611,7 +655,7 @@ ${monthTools('b',bY,bM,"var y=+document.getElementById('bAY').value,m=+document.
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Charges<span class="aux mono" style="color:var(--dn)">${f$(tCh)} €</span></div>
 <div class="card-b">
-${cm.ch.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>').join('')}
+${cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+c.l+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto · Garde ›</span></span><span class="mono" style="font-weight:600;width:92px;text-align:right">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>').join('')}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nc-l" placeholder="Nouvelle charge"><input class="inp sm mono" id="nc-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nc-l').value.trim();if(!l)return;gOBM(bY,bM).ch.push({l,v:+document.getElementById('nc-v').value||0});save();rBudget()">+</button></div>
 </div></div>
 
@@ -754,6 +798,161 @@ const after=r.toLowerCase().startsWith('apr');const parts=r.replace(/[^0-9/]/g,'
 if(parts.length!==2)return;const pm2=+parts[0],py=+parts[1];if(!pm2||!py)return;const pivot=py*12+pm2;
 if(after)DB.im=DB.im.filter(d=>(d.y*12+d.m)<=pivot);else DB.im=DB.im.filter(d=>(d.y*12+d.m)>=pivot);
 save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest()}
+/* ================= GARDE À DOMICILE (nounou) ================= */
+// Paramètres sourcés : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt emploi à domicile 2026.
+function defGarde(){return{rate:12,hours:{},leave:{},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
+cpDays:25,cpHours:8,cpStartM:6,
+p:{txSal:21.88025,txPat:47.396,abatH:2,abatPart:90,cmgCotPct:50,cmgCotCap:524,capH:15.18,chr:10.50,effort:0.1032,rev:6000,revMin:635,revMax:8500,ciPct:50,ciCap:15000}}}
+function ensureGarde(){const d=defGarde();if(!DB.garde)DB.garde=d;const g=DB.garde;
+Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});if(!g.hours)g.hours={};if(!g.leave)g.leave={};if(!g.p)g.p={};Object.keys(d.p).forEach(k=>{if(g.p[k]==null)g.p[k]=d.p[k]})}
+const gKey=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+function todayKey(){const n=new Date();return gKey(n.getFullYear(),n.getMonth()+1,n.getDate())}
+function gHours(y,m){const g=DB.garde;const pre=y+'-'+String(m).padStart(2,'0')+'-';let h=0,days=0,cp=0;
+Object.keys(g.hours||{}).forEach(k=>{if(k.startsWith(pre)){const v=+g.hours[k]||0;if(v>0){h+=v;days++}}});
+Object.keys(g.leave||{}).forEach(k=>{if(k.startsWith(pre)&&g.leave[k])cp+=+g.leave[k]||0});
+const cpH=cp*(g.cpHours||0);return{h:Math.round(h*100)/100,days,cp,cpH,paid:Math.round((h+cpH)*100)/100}}
+function gardeCost(y,m){const g=DB.garde,p=g.p;const st=gHours(y,m);const h=st.paid;
+const net=h*g.rate;const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
+const abat=Math.min(p.abatH*(p.abatPart/100)*h,cotPat);const cotTot=cotSal+cotPat-abat;
+const cmgCot=Math.min(cotTot*p.cmgCotPct/100,p.cmgCotCap);const cotRest=cotTot-cmgCot;
+const coutRet=Math.min(g.rate,p.capH)*h;const rev=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
+const fact=rev*(p.effort/100)/p.chr;const cmgRem=Math.max(0,coutRet*(1-fact));
+const cash=net+cotRest-cmgRem;const ci=Math.min(Math.max(0,cash),p.ciCap/12)*p.ciPct/100;const real=cash-ci;
+const budget=g.budgetMode==='cash'?cash:net;
+return{h:st.h,days:st.days,cp:st.cp,cpH:st.cpH,paid:h,net,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest,cmgRem,fact,cash,ci,real,budget}}
+// Période de référence des congés contenant (y,m) : du 1er cpStartM au dernier jour du mois précédent l'année suivante
+function cpPeriod(y,m){const g=DB.garde;const s=g.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
+function cpTaken(y,m){const g=DB.garde;const pr=cpPeriod(y,m);let n=0;const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
+Object.keys(g.leave||{}).forEach(k=>{if(!g.leave[k])return;const [yy,mm]=k.split('-').map(Number);const idx=yy*12+mm;if(idx>=lo&&idx<=hi)n+=+g.leave[k]||0});return{n,pr}}
+function gardeSrc(y,m){let r={y,m};for(let i=0;i<(DB.garde.lag||0);i++)r=pM(r.y,r.m);return r}
+function migrateGarde(){const g=DB.garde;if(g.crecheMigrated)return;let ch=false;
+DB.bm.filter(b=>(b.y*12+b.m)>=2026*12+9).forEach(b=>{if(!b.ch.some(c=>/cr[eè]che/i.test(c.l))){b.ch.push({l:'Micro-crèche Zayn',v:1350});ch=true}});
+g.crecheMigrated=true;if(ch)save()}
+function syncMonth(bm){if(!bm||!DB.garde)return;const g=DB.garde;let ch=false;const idx=bm.y*12+bm.m;
+const i=bm.ch.findIndex(x=>x.auto==='garde');
+if(g.budgetLine&&idx>=g.startY*12+g.startM){const s=gardeSrc(bm.y,bm.m);const c=gardeCost(s.y,s.m);const v=Math.round(c.budget);
+const lbl='Nounou · '+(g.budgetMode==='cash'?'décaissé':'net')+' '+MS[s.m]+(c.paid?'':' (0 h)');
+if(i<0){bm.ch.push({l:lbl,v,auto:'garde'});ch=true}else if(bm.ch[i].l!==lbl||bm.ch[i].v!==v){bm.ch[i].l=lbl;bm.ch[i].v=v;ch=true}}
+else if(i>=0){bm.ch.splice(i,1);ch=true}
+if(ch)save()}
+
+let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false;
+function rGarde(){
+const el=document.getElementById('pg-garde');const n=new Date();
+if(!gY){gY=n.getFullYear();gM=n.getMonth()+1}
+const g=DB.garde;const st=gHours(gY,gM);const c=gardeCost(gY,gM);const cp=cpTaken(gY,gM);const cpLeft=Math.max(0,(g.cpDays||0)-cp.n);
+const first=new Date(gY,gM-1,1);const off=(first.getDay()+6)%7;const nd=new Date(gY,gM,0).getDate();
+const tk=todayKey();const nx=nM(gY,gM);
+let cells='';for(let i=0;i<off;i++)cells+='<div class="cal-cell blank"></div>';
+for(let d=1;d<=nd;d++){const k=gKey(gY,gM,d);const v=g.hours[k];const lv=g.leave[k];const dow=(off+d-1)%7;const isFut=k>tk;
+cells+='<div class="cal-cell'+(v?' has':'')+(lv?' cp':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(isFut?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+(lv?'<span class="hb" style="color:var(--up)">CP</span>':v?'<span class="hb">'+f$(v)+'h</span>':'')+'</div>'}
+let panel='';
+if(GSEL){const [sy,sm,sd]=GSEL.split('-').map(Number);const dt=new Date(sy,sm-1,sd);const cur=g.hours[GSEL]||'';const isCp=!!g.leave[GSEL];
+panel=`<div class="cal-panel">
+<div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}${isCp?' <span class="chip tag-up">Congé payé</span>':''}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
+<div class="row" style="margin-top:10px"><input class="inp mono" id="g-h" type="number" step="0.5" inputmode="decimal" placeholder="Heures travaillées" value="${cur}" style="flex:1;font-size:20px;text-align:center"><button class="btn btn-gold" onclick="gSet(+document.getElementById('g-h').value)">OK</button></div>
+<div class="chips">${[4,5,6,7,8,9,10].map(h=>'<button onclick="gSet('+h+')">'+h+'h</button>').join('')}<button style="color:var(--up);border-color:rgba(63,207,142,.4)" onclick="gSetCP(${isCp?0:1})">${isCp?'Retirer le congé':'Congé payé'}</button>${(cur||isCp)?'<button style="color:var(--dn)" onclick="gClear()">Effacer</button>':''}</div>
+</div>`}
+const budgetSrc=[];sBM().forEach(b=>{const s=gardeSrc(b.y,b.m);if(s.y===gY&&s.m===gM&&g.budgetLine&&(b.y*12+b.m)>=g.startY*12+g.startM)budgetSrc.push(MS[b.m]+' '+b.y)});
+const p=g.p;const revUsed=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
+const cpLbl=MS[cp.pr.fm]+' '+cp.pr.fy+' → '+MS[cp.pr.tm]+' '+cp.pr.ty;
+
+el.innerHTML=`
+<div class="pagetitle">Garde à domicile</div>
+<div class="mnav">
+<button class="arrbtn" onclick="var r=pM(gY,gM);gY=r.y;gM=r.m;GSEL=null;rGarde()">◀</button>
+<div class="mt"><b>${ML[gM]} ${gY}</b><div>${st.days} jour${st.days>1?'s':''} travaillé${st.days>1?'s':''}${st.cp?' · '+st.cp+' CP':''}</div></div>
+<button class="arrbtn" onclick="var r=nM(gY,gM);gY=r.y;gM=r.m;GSEL=null;rGarde()">▶</button>
+</div>
+
+<div class="statrow">
+<div class="stat"><div class="sl">Heures</div><div class="sv mono" style="color:var(--gold)">${f$(st.h)} h</div><div class="sf">${st.days?f$(Math.round(st.h/st.days*10)/10)+' h/jour':'—'}</div></div>
+<div class="stat"><div class="sl">Net à verser</div><div class="sv mono">${f$(Math.round(c.net))} €</div><div class="sf">${f$(st.paid)} h payées × ${f$(g.rate)} €</div></div>
+<div class="stat"><div class="sl">Congés restants</div><div class="sv mono" style="color:${cpLeft>5?'var(--up)':'var(--dn)'}">${f$(cpLeft)} j</div><div class="sf">${f$(cp.n)} / ${g.cpDays} pris</div></div>
+</div>
+
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Heures par jour<span class="aux" style="font-size:10.5px;color:var(--td)">toucher un jour</span></div>
+<div class="card-b">
+<div class="cal-dow"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+<div class="cal-grid">${cells}</div>
+${panel}
+</div></div>
+
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Déclaration Pajemploi · ${ML[gM]}</div>
+<div class="card-b">
+<div class="cost-line"><span>Heures travaillées</span><b style="color:var(--gold);font-size:18px">${f$(st.h)} h</b></div>
+<div class="cost-line"><span>Jours de congés payés<small>${st.cp?st.cp+' × '+f$(g.cpHours)+' h payées':'aucun ce mois'}</small></span><b>${st.cp?st.cp+' j':'—'}</b></div>
+<div class="cost-line tot"><span>Net à verser à la nounou<small>${f$(st.paid)} h payées × ${f$(g.rate)} € net</small></span><b style="color:var(--gold);font-size:18px">${f$(Math.round(c.net*100)/100)} €</b></div>
+<div style="font-size:11.5px;color:var(--td);margin-top:8px">À saisir sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} — on déclare le <b>net</b>. Pajemploi prélève ensuite les cotisations restantes, la CAF verse le CMG le mois suivant, le crédit d'impôt arrive en N+1.</div>
+</div></div>
+
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Congés payés<span class="aux mono">${f$(cp.n)} / ${g.cpDays} j</span></div>
+<div class="card-b">
+<div class="gauge-track"><div class="gauge-fill ok" style="width:${g.cpDays?Math.min(100,Math.round(cp.n/g.cpDays*100)):0}%"></div></div>
+<div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)"><span>Période ${cpLbl}</span><span class="mono" style="color:${cpLeft>5?'var(--up)':'var(--dn)'}">${f$(cpLeft)} j restants</span></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:5px">Un jour marqué « Congé payé » dans le calendrier compte ${f$(g.cpHours)} h payées (modifiable dans les paramètres).</div>
+</div></div>
+
+<div class="card"><div class="card-h" style="cursor:pointer" onclick="GCOST=!GCOST;rGarde()"><span class="dot" style="background:var(--violet)"></span>Coût réel après aides<span class="aux" style="color:var(--td)">${f$(Math.round(c.real))} € · ${GCOST?'▾':'▸'}</span></div>
+${GCOST?`<div class="card-b">
+<div class="cost-line"><span>Salaire net</span><b>${f$(Math.round(c.net))} €</b></div>
+<div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(c.brut))} €</b></div>
+<div class="cost-line"><span>Cotisations sal. + patronales<small>${f$(Math.round(c.cotSal))} + ${f$(Math.round(c.cotPat))} − abattement ${f$(Math.round(c.abat))}</small></span><b style="color:var(--tm)">${f$(Math.round(c.cotTot))} €</b></div>
+<div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} %, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(c.cmgCot))} €</b></div>
+<div class="cost-line"><span>Cotisations prélevées par Pajemploi<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(c.cotRest))} €</b></div>
+<div class="cost-line"><span>CMG rémunération (CAF)<small>${Math.round((1-c.fact)*100)} % du net retenu · revenus ${f$(revUsed)} €/mois</small></span><b style="color:var(--up)">− ${f$(Math.round(c.cmgRem))} €</b></div>
+<div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(c.cash))} €</b></div>
+<div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(c.ci))} €</b></div>
+<div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(c.real))} €</b></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">${budgetSrc.length?'Ce mois alimente la ligne « Nounou » ('+(g.budgetMode==='cash'?'décaissé estimé':'net versé')+') du budget de '+budgetSrc.join(', ')+'.':'Aucun mois budget ne se source encore sur '+ML[gM]+'.'}</div>
+</div>`:''}
+</div>
+
+<div class="card"><div class="card-h" style="cursor:pointer" onclick="GPRM=!GPRM;rGarde()"><span class="dot" style="background:var(--cyan)"></span>Paramètres<span class="aux" style="color:var(--td)">${GPRM?'▾':'▸'}</span></div>
+${GPRM?`<div class="card-b">
+<div class="prm"><label>Taux horaire net<small>€/h versés à la nounou</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rate}" onchange="DB.garde.rate=+this.value||0;gSave()"></div>
+<div class="prm"><label>Congés payés par an<small>jours</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
+<div class="prm"><label>Heures payées par jour de congé</label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
+<div class="prm"><label>Début de la période de congés<small>convention : 1er juin</small></label><select class="inp sm" onchange="DB.garde.cpStartM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.cpStartM?' selected':'')+'>1er '+ML[m].toLowerCase()+'</option>').join('')}</select></div>
+<div class="eyebrow" style="margin:12px 0 4px">Ligne Budget</div>
+<div class="prm"><label>Ligne automatique « Nounou »</label><select class="inp sm" onchange="DB.garde.budgetLine=this.value==='1';gSave()"><option value="1"${g.budgetLine?' selected':''}>Oui</option><option value="0"${!g.budgetLine?' selected':''}>Non</option></select></div>
+<div class="prm"><label>Montant utilisé<small>net = ce que vous virez · décaissé = net + cotisations − CMG</small></label><select class="inp sm" onchange="DB.garde.budgetMode=this.value;gSave()"><option value="net"${g.budgetMode!=='cash'?' selected':''}>Net versé</option><option value="cash"${g.budgetMode==='cash'?' selected':''}>Décaissé estimé</option></select></div>
+<div class="prm"><label>Premier mois concerné</label><div class="row" style="gap:4px"><select class="inp sm" style="padding-right:22px" onchange="DB.garde.startM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.startM?' selected':'')+'>'+MS[m]+'</option>').join('')}</select><select class="inp sm" style="padding-right:22px" onchange="DB.garde.startY=+this.value;gSave()">${YRS.map(y=>'<option'+(y===g.startY?' selected':'')+'>'+y+'</option>').join('')}</select></div></div>
+<div class="prm"><label>Décalage<small>1 = heures du mois précédent</small></label><select class="inp sm" onchange="DB.garde.lag=+this.value;gSave()"><option value="0"${g.lag===0?' selected':''}>0 mois</option><option value="1"${g.lag===1?' selected':''}>1 mois</option><option value="2"${g.lag===2?' selected':''}>2 mois</option></select></div>
+<div class="eyebrow" style="margin:12px 0 4px">Cotisations (Pajemploi 01/2026)</div>
+<div class="prm"><label>Cotisations salariales<small>% du brut</small></label><input class="inp sm mono" type="number" step="0.001" inputmode="decimal" value="${p.txSal}" onchange="DB.garde.p.txSal=+this.value||0;gSave()"></div>
+<div class="prm"><label>Cotisations patronales<small>% du brut</small></label><input class="inp sm mono" type="number" step="0.001" inputmode="decimal" value="${p.txPat}" onchange="DB.garde.p.txPat=+this.value||0;gSave()"></div>
+<div class="prm"><label>Abattement patronal<small>€ par heure</small></label><input class="inp sm mono" type="number" step="0.1" inputmode="decimal" value="${p.abatH}" onchange="DB.garde.p.abatH=+this.value||0;gSave()"></div>
+<div class="prm"><label>Part des heures éligibles<small>%</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.abatPart}" onchange="DB.garde.p.abatPart=+this.value||0;gSave()"></div>
+<div class="eyebrow" style="margin:12px 0 4px">CMG (barème 04/2026)</div>
+<div class="prm"><label>CMG cotisations<small>% pris en charge</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotPct}" onchange="DB.garde.p.cmgCotPct=+this.value||0;gSave()"></div>
+<div class="prm"><label>Plafond CMG cotisations<small>524 € (&lt;3 ans) · 263 € (3-6 ans)</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotCap}" onchange="DB.garde.p.cmgCotCap=+this.value||0;gSave()"></div>
+<div class="prm"><label>Plafond horaire retenu<small>€/h net</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.capH}" onchange="DB.garde.p.capH=+this.value||0;gSave()"></div>
+<div class="prm"><label>Coût horaire de référence<small>€ · garde à domicile</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.chr}" onchange="DB.garde.p.chr=+this.value||0;gSave()"></div>
+<div class="prm"><label>Taux d'effort<small>% · 2 enfants = 0,1032 · 3 = 0,0826</small></label><input class="inp sm mono" type="number" step="0.0001" inputmode="decimal" value="${p.effort}" onchange="DB.garde.p.effort=+this.value||0;gSave()"></div>
+<div class="prm"><label>Revenus du foyer N-2<small>€/mois · net imposable 2024 ÷ 12 — <b style="color:var(--gold)">hypothèse à remplacer</b></small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.rev}" onchange="DB.garde.p.rev=+this.value||0;gSave()"></div>
+<div class="prm"><label>Plancher / plafond de revenus<small>€/mois</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.revMin}" onchange="DB.garde.p.revMin=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.revMax}" onchange="DB.garde.p.revMax=+this.value||0;gSave()"></div></div>
+<div class="eyebrow" style="margin:12px 0 4px">Crédit d'impôt</div>
+<div class="prm"><label>Taux<small>% des dépenses après CMG</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciPct}" onchange="DB.garde.p.ciPct=+this.value||0;gSave()"></div>
+<div class="prm"><label>Plafond de dépenses<small>€/an · 12 000 + 1 500/enfant, max 15 000</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciCap}" onchange="DB.garde.p.ciCap=+this.value||0;gSave()"></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:10px">Ajustez au premier bulletin Pajemploi et au premier versement CAF.</div>
+</div>`:''}
+</div>
+
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Historique</div>
+<div class="card-b" style="overflow-x:auto"><table><thead><tr><th>Mois</th><th>Heures</th><th>CP</th><th>Net</th><th>Réel</th></tr></thead><tbody>
+${(()=>{const ms=new Set();Object.keys(g.hours).forEach(k=>{if(g.hours[k]>0)ms.add(k.slice(0,7))});Object.keys(g.leave).forEach(k=>{if(g.leave[k])ms.add(k.slice(0,7))});const arr=[...ms].sort().reverse().slice(0,8);
+return arr.length?arr.map(k=>{const [yy,mm]=k.split('-').map(Number);const cc=gardeCost(yy,mm);return'<tr><td style="font-weight:600">'+MS[mm]+' '+yy+'</td><td class="mono">'+f$(cc.h)+' h</td><td class="mono">'+(cc.cp||'—')+'</td><td class="mono" style="color:var(--gold)">'+f$(Math.round(cc.net))+' €</td><td class="mono" style="color:var(--blue)">'+f$(Math.round(cc.real))+' €</td></tr>'}).join(''):'<tr><td colspan="5" class="empty">Aucune heure saisie pour l\u2019instant</td></tr>'})()}
+</tbody></table></div></div>`;
+const gi=document.getElementById('g-h');if(gi)setTimeout(()=>gi.focus(),80)}
+function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
+function gSet(h){if(!GSEL)return;h=Math.round((+h||0)*100)/100;if(h>0){DB.garde.hours[GSEL]=h;delete DB.garde.leave[GSEL]}else delete DB.garde.hours[GSEL];
+save();gResync();GSEL=null;rGarde()}
+function gSetCP(v){if(!GSEL)return;if(v){DB.garde.leave[GSEL]=1;delete DB.garde.hours[GSEL]}else delete DB.garde.leave[GSEL];save();gResync();GSEL=null;rGarde()}
+function gClear(){if(!GSEL)return;delete DB.garde.hours[GSEL];delete DB.garde.leave[GSEL];save();gResync();GSEL=null;rGarde()}
+function gSave(){save();gResync();rGarde()}
+function gResync(){DB.bm.forEach(b=>syncMonth(b))}
+
 /* ================= PLUS (hub) ================= */
 function rMore(){
 const el=document.getElementById('pg-more');
@@ -866,7 +1065,10 @@ const reg=[
 {id:'livretNet',name:'Livret A net (€)',data:allB.map(d=>d.lv-(d.lr||[]).reduce((s,r)=>s+r.v,0)),src:'Budget'},
 {id:'patri',name:'Patrimoine (k€)',data:allB.map(d=>calcPatri(d,gIM(d.y,d.m))/1000),src:'Calculé'},
 {id:'gain',name:'Gain/Perte patrimoine (k€)',data:allB.map((d,i)=>{if(i===0)return 0;const p=allB[i-1];return(calcPatri(d,gIM(d.y,d.m))-calcPatri(p,gIM(p.y,p.m)))/1000}),src:'Calculé'},
-{id:'deltaC',name:'Δ Compte (k€)',data:allB.map((d,i)=>i>0?d.sav-allB[i-1].sav:0),src:'Calculé'}];
+{id:'deltaC',name:'Δ Compte (k€)',data:allB.map((d,i)=>i>0?d.sav-allB[i-1].sav:0),src:'Calculé'},
+{id:'gardeH',name:'Nounou · heures (h)',data:allB.map(d=>gHours(d.y,d.m).h),src:'Garde'},
+{id:'gardeNet',name:'Nounou · net versé (€)',data:allB.map(d=>Math.round(gardeCost(d.y,d.m).net)),src:'Garde'},
+{id:'gardeReal',name:'Nounou · coût réel après aides (€)',data:allB.map(d=>Math.round(gardeCost(d.y,d.m).real)),src:'Garde'}];
 const supNames=[...new Set(allI.flatMap(m=>m.supports.map(s=>s.n)))];
 supNames.forEach(n=>reg.push({id:'sup_'+n.replace(/\s/g,'_'),name:n+' (€)',data:allB.map(d=>{const im2=gIM(d.y,d.m);if(!im2)return 0;const s=im2.supports.find(x=>x.n===n);return s?s.v:0}),src:'Invest'}));
 return{labels,series:reg}}
