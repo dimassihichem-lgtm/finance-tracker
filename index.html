@@ -217,6 +217,8 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .prm label small{display:block;font-size:10px;color:var(--td)}
 .nbtn{font-size:10px}
 .cal-cell.cp{background:var(--upDim);border-color:rgba(63,207,142,.45)}
+.cal-cell.absd{background:var(--dnDim);border-color:rgba(240,113,111,.45)}
+.cal-cell.hol .dn::after{content:'✦';font-size:7px;color:var(--blue);margin-left:2px;vertical-align:top}
 .cal-cell.cp .dn{color:var(--tx)}
 @media(min-width:640px){.hero .hv{font-size:44px}}
 </style>
@@ -451,7 +453,7 @@ el.innerHTML=`
     <div class="row rb">
       <div><div class="eyebrow">Nounou · ${ML[cm2]}</div>
         <div style="font-size:15px;font-weight:600;margin-top:2px"><span class="mono" style="color:var(--gold)">${f$(gh.h)} h</span> <span style="color:var(--td);font-weight:500;font-size:13px">· ${gh.days} jour${gh.days>1?'s':''}${gh.cp?' · '+gh.cp+' CP':''} · ${f$(Math.round(gcost.net))} € net</span></div></div>
-      <span class="chip ${DB.garde.hours[todayKey()]?'tag-up':'tag-gold'}">${DB.garde.hours[todayKey()]?'Aujourd\u2019hui ✓':'Saisir aujourd\u2019hui'}</span>
+      <span class="chip ${cpStatus(cy,cm2).alerts.some(a=>a.t==='warn')?'tag-dn':'tag-gold'}">${cpStatus(cy,cm2).alerts.some(a=>a.t==='warn')?'Congés à poser ⚠':'Planning ✓'}</span>
     </div>
   </div>
 </div>
@@ -799,31 +801,83 @@ if(parts.length!==2)return;const pm2=+parts[0],py=+parts[1];if(!pm2||!py)return;
 if(after)DB.im=DB.im.filter(d=>(d.y*12+d.m)<=pivot);else DB.im=DB.im.filter(d=>(d.y*12+d.m)>=pivot);
 save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest()}
 /* ================= GARDE À DOMICILE (nounou) ================= */
-// Paramètres sourcés : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt emploi à domicile 2026.
-function defGarde(){return{rate:12,hours:{},leave:{},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
-cpDays:25,cpHours:8,cpStartM:6,
+// Sources : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt 2026 ; CCN IDCC 3239 (HS > 40 h : +25 %/+50 % ; 1er mai +100 % ; férié ordinaire travaillé +10 % ; CP 2,5 j ouvrables/mois ; mensualisation 52/12).
+function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
+function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},
+plans:[{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0,8],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])}],
+contractStart:'2026-09',startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
+cpDays:25,cpHours:8,cpStartM:6,hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
 p:{txSal:21.88025,txPat:47.396,abatH:2,abatPart:90,cmgCotPct:50,cmgCotCap:524,capH:15.18,chr:10.50,effort:0.1032,rev:6000,revMin:635,revMax:8500,ciPct:50,ciCap:15000}}}
 function ensureGarde(){const d=defGarde();if(!DB.garde)DB.garde=d;const g=DB.garde;
-Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});if(!g.hours)g.hours={};if(!g.leave)g.leave={};if(!g.p)g.p={};Object.keys(d.p).forEach(k=>{if(g.p[k]==null)g.p[k]=d.p[k]})}
+Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});['hs','fer','p'].forEach(o=>{if(!g[o])g[o]={};Object.keys(d[o]).forEach(k=>{if(g[o][k]==null)g[o][k]=d[o][k]})});
+if(!Array.isArray(g.plans)||!g.plans.length)g.plans=d.plans;g.plans.forEach(pl=>{if(!pl.d)pl.d=defPlanDays()});
+Object.keys(g.hours).forEach(k=>{if(typeof g.hours[k]==='number')g.hours[k]={s:g.hours[k],p:0}})}
 const gKey=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 function todayKey(){const n=new Date();return gKey(n.getFullYear(),n.getMonth()+1,n.getDate())}
-function gHours(y,m){const g=DB.garde;const pre=y+'-'+String(m).padStart(2,'0')+'-';let h=0,days=0,cp=0;
-Object.keys(g.hours||{}).forEach(k=>{if(k.startsWith(pre)){const v=+g.hours[k]||0;if(v>0){h+=v;days++}}});
-Object.keys(g.leave||{}).forEach(k=>{if(k.startsWith(pre)&&g.leave[k])cp+=+g.leave[k]||0});
-const cpH=cp*(g.cpHours||0);return{h:Math.round(h*100)/100,days,cp,cpH,paid:Math.round((h+cpH)*100)/100}}
-function gardeCost(y,m){const g=DB.garde,p=g.p;const st=gHours(y,m);const h=st.paid;
-const net=h*g.rate;const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
+const kDate=k=>new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8,10));
+const dKey=d=>gKey(d.getFullYear(),d.getMonth()+1,d.getDate());
+const dowOf=k=>((kDate(k).getDay()+6)%7)+1; // 1=lundi … 7=dimanche
+const DOWN=['','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+// Jours fériés France métropolitaine
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+const HOL={};
+function holName(k){const y=+k.slice(0,4);if(!HOL[y]){const e=easter(y);const add=n=>{const r=new Date(e);r.setDate(r.getDate()+n);return r};const o={};
+[[new Date(y,0,1),'Jour de l\u2019an'],[add(1),'Lundi de Pâques'],[new Date(y,4,1),'1er mai'],[new Date(y,4,8),'8 mai'],[add(39),'Ascension'],[add(50),'Lundi de Pentecôte'],[new Date(y,6,14),'14 juillet'],[new Date(y,7,15),'15 août'],[new Date(y,10,1),'Toussaint'],[new Date(y,10,11),'11 novembre'],[new Date(y,11,25),'Noël']].forEach(x=>o[dKey(x[0])]=x[1]);HOL[y]=o}return HOL[y][k]||null}
+// Planning en vigueur à une date
+function planFor(k){const ps=(DB.garde.plans||[]).filter(p=>p.from<=k).sort((a,b)=>a.from<b.from?1:-1);return ps.length?ps[0]:null}
+function planDay(k){const p=planFor(k);if(!p)return{s:0,p:0};const d=p.d[dowOf(k)]||{};return{s:+d.s||0,p:+d.p||0}}
+function planWeekly(pl){let s=0,p=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};s+=+d.s||0;p+=+d.p||0}return{s,p}}
+function realDay(k){const v=DB.garde.hours[k];if(v==null)return null;if(typeof v==='number')return{s:v,p:0};return{s:+v.s||0,p:+v.p||0}}
+function dayInfo(k){const g=DB.garde;const prev=planDay(k);const real=realDay(k);const hol=holName(k);const mai1=k.slice(5)==='05-01';
+const cp=!!g.leave[k],abs=!!g.abs[k];let eff={s:0,p:0},status='off';
+if(cp)status='cp';else if(abs)status='abs';else if(real){eff=real;status=(eff.s+eff.p)>0?'work':'off'}else if(hol&&(prev.s+prev.p)>0){status='holoff'}else{eff=prev;status=(eff.s+eff.p)>0?'plan':'off'}
+return{prev,real,hol,mai1,cp,abs,eff,status}}
+const payOf=(e,g)=>e.s*g.rate+e.p*g.rateShared;
+// Calcul du mois
+function gardeMonth(y,m){const g=DB.garde;const nd=new Date(y,m,0).getDate();
+const plEnd=planFor(gKey(y,m,nd));const wk=plEnd?planWeekly(plEnd):{s:0,p:0};
+const baseHs=wk.s*52/12,baseHp=wk.p*52/12;const base=baseHs*g.rate+baseHp*g.rateShared;
+let hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,extraS=0,extraP=0,holMaj=0,holWorked=0,holOff=0;
+for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
+if(i.cp){cp++;continue}if(i.abs){abs++;absH+=i.prev.s+i.prev.p;absEur+=payOf(i.prev,g);continue}
+if(i.status==='holoff'){holOff++;continue}
+const t=i.eff.s+i.eff.p;if(t>0){days++;hS+=i.eff.s;hP+=i.eff.p}
+if(i.real){extraS+=Math.max(0,i.real.s-i.prev.s);extraP+=Math.max(0,i.real.p-i.prev.p)}
+if(i.hol&&t>0){holWorked++;holMaj+=payOf(i.eff,g)*(i.mai1?g.fer.majMai:g.fer.majOrd)/100}}
+// Heures supplémentaires par semaine (semaine rattachée au mois de son jeudi)
+let hsH=0,hsEur=0;const mon=new Date(y,m-1,1);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+for(let w=0;w<6;w++){const th=new Date(mon);th.setDate(mon.getDate()+3);if(th.getMonth()+1===m&&th.getFullYear()===y){let tot=0,pay=0;
+for(let j=0;j<7;j++){const dd=new Date(mon);dd.setDate(mon.getDate()+j);const i=dayInfo(dKey(dd));const t=i.eff.s+i.eff.p;if(['work','plan'].includes(i.status)&&t>0){tot+=t;pay+=payOf(i.eff,g)}}
+const hs=Math.max(0,tot-g.hs.seuil);if(hs>0){const rr=pay/tot;const h1=Math.min(hs,g.hs.h1),h2=hs-h1;hsH+=hs;hsEur+=(h1*g.hs.maj1/100+h2*g.hs.maj2/100)*rr}}
+mon.setDate(mon.getDate()+7)}
+const extraEur=extraS*g.rate+extraP*g.rateShared;
+let net,paidH;
+if(g.mode==='mensualise'){net=base+extraEur+holMaj+hsEur-absEur;paidH=baseHs+baseHp-absH+extraS+extraP}
+else{net=hS*g.rate+hP*g.rateShared+cp*g.cpHours*g.rate;paidH=hS+hP+cp*g.cpHours}
+return{base,baseHs,baseHp,wk,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,extraS,extraP,extraEur,holMaj,holWorked,holOff,hsH,hsEur,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
+function gardeCost(y,m){const g=DB.garde,p=g.p;const r=gardeMonth(y,m);const h=r.paidH;const net=r.net;
+const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
 const abat=Math.min(p.abatH*(p.abatPart/100)*h,cotPat);const cotTot=cotSal+cotPat-abat;
 const cmgCot=Math.min(cotTot*p.cmgCotPct/100,p.cmgCotCap);const cotRest=cotTot-cmgCot;
-const coutRet=Math.min(g.rate,p.capH)*h;const rev=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
+const rateAvg=h>0?net/h:g.rate;const coutRet=Math.min(rateAvg,p.capH)*h;const rev=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
 const fact=rev*(p.effort/100)/p.chr;const cmgRem=Math.max(0,coutRet*(1-fact));
 const cash=net+cotRest-cmgRem;const ci=Math.min(Math.max(0,cash),p.ciCap/12)*p.ciPct/100;const real=cash-ci;
-const budget=g.budgetMode==='cash'?cash:net;
-return{h:st.h,days:st.days,cp:st.cp,cpH:st.cpH,paid:h,net,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest,cmgRem,fact,cash,ci,real,budget}}
-// Période de référence des congés contenant (y,m) : du 1er cpStartM au dernier jour du mois précédent l'année suivante
-function cpPeriod(y,m){const g=DB.garde;const s=g.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
-function cpTaken(y,m){const g=DB.garde;const pr=cpPeriod(y,m);let n=0;const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
-Object.keys(g.leave||{}).forEach(k=>{if(!g.leave[k])return;const [yy,mm]=k.split('-').map(Number);const idx=yy*12+mm;if(idx>=lo&&idx<=hi)n+=+g.leave[k]||0});return{n,pr}}
+return Object.assign({},r,{paid:h,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest,cmgRem,fact,cash,ci,real,budget:g.budgetMode==='cash'?cash:net})}
+// Congés
+function cpPeriod(y,m){const s=DB.garde.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
+function cpStatus(y,m){const g=DB.garde;const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
+const cs=(g.contractStart||'2026-09').split('-').map(Number);const start=Math.max(lo,cs[0]*12+cs[1]);
+let taken=0,mainTaken=0;Object.keys(g.leave||{}).forEach(k=>{if(!g.leave[k])return;const idx=+k.slice(0,4)*12+ +k.slice(5,7);if(idx>=lo&&idx<=hi)taken++;
+const mm=+k.slice(5,7),yy=+k.slice(0,4);if(yy===y&&mm>=5&&mm<=10)mainTaken++});
+const presMonths=Math.max(0,Math.min(12,hi-start+1));const rights=Math.round(g.cpDays*presMonths/12*100)/100;
+const acqMonths=Math.max(0,(y*12+m-1)-start+1);const acquired=Math.min(rights,Math.round(acqMonths*g.cpDays/12*100)/100);
+const remainMonths=Math.max(1,hi-(y*12+m)+1);const toPose=Math.max(0,Math.round((rights-taken)*100)/100);
+const endLbl=MS[pr.tm]+' '+pr.ty;const alerts=[];
+if(toPose>0&&remainMonths<=3)alerts.push({t:'warn',m:'⚠ '+f$(toPose)+' j de congés à poser avant fin '+endLbl+' (≈ '+f$(Math.ceil(toPose/remainMonths))+' j/mois).'});
+if(m>=8&&m<=10&&mainTaken<10&&(cs[0]*12+cs[1])<=y*12+5)alerts.push({t:'warn',m:'⚠ Congé principal : au moins 2 semaines à poser entre mai et octobre — '+mainTaken+' j posés cette année.'});
+if(taken>acquired+0.01&&g.mode==='mensualise')alerts.push({t:'info',m:'ℹ '+f$(taken-acquired)+' j pris par anticipation (acquis : '+f$(acquired)+' j).'});
+return{pr,taken,acquired,rights,toPose,remainMonths,mainTaken,endLbl,alerts}}
 function gardeSrc(y,m){let r={y,m};for(let i=0;i<(DB.garde.lag||0);i++)r=pM(r.y,r.m);return r}
 function migrateGarde(){const g=DB.garde;if(g.crecheMigrated)return;let ch=false;
 DB.bm.filter(b=>(b.y*12+b.m)>=2026*12+9).forEach(b=>{if(!b.ch.some(c=>/cr[eè]che/i.test(c.l))){b.ch.push({l:'Micro-crèche Zayn',v:1350});ch=true}});
@@ -831,125 +885,163 @@ g.crecheMigrated=true;if(ch)save()}
 function syncMonth(bm){if(!bm||!DB.garde)return;const g=DB.garde;let ch=false;const idx=bm.y*12+bm.m;
 const i=bm.ch.findIndex(x=>x.auto==='garde');
 if(g.budgetLine&&idx>=g.startY*12+g.startM){const s=gardeSrc(bm.y,bm.m);const c=gardeCost(s.y,s.m);const v=Math.round(c.budget);
-const lbl='Nounou · '+(g.budgetMode==='cash'?'décaissé':'net')+' '+MS[s.m]+(c.paid?'':' (0 h)');
+const lbl='Nounou · '+(g.budgetMode==='cash'?'décaissé':'net')+' '+MS[s.m];
 if(i<0){bm.ch.push({l:lbl,v,auto:'garde'});ch=true}else if(bm.ch[i].l!==lbl||bm.ch[i].v!==v){bm.ch[i].l=lbl;bm.ch[i].v=v;ch=true}}
 else if(i>=0){bm.ch.splice(i,1);ch=true}
 if(ch)save()}
 
-let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false;
+/* ---- page Garde ---- */
+let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false,GPLAN=false,GPI=-1;
+const fh=h=>(Math.round(h*100)/100).toLocaleString('fr-FR');
+function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';
+if(i.status==='holoff')return'<span class="hb" style="color:var(--blue)">férié</span>';const e=i.eff;if(e.s+e.p<=0)return'';
+const txt=(e.s?fh(e.s):'')+(e.s&&e.p?'+':'')+(e.p?fh(e.p)+'p':'');return'<span class="hb"'+(i.status==='plan'?' style="color:var(--td);font-weight:500"':'')+'>'+txt+'</span>'}
 function rGarde(){
 const el=document.getElementById('pg-garde');const n=new Date();
 if(!gY){gY=n.getFullYear();gM=n.getMonth()+1}
-const g=DB.garde;const st=gHours(gY,gM);const c=gardeCost(gY,gM);const cp=cpTaken(gY,gM);const cpLeft=Math.max(0,(g.cpDays||0)-cp.n);
+const g=DB.garde;const r=gardeCost(gY,gM);const cs=cpStatus(gY,gM);
 const first=new Date(gY,gM-1,1);const off=(first.getDay()+6)%7;const nd=new Date(gY,gM,0).getDate();
-const tk=todayKey();const nx=nM(gY,gM);
+const tk=todayKey();const nx=nM(gY,gM);const mens=g.mode==='mensualise';
 let cells='';for(let i=0;i<off;i++)cells+='<div class="cal-cell blank"></div>';
-for(let d=1;d<=nd;d++){const k=gKey(gY,gM,d);const v=g.hours[k];const lv=g.leave[k];const dow=(off+d-1)%7;const isFut=k>tk;
-cells+='<div class="cal-cell'+(v?' has':'')+(lv?' cp':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(isFut?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+(lv?'<span class="hb" style="color:var(--up)">CP</span>':v?'<span class="hb">'+f$(v)+'h</span>':'')+'</div>'}
+for(let d=1;d<=nd;d++){const k=gKey(gY,gM,d);const i=dayInfo(k);const dow=(off+d-1)%7;
+cells+='<div class="cal-cell'+(i.status==='work'?' has':'')+(i.status==='cp'?' cp':'')+(i.status==='abs'?' absd':'')+(i.hol?' hol':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(k>tk?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+cellBadge(i)+'</div>'}
 let panel='';
-if(GSEL){const [sy,sm,sd]=GSEL.split('-').map(Number);const dt=new Date(sy,sm-1,sd);const cur=g.hours[GSEL]||'';const isCp=!!g.leave[GSEL];
+if(GSEL){const i=dayInfo(GSEL);const dt=kDate(GSEL);const cur=i.real||i.prev;
 panel=`<div class="cal-panel">
-<div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}${isCp?' <span class="chip tag-up">Congé payé</span>':''}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
-<div class="row" style="margin-top:10px"><input class="inp mono" id="g-h" type="number" step="0.5" inputmode="decimal" placeholder="Heures travaillées" value="${cur}" style="flex:1;font-size:20px;text-align:center"><button class="btn btn-gold" onclick="gSet(+document.getElementById('g-h').value)">OK</button></div>
-<div class="chips">${[4,5,6,7,8,9,10].map(h=>'<button onclick="gSet('+h+')">'+h+'h</button>').join('')}<button style="color:var(--up);border-color:rgba(63,207,142,.4)" onclick="gSetCP(${isCp?0:1})">${isCp?'Retirer le congé':'Congé payé'}</button>${(cur||isCp)?'<button style="color:var(--dn)" onclick="gClear()">Effacer</button>':''}</div>
+<div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
+<div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
+<div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(g.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
+<div><div class="lbl">Partagé (h) · ${f$(g.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
+<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value)">Enregistrer</button>
+<button class="btn btn-ghost sm" onclick="gMark('leave')">${i.cp?'Retirer le CP':'Congé payé'}</button><button class="btn btn-ghost sm" onclick="gMark('abs')">${i.abs?'Retirer l\u2019absence':'Absence'}</button>
+${(i.real||i.cp||i.abs)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
 </div>`}
 const budgetSrc=[];sBM().forEach(b=>{const s=gardeSrc(b.y,b.m);if(s.y===gY&&s.m===gM&&g.budgetLine&&(b.y*12+b.m)>=g.startY*12+g.startM)budgetSrc.push(MS[b.m]+' '+b.y)});
 const p=g.p;const revUsed=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
-const cpLbl=MS[cp.pr.fm]+' '+cp.pr.fy+' → '+MS[cp.pr.tm]+' '+cp.pr.ty;
+// Planning
+const plans=[...g.plans].sort((a,b)=>a.from<b.from?-1:1);if(GPI<0||GPI>=plans.length)GPI=plans.length-1;const pl=plans[GPI];const plIdx=g.plans.indexOf(pl);const wk=planWeekly(pl);
+const baseNet=(wk.s*g.rate+wk.p*g.rateShared)*52/12;
 
 el.innerHTML=`
 <div class="pagetitle">Garde à domicile</div>
 <div class="mnav">
 <button class="arrbtn" onclick="var r=pM(gY,gM);gY=r.y;gM=r.m;GSEL=null;rGarde()">◀</button>
-<div class="mt"><b>${ML[gM]} ${gY}</b><div>${st.days} jour${st.days>1?'s':''} travaillé${st.days>1?'s':''}${st.cp?' · '+st.cp+' CP':''}</div></div>
+<div class="mt"><b>${ML[gM]} ${gY}</b><div>${r.days} jour${r.days>1?'s':''} travaillé${r.days>1?'s':''}${r.cp?' · '+r.cp+' CP':''}${r.holOff?' · '+r.holOff+' férié'+(r.holOff>1?'s':''):''}</div></div>
 <button class="arrbtn" onclick="var r=nM(gY,gM);gY=r.y;gM=r.m;GSEL=null;rGarde()">▶</button>
 </div>
-
+${cs.alerts.map(a=>'<div class="card" style="border-color:'+(a.t==='warn'?'rgba(240,113,111,.5)':'var(--line2)')+'"><div class="card-b" style="font-size:13px;padding:11px 14px;color:'+(a.t==='warn'?'var(--dn)':'var(--tm)')+'">'+a.m+'</div></div>').join('')}
 <div class="statrow">
-<div class="stat"><div class="sl">Heures</div><div class="sv mono" style="color:var(--gold)">${f$(st.h)} h</div><div class="sf">${st.days?f$(Math.round(st.h/st.days*10)/10)+' h/jour':'—'}</div></div>
-<div class="stat"><div class="sl">Net à verser</div><div class="sv mono">${f$(Math.round(c.net))} €</div><div class="sf">${f$(st.paid)} h payées × ${f$(g.rate)} €</div></div>
-<div class="stat"><div class="sl">Congés restants</div><div class="sv mono" style="color:${cpLeft>5?'var(--up)':'var(--dn)'}">${f$(cpLeft)} j</div><div class="sf">${f$(cp.n)} / ${g.cpDays} pris</div></div>
+<div class="stat"><div class="sl">Heures</div><div class="sv mono" style="color:var(--gold)">${fh(r.h)} h</div><div class="sf">${fh(r.hS)} solo · ${fh(r.hP)} partagé</div></div>
+<div class="stat"><div class="sl">Net à verser</div><div class="sv mono">${f$(Math.round(r.net))} €</div><div class="sf">${mens?'mensualisé':'au réel'}${r.extraEur+r.hsEur+r.holMaj>0?' +'+f$(Math.round(r.extraEur+r.hsEur+r.holMaj))+' €':''}</div></div>
+<div class="stat"><div class="sl">Congés à poser</div><div class="sv mono" style="color:${cs.toPose>0&&cs.remainMonths<=3?'var(--dn)':'var(--up)'}">${f$(cs.toPose)} j</div><div class="sf">${f$(cs.taken)} pris / ${f$(cs.rights)} droits</div></div>
 </div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Heures par jour<span class="aux" style="font-size:10.5px;color:var(--td)">toucher un jour</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Calendrier<span class="aux" style="font-size:10.5px;color:var(--td)">gris = planning · or = saisi · p = partagé</span></div>
 <div class="card-b">
 <div class="cal-dow"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
 <div class="cal-grid">${cells}</div>
 ${panel}
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Déclaration Pajemploi · ${ML[gM]}</div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
-<div class="cost-line"><span>Heures travaillées</span><b style="color:var(--gold);font-size:18px">${f$(st.h)} h</b></div>
-<div class="cost-line"><span>Jours de congés payés<small>${st.cp?st.cp+' × '+f$(g.cpHours)+' h payées':'aucun ce mois'}</small></span><b>${st.cp?st.cp+' j':'—'}</b></div>
-<div class="cost-line tot"><span>Net à verser à la nounou<small>${f$(st.paid)} h payées × ${f$(g.rate)} € net</small></span><b style="color:var(--gold);font-size:18px">${f$(Math.round(c.net*100)/100)} €</b></div>
-<div style="font-size:11.5px;color:var(--td);margin-top:8px">À saisir sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} — on déclare le <b>net</b>. Pajemploi prélève ensuite les cotisations restantes, la CAF verse le CMG le mois suivant, le crédit d'impôt arrive en N+1.</div>
+${mens?`<div class="cost-line"><span>Salaire mensualisé<small>${fh(r.wk.s)} h solo + ${fh(r.wk.p)} h partagé / semaine × 52 ÷ 12 = ${fh(r.baseHs+r.baseHp)} h</small></span><b>${f$(Math.round(r.base))} €</b></div>
+${r.extraS+r.extraP>0?'<div class="cost-line"><span>Heures complémentaires<small>'+fh(r.extraS)+' h solo · '+fh(r.extraP)+' h partagé, au taux normal</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.extraEur))+' €</b></div>':''}
+${r.hsH>0?'<div class="cost-line"><span>Heures supplémentaires<small>'+fh(r.hsH)+' h au-delà de '+g.hs.seuil+' h/semaine : majoration '+g.hs.maj1+' % / '+g.hs.maj2+' %</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.hsEur))+' €</b></div>':''}
+${r.holWorked>0?'<div class="cost-line"><span>Jours fériés travaillés<small>'+r.holWorked+' jour'+(r.holWorked>1?'s':'')+' · majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.holMaj))+' €</b></div>':''}
+${r.abs>0?'<div class="cost-line"><span>Absences non rémunérées<small>'+r.abs+' jour'+(r.abs>1?'s':'')+' · '+fh(r.absH)+' h</small></span><b style="color:var(--dn)">− '+f$(Math.round(r.absEur))+' €</b></div>':''}
+${r.holOff>0?'<div class="cost-line"><span>Fériés chômés<small>'+r.holOff+' · salaire maintenu, inclus dans la mensualisation</small></span><b style="color:var(--td)">0 €</b></div>':''}
+${r.cp>0?'<div class="cost-line"><span>Congés payés posés<small>'+r.cp+' j · inclus dans la mensualisation (année complète)</small></span><b style="color:var(--td)">0 €</b></div>':''}`
+:`<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(g.rate)} €</small></span><b>${f$(Math.round(r.hS*g.rate))} €</b></div>
+<div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(g.rateShared)} €</small></span><b>${f$(Math.round(r.hP*g.rateShared))} €</b></div>
+<div class="cost-line"><span>Congés payés<small>${r.cp} j × ${fh(g.cpHours)} h</small></span><b>${f$(Math.round(r.cp*g.cpHours*g.rate))} €</b></div>`}
+<div class="cost-line tot"><span>Net à verser<small>${fh(r.paidH)} h à déclarer</small></span><b style="color:var(--gold);font-size:18px">${f$(Math.round(r.net*100)/100)} €</b></div>
+<div style="font-size:11.5px;color:var(--td);margin-top:8px">Sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} : heures normales ${fh(mens?r.baseHs+r.baseHp-r.absH:r.hS+r.hP)} h${r.extraS+r.extraP>0?', complémentaires '+fh(r.extraS+r.extraP)+' h':''}${r.hsH>0?', supplémentaires '+fh(r.hsH)+' h':''}, salaire <b>net</b>. ${mens?'Année complète : ne pas remplir la case « congés payés ».':''}</div>
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Congés payés<span class="aux mono">${f$(cp.n)} / ${g.cpDays} j</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Congés payés<span class="aux mono">${f$(cs.taken)} / ${f$(cs.rights)} j</span></div>
 <div class="card-b">
-<div class="gauge-track"><div class="gauge-fill ok" style="width:${g.cpDays?Math.min(100,Math.round(cp.n/g.cpDays*100)):0}%"></div></div>
-<div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)"><span>Période ${cpLbl}</span><span class="mono" style="color:${cpLeft>5?'var(--up)':'var(--dn)'}">${f$(cpLeft)} j restants</span></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:5px">Un jour marqué « Congé payé » dans le calendrier compte ${f$(g.cpHours)} h payées (modifiable dans les paramètres).</div>
+<div class="gauge-track"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.taken/cs.rights*100)):0}%"></div></div>
+<div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)"><span>${MS[cs.pr.fm]} ${cs.pr.fy} → ${cs.endLbl}</span><span class="mono">acquis ${f$(cs.acquired)} j</span></div>
+<div style="font-size:12px;color:var(--tm);margin-top:6px">À poser d'ici fin ${cs.endLbl} : <b class="mono" style="color:${cs.toPose>0?'var(--gold)':'var(--up)'}">${f$(cs.toPose)} j</b> sur ${cs.remainMonths} mois${cs.toPose>0?' — soit ≈ '+f$(Math.ceil(cs.toPose/cs.remainMonths))+' j/mois':''}. Congé principal mai–oct : ${cs.mainTaken} j posés.</div>
+<div style="font-size:10.5px;color:var(--td);margin-top:5px">Acquisition ${fh(g.cpDays/12)} j/mois (${g.cpDays} j ouvrés/an) depuis ${g.contractStart}. Marquez un jour « Congé payé » dans le calendrier.</div>
 </div></div>
 
-<div class="card"><div class="card-h" style="cursor:pointer" onclick="GCOST=!GCOST;rGarde()"><span class="dot" style="background:var(--violet)"></span>Coût réel après aides<span class="aux" style="color:var(--td)">${f$(Math.round(c.real))} € · ${GCOST?'▾':'▸'}</span></div>
+<div class="card"><div class="card-h" style="cursor:pointer" onclick="GPLAN=!GPLAN;rGarde()"><span class="dot" style="background:var(--violet)"></span>Planning type<span class="aux" style="color:var(--td)">${fh(wk.s)} h solo · ${fh(wk.p)} h partagé / sem. · ${GPLAN?'▾':'▸'}</span></div>
+${GPLAN?`<div class="card-b">
+<div class="row" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"><select class="inp sm" style="width:auto" onchange="GPI=+this.value;rGarde()">${plans.map((x,i)=>'<option value="'+i+'"'+(i===GPI?' selected':'')+'>Depuis le '+kDate(x.from).toLocaleDateString('fr-FR')+'</option>').join('')}</select>
+<input class="inp sm" type="date" value="${pl.from}" style="width:auto" onchange="DB.garde.plans[${plIdx}].from=this.value;gSave()">
+<button class="btn btn-ghost xs" onclick="gPlanNew(${plIdx})">+ Nouveau à partir du…</button>${plans.length>1?'<button class="btn btn-danger xs" onclick="if(confirm(\'Supprimer ce planning ?\')){DB.garde.plans.splice('+plIdx+',1);GPI=-1;gSave()}">Suppr.</button>':''}</div>
+<div class="dl-head"><span style="flex:1">Jour</span><span style="width:84px;text-align:center">Solo h</span><span style="width:84px;text-align:center">Partagé h</span></div>
+${[1,2,3,4,5,6,7].map(i=>{const d=pl.d[i]||{s:0,p:0};return'<div class="dline"><span style="flex:1;font-size:13.5px">'+DOWN[i]+'</span><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" style="width:84px;text-align:center" value="'+(d.s||'')+'" placeholder="0" onchange="DB.garde.plans['+plIdx+'].d['+i+'].s=+this.value||0;gSave()"><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" style="width:84px;text-align:center" value="'+(d.p||'')+'" placeholder="0" onchange="DB.garde.plans['+plIdx+'].d['+i+'].p=+this.value||0;gSave()"></div>'}).join('')}
+<div class="hr"></div>
+<div class="cost-line tot"><span>Salaire mensualisé net<small>(${fh(wk.s)} × ${f$(g.rate)} + ${fh(wk.p)} × ${f$(g.rateShared)}) × 52 ÷ 12 · ${fh((wk.s+wk.p)*52/12)} h/mois</small></span><b style="color:var(--gold)">${f$(Math.round(baseNet))} €</b></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:6px">Chaque planning s'applique à partir de sa date d'effet. Pour un changement d'horaires : « Nouveau à partir du… », puis ajustez — un avenant au contrat est nécessaire.</div>
+</div>`:''}
+</div>
+
+<div class="card"><div class="card-h" style="cursor:pointer" onclick="GCOST=!GCOST;rGarde()"><span class="dot" style="background:var(--pink)"></span>Coût réel après aides<span class="aux" style="color:var(--td)">${f$(Math.round(r.real))} € · ${GCOST?'▾':'▸'}</span></div>
 ${GCOST?`<div class="card-b">
-<div class="cost-line"><span>Salaire net</span><b>${f$(Math.round(c.net))} €</b></div>
-<div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(c.brut))} €</b></div>
-<div class="cost-line"><span>Cotisations sal. + patronales<small>${f$(Math.round(c.cotSal))} + ${f$(Math.round(c.cotPat))} − abattement ${f$(Math.round(c.abat))}</small></span><b style="color:var(--tm)">${f$(Math.round(c.cotTot))} €</b></div>
-<div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} %, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(c.cmgCot))} €</b></div>
-<div class="cost-line"><span>Cotisations prélevées par Pajemploi<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(c.cotRest))} €</b></div>
-<div class="cost-line"><span>CMG rémunération (CAF)<small>${Math.round((1-c.fact)*100)} % du net retenu · revenus ${f$(revUsed)} €/mois</small></span><b style="color:var(--up)">− ${f$(Math.round(c.cmgRem))} €</b></div>
-<div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(c.cash))} €</b></div>
-<div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(c.ci))} €</b></div>
-<div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(c.real))} €</b></div>
+<div class="cost-line"><span>Salaire net</span><b>${f$(Math.round(r.net))} €</b></div>
+<div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(r.brut))} €</b></div>
+<div class="cost-line"><span>Cotisations sal. + patronales<small>${f$(Math.round(r.cotSal))} + ${f$(Math.round(r.cotPat))} − abattement ${f$(Math.round(r.abat))}</small></span><b style="color:var(--tm)">${f$(Math.round(r.cotTot))} €</b></div>
+<div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} %, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgCot))} €</b></div>
+<div class="cost-line"><span>Cotisations prélevées par Pajemploi<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
+<div class="cost-line"><span>CMG rémunération (CAF)<small>${Math.round((1-r.fact)*100)} % du net retenu · revenus ${f$(revUsed)} €/mois</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
+<div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(r.cash))} €</b></div>
+<div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(r.ci))} €</b></div>
+<div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(r.real))} €</b></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:8px">${budgetSrc.length?'Ce mois alimente la ligne « Nounou » ('+(g.budgetMode==='cash'?'décaissé estimé':'net versé')+') du budget de '+budgetSrc.join(', ')+'.':'Aucun mois budget ne se source encore sur '+ML[gM]+'.'}</div>
 </div>`:''}
 </div>
 
 <div class="card"><div class="card-h" style="cursor:pointer" onclick="GPRM=!GPRM;rGarde()"><span class="dot" style="background:var(--cyan)"></span>Paramètres<span class="aux" style="color:var(--td)">${GPRM?'▾':'▸'}</span></div>
 ${GPRM?`<div class="card-b">
-<div class="prm"><label>Taux horaire net<small>€/h versés à la nounou</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rate}" onchange="DB.garde.rate=+this.value||0;gSave()"></div>
-<div class="prm"><label>Congés payés par an<small>jours</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
-<div class="prm"><label>Heures payées par jour de congé</label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
-<div class="prm"><label>Début de la période de congés<small>convention : 1er juin</small></label><select class="inp sm" onchange="DB.garde.cpStartM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.cpStartM?' selected':'')+'>1er '+ML[m].toLowerCase()+'</option>').join('')}</select></div>
+<div class="prm"><label>Taux net solo<small>€/h</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rate}" onchange="DB.garde.rate=+this.value||0;gSave()"></div>
+<div class="prm"><label>Taux net garde partagée<small>€/h · votre part</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rateShared}" onchange="DB.garde.rateShared=+this.value||0;gSave()"></div>
+<div class="prm"><label>Mode de paie<small>mensualisé = planning × 52/12 + écarts</small></label><select class="inp sm" onchange="DB.garde.mode=this.value;gSave()"><option value="mensualise"${mens?' selected':''}>Mensualisé</option><option value="reel"${!mens?' selected':''}>Au réel</option></select></div>
+<div class="prm"><label>Début du contrat<small>AAAA-MM · acquisition des congés</small></label><input class="inp sm mono" value="${g.contractStart}" onchange="DB.garde.contractStart=this.value;gSave()"></div>
+<div class="eyebrow" style="margin:12px 0 4px">Congés & fériés (CCN 3239)</div>
+<div class="prm"><label>Congés payés par an<small>jours ouvrés</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
+<div class="prm"><label>Début de la période de référence<small>convention : 1er juin</small></label><select class="inp sm" onchange="DB.garde.cpStartM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.cpStartM?' selected':'')+'>1er '+ML[m].toLowerCase()+'</option>').join('')}</select></div>
+<div class="prm"><label>Heures payées par jour de CP<small>mode « au réel » seulement</small></label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
+<div class="prm"><label>Seuil heures sup<small>h / semaine</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.seuil}" onchange="DB.garde.hs.seuil=+this.value||0;gSave()"></div>
+<div class="prm"><label>Majoration HS<small>% sur les ${g.hs.h1} premières h · % au-delà</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj1}" onchange="DB.garde.hs.maj1=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj2}" onchange="DB.garde.hs.maj2=+this.value||0;gSave()"></div></div>
+<div class="prm"><label>Majoration férié travaillé<small>% ordinaire · % 1er mai</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.fer.majOrd}" onchange="DB.garde.fer.majOrd=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.fer.majMai}" onchange="DB.garde.fer.majMai=+this.value||0;gSave()"></div></div>
 <div class="eyebrow" style="margin:12px 0 4px">Ligne Budget</div>
 <div class="prm"><label>Ligne automatique « Nounou »</label><select class="inp sm" onchange="DB.garde.budgetLine=this.value==='1';gSave()"><option value="1"${g.budgetLine?' selected':''}>Oui</option><option value="0"${!g.budgetLine?' selected':''}>Non</option></select></div>
 <div class="prm"><label>Montant utilisé<small>net = ce que vous virez · décaissé = net + cotisations − CMG</small></label><select class="inp sm" onchange="DB.garde.budgetMode=this.value;gSave()"><option value="net"${g.budgetMode!=='cash'?' selected':''}>Net versé</option><option value="cash"${g.budgetMode==='cash'?' selected':''}>Décaissé estimé</option></select></div>
 <div class="prm"><label>Premier mois concerné</label><div class="row" style="gap:4px"><select class="inp sm" style="padding-right:22px" onchange="DB.garde.startM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.startM?' selected':'')+'>'+MS[m]+'</option>').join('')}</select><select class="inp sm" style="padding-right:22px" onchange="DB.garde.startY=+this.value;gSave()">${YRS.map(y=>'<option'+(y===g.startY?' selected':'')+'>'+y+'</option>').join('')}</select></div></div>
-<div class="prm"><label>Décalage<small>1 = heures du mois précédent</small></label><select class="inp sm" onchange="DB.garde.lag=+this.value;gSave()"><option value="0"${g.lag===0?' selected':''}>0 mois</option><option value="1"${g.lag===1?' selected':''}>1 mois</option><option value="2"${g.lag===2?' selected':''}>2 mois</option></select></div>
+<div class="prm"><label>Décalage<small>1 = salaire du mois précédent</small></label><select class="inp sm" onchange="DB.garde.lag=+this.value;gSave()"><option value="0"${g.lag===0?' selected':''}>0 mois</option><option value="1"${g.lag===1?' selected':''}>1 mois</option><option value="2"${g.lag===2?' selected':''}>2 mois</option></select></div>
 <div class="eyebrow" style="margin:12px 0 4px">Cotisations (Pajemploi 01/2026)</div>
 <div class="prm"><label>Cotisations salariales<small>% du brut</small></label><input class="inp sm mono" type="number" step="0.001" inputmode="decimal" value="${p.txSal}" onchange="DB.garde.p.txSal=+this.value||0;gSave()"></div>
 <div class="prm"><label>Cotisations patronales<small>% du brut</small></label><input class="inp sm mono" type="number" step="0.001" inputmode="decimal" value="${p.txPat}" onchange="DB.garde.p.txPat=+this.value||0;gSave()"></div>
-<div class="prm"><label>Abattement patronal<small>€ par heure</small></label><input class="inp sm mono" type="number" step="0.1" inputmode="decimal" value="${p.abatH}" onchange="DB.garde.p.abatH=+this.value||0;gSave()"></div>
-<div class="prm"><label>Part des heures éligibles<small>%</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.abatPart}" onchange="DB.garde.p.abatPart=+this.value||0;gSave()"></div>
+<div class="prm"><label>Abattement patronal<small>€/h · sur % des heures</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" step="0.1" inputmode="decimal" value="${p.abatH}" onchange="DB.garde.p.abatH=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.abatPart}" onchange="DB.garde.p.abatPart=+this.value||0;gSave()"></div></div>
 <div class="eyebrow" style="margin:12px 0 4px">CMG (barème 04/2026)</div>
-<div class="prm"><label>CMG cotisations<small>% pris en charge</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotPct}" onchange="DB.garde.p.cmgCotPct=+this.value||0;gSave()"></div>
-<div class="prm"><label>Plafond CMG cotisations<small>524 € (&lt;3 ans) · 263 € (3-6 ans)</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotCap}" onchange="DB.garde.p.cmgCotCap=+this.value||0;gSave()"></div>
-<div class="prm"><label>Plafond horaire retenu<small>€/h net</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.capH}" onchange="DB.garde.p.capH=+this.value||0;gSave()"></div>
-<div class="prm"><label>Coût horaire de référence<small>€ · garde à domicile</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.chr}" onchange="DB.garde.p.chr=+this.value||0;gSave()"></div>
-<div class="prm"><label>Taux d'effort<small>% · 2 enfants = 0,1032 · 3 = 0,0826</small></label><input class="inp sm mono" type="number" step="0.0001" inputmode="decimal" value="${p.effort}" onchange="DB.garde.p.effort=+this.value||0;gSave()"></div>
+<div class="prm"><label>CMG cotisations<small>% · plafond €</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotPct}" onchange="DB.garde.p.cmgCotPct=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.cmgCotCap}" onchange="DB.garde.p.cmgCotCap=+this.value||0;gSave()"></div></div>
+<div class="prm"><label>Plafond horaire · coût de référence<small>€/h</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.capH}" onchange="DB.garde.p.capH=+this.value||0;gSave()"><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${p.chr}" onchange="DB.garde.p.chr=+this.value||0;gSave()"></div></div>
+<div class="prm"><label>Taux d'effort<small>% · 2 enfants = 0,1032</small></label><input class="inp sm mono" type="number" step="0.0001" inputmode="decimal" value="${p.effort}" onchange="DB.garde.p.effort=+this.value||0;gSave()"></div>
 <div class="prm"><label>Revenus du foyer N-2<small>€/mois · net imposable 2024 ÷ 12 — <b style="color:var(--gold)">hypothèse à remplacer</b></small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.rev}" onchange="DB.garde.p.rev=+this.value||0;gSave()"></div>
 <div class="prm"><label>Plancher / plafond de revenus<small>€/mois</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.revMin}" onchange="DB.garde.p.revMin=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.revMax}" onchange="DB.garde.p.revMax=+this.value||0;gSave()"></div></div>
 <div class="eyebrow" style="margin:12px 0 4px">Crédit d'impôt</div>
-<div class="prm"><label>Taux<small>% des dépenses après CMG</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciPct}" onchange="DB.garde.p.ciPct=+this.value||0;gSave()"></div>
-<div class="prm"><label>Plafond de dépenses<small>€/an · 12 000 + 1 500/enfant, max 15 000</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciCap}" onchange="DB.garde.p.ciCap=+this.value||0;gSave()"></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:10px">Ajustez au premier bulletin Pajemploi et au premier versement CAF.</div>
+<div class="prm"><label>Taux · plafond de dépenses<small>% · €/an (12 000 + 1 500/enfant, max 15 000)</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciPct}" onchange="DB.garde.p.ciPct=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${p.ciCap}" onchange="DB.garde.p.ciCap=+this.value||0;gSave()"></div></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:10px">Le contrat de travail et le bulletin Pajemploi font foi. Ajustez au premier bulletin et au premier versement CAF.</div>
 </div>`:''}
 </div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Historique</div>
 <div class="card-b" style="overflow-x:auto"><table><thead><tr><th>Mois</th><th>Heures</th><th>CP</th><th>Net</th><th>Réel</th></tr></thead><tbody>
-${(()=>{const ms=new Set();Object.keys(g.hours).forEach(k=>{if(g.hours[k]>0)ms.add(k.slice(0,7))});Object.keys(g.leave).forEach(k=>{if(g.leave[k])ms.add(k.slice(0,7))});const arr=[...ms].sort().reverse().slice(0,8);
-return arr.length?arr.map(k=>{const [yy,mm]=k.split('-').map(Number);const cc=gardeCost(yy,mm);return'<tr><td style="font-weight:600">'+MS[mm]+' '+yy+'</td><td class="mono">'+f$(cc.h)+' h</td><td class="mono">'+(cc.cp||'—')+'</td><td class="mono" style="color:var(--gold)">'+f$(Math.round(cc.net))+' €</td><td class="mono" style="color:var(--blue)">'+f$(Math.round(cc.real))+' €</td></tr>'}).join(''):'<tr><td colspan="5" class="empty">Aucune heure saisie pour l\u2019instant</td></tr>'})()}
+${(()=>{const ms=new Set();[g.hours,g.leave,g.abs].forEach(o=>Object.keys(o||{}).forEach(k=>{if(o[k])ms.add(k.slice(0,7))}));const cur=gY+'-'+String(gM).padStart(2,'0');ms.add(cur);const arr=[...ms].sort().reverse().slice(0,8);
+return arr.map(k=>{const [yy,mm]=k.split('-').map(Number);const cc=gardeCost(yy,mm);return'<tr><td style="font-weight:600">'+MS[mm]+' '+yy+'</td><td class="mono">'+fh(cc.h)+' h</td><td class="mono">'+(cc.cp||'—')+'</td><td class="mono" style="color:var(--gold)">'+f$(Math.round(cc.net))+' €</td><td class="mono" style="color:var(--blue)">'+f$(Math.round(cc.real))+' €</td></tr>'}).join('')})()}
 </tbody></table></div></div>`;
-const gi=document.getElementById('g-h');if(gi)setTimeout(()=>gi.focus(),80)}
+const gi=document.getElementById('g-s');if(gi)setTimeout(()=>gi.focus(),80)}
 function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
-function gSet(h){if(!GSEL)return;h=Math.round((+h||0)*100)/100;if(h>0){DB.garde.hours[GSEL]=h;delete DB.garde.leave[GSEL]}else delete DB.garde.hours[GSEL];
-save();gResync();GSEL=null;rGarde()}
-function gSetCP(v){if(!GSEL)return;if(v){DB.garde.leave[GSEL]=1;delete DB.garde.hours[GSEL]}else delete DB.garde.leave[GSEL];save();gResync();GSEL=null;rGarde()}
-function gClear(){if(!GSEL)return;delete DB.garde.hours[GSEL];delete DB.garde.leave[GSEL];save();gResync();GSEL=null;rGarde()}
+function gSet(s,p){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;DB.garde.hours[GSEL]={s,p};delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];save();gResync();GSEL=null;rGarde()}
+function gMark(t){if(!GSEL)return;const g=DB.garde;const o=t==='leave'?g.leave:g.abs;const other=t==='leave'?g.abs:g.leave;
+if(o[GSEL])delete o[GSEL];else{o[GSEL]=1;delete other[GSEL];delete g.hours[GSEL]}save();gResync();GSEL=null;rGarde()}
+function gClear(){if(!GSEL)return;delete DB.garde.hours[GSEL];delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];save();gResync();GSEL=null;rGarde()}
+function gPlanNew(i){const src=DB.garde.plans[i];const from=prompt('Date d\u2019effet du nouveau planning (AAAA-MM-JJ) :',todayKey());if(!from||!/^\d{4}-\d{2}-\d{2}$/.test(from))return;
+DB.garde.plans.push({from,d:JSON.parse(JSON.stringify(src.d))});GPI=-1;gSave()}
 function gSave(){save();gResync();rGarde()}
 function gResync(){DB.bm.forEach(b=>syncMonth(b))}
 
