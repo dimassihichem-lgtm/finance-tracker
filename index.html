@@ -805,8 +805,8 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
 function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},
 plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
-contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'partage',share:50,manual:0,ref:{}},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
-cpDays:25,cpHours:8,cpStartM:6,hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
+contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'partage',share:50,manual:0,ref:{},requireJustif:true},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
+cpDays:25,cpHours:8,cpStartM:6,cpMode:'ouvres',cmgReal:{},hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
 p:{txSal:21.88025,txPat:47.396,abatH:2,abatPart:90,cmgCotPct:50,cmgCotCap:524,capH:15.18,chr:10.50,effort:0.1032,rev:6000,revMin:635,revMax:8500,ciPct:50,ciCap:15000}}}
 function ensureGarde(){const d=defGarde();if(!DB.garde)DB.garde=d;const g=DB.garde;
 Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});['hs','fer','p'].forEach(o=>{if(!g[o])g[o]={};Object.keys(d[o]).forEach(k=>{if(g[o][k]==null)g[o][k]=d[o][k]})});
@@ -815,7 +815,7 @@ const oldDef=JSON.stringify([{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0]
 if(JSON.stringify(g.plans)===oldDef)g.plans=d.plans;
 Object.keys(g.hours).forEach(k=>{if(typeof g.hours[k]==='number')g.hours[k]={s:g.hours[k],p:0}});
 if(!g.contractFrom)g.contractFrom=(g.contractStart||'2026-09')+'-01';delete g.contractStart;
-if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={}}
+if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={};if(!g.cmgReal)g.cmgReal={};if(!g.cpMode)g.cpMode='ouvres'}
 const gKey=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 function todayKey(){const n=new Date();return gKey(n.getFullYear(),n.getMonth()+1,n.getDate())}
 const kDate=k=>new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8,10));
@@ -880,7 +880,8 @@ if(n.mode==='manual'){amt=+n.manual||0;base='montant fixé manuellement'}
 else if(n.mode==='partage'){amt=(+n.price||0)*((+n.share||0)/100);base='garde partagée · prise en charge intégrale, votre quote-part '+(+n.share||0)+' %'}
 else{const pr=Math.min(1,wkH/17.5);amt=(+n.price||0)*0.5*pr;base='50 % × '+fh(wkH)+' h / 17,5 h'}
 if(r.partial){const nd=new Date(y,m,0).getDate();const d1=r.from?+r.from.slice(8,10):1;const d2=r.to?+r.to.slice(8,10):nd;amt=amt*Math.max(0,(d2-d1+1))/nd;base+=' · prorata du mois'}
-return{amt:Math.round(amt*100)/100,justif:!!(n.ref&&n.ref[k]),base}}
+amt=Math.round(amt*100)/100;const justif=!!(n.ref&&n.ref[k]);const due=justif||!n.requireJustif;
+return{amt:due?amt:0,pending:due?0:amt,justif,req:!!n.requireJustif,base}}
 function gardeCost(y,m){const g=DB.garde,p=g.p;const r=gardeMonth(y,m);const h=r.paidH;const net=r.net;const nv=navFor(y,m);
 const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
 const abat=Math.min(p.abatH*(p.abatPart/100)*h,cotPat);const cotTot=cotSal+cotPat-abat;
@@ -888,16 +889,28 @@ const cmgCot=Math.min(cotTot*p.cmgCotPct/100,p.cmgCotCap);const cotRest=cotTot-c
 const rateAvg=h>0?net/h:g.rate;const coutRet=Math.min(rateAvg,p.capH)*h;const rev=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
 const fact=rev*(p.effort/100)/p.chr;const cmgRem=Math.max(0,coutRet*(1-fact));
 const toPay=net+nv.amt;
-const cash=net+cotRest-cmgRem+nv.amt;const ci=Math.min(Math.max(0,cash),p.ciCap/12)*p.ciPct/100;const real=cash-ci;
-return Object.assign({},r,{paid:h,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest,cmgRem,fact,nav:nv,toPay,cash,ci,real,budget:g.budgetMode==='cash'?cash:toPay})}
+const kM=y+'-'+String(m).padStart(2,'0');const ov=(g.cmgReal||{})[kM]||{};
+const cotRestF=ov.cot!=null&&ov.cot!==''?+ov.cot:cotRest;const cmgRemF=ov.rem!=null&&ov.rem!==''?+ov.rem:cmgRem;
+const cash=net+cotRestF-cmgRemF+nv.amt;const ci=Math.min(Math.max(0,cash),p.ciCap/12)*p.ciPct/100;const real=cash-ci;
+return Object.assign({},r,{paid:h,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest:cotRestF,cmgRem:cmgRemF,cotRestEst:cotRest,cmgRemEst:cmgRem,ovCot:ov.cot!=null&&ov.cot!=='',ovRem:ov.rem!=null&&ov.rem!=='',fact,nav:nv,toPay,cash,ci,real,budget:g.budgetMode==='cash'?cash:toPay})}
 // Congés
+function cpDecompte(keys){const g=DB.garde;if(g.cpMode==='marked')return keys.length;
+const byWeek={};keys.forEach(k=>{const d=kDate(k);const mo=new Date(d);mo.setDate(d.getDate()-((d.getDay()+6)%7));(byWeek[dKey(mo)]=byWeek[dKey(mo)]||[]).push(d)});
+let n=0;Object.keys(byWeek).forEach(w=>{const ds=byWeek[w].sort((a,b)=>a-b);const a=ds[0],b=ds[ds.length-1];
+for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(((d.getDay()+6)%7)<5)n++}});return n}
+function cpKeys(lo,hi){const g=DB.garde;return Object.keys(g.leave||{}).filter(k=>{if(!g.leave[k])return false;const i=+k.slice(0,4)*12+ +k.slice(5,7);return i>=lo&&i<=hi})}
 function cpPeriod(y,m){const s=DB.garde.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
 function cpStatus(y,m){const g=DB.garde;const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
 const cf=(g.contractFrom||'2026-09-01').split('-').map(Number);const cs=[cf[0],cf[1]];const start=Math.max(lo,cf[0]*12+cf[1]);
-let taken=0,mainTaken=0;Object.keys(g.leave||{}).forEach(k=>{if(!g.leave[k])return;const idx=+k.slice(0,4)*12+ +k.slice(5,7);if(idx>=lo&&idx<=hi)taken++;
-const mm=+k.slice(5,7),yy=+k.slice(0,4);if(yy===y&&mm>=5&&mm<=10)mainTaken++});
-const presMonths=Math.max(0,Math.min(12,hi-start+1));const rights=Math.round(g.cpDays*presMonths/12*100)/100;
-const acqMonths=Math.max(0,(y*12+m-1)-start+1);const acquired=Math.min(rights,Math.round(acqMonths*g.cpDays/12*100)/100);
+const taken=cpDecompte(cpKeys(lo,hi));
+const mainTaken=cpDecompte(cpKeys(y*12+5,y*12+10));
+const MS_=1000*3600*24*30.4375;
+const pStart=new Date(pr.fy,pr.fm-1,1),pEnd=new Date(pr.ty,pr.tm,0);
+const cfD=new Date(g.contractFrom||pStart);const ctD=g.contractTo?new Date(g.contractTo):null;
+const effStart=cfD>pStart?cfD:pStart;const effEnd=(ctD&&ctD<pEnd)?ctD:pEnd;
+const rights=Math.max(0,Math.min(g.cpDays,Math.round((effEnd-effStart)/MS_*g.cpDays/12*100)/100));
+const asOf=new Date(y,m,0);const effAs=(ctD&&ctD<asOf)?ctD:asOf;
+const acquired=Math.max(0,Math.min(rights,Math.round(Math.max(0,effAs-effStart)/MS_*g.cpDays/12*100)/100));
 const ctS=g.contractTo?(+g.contractTo.slice(0,4)*12+ +g.contractTo.slice(5,7)):null;
 const endIdx=ctS?Math.min(hi,ctS):hi;
 const remainMonths=Math.max(1,endIdx-(y*12+m)+1);const toPose=Math.max(0,Math.round((rights-taken)*100)/100);
@@ -909,14 +922,15 @@ return{pr,taken,acquired,rights,toPose,remainMonths,mainTaken,endLbl,alerts}}
 function soldeTout(){const g=DB.garde;if(!g.contractTo||!g.contractFrom)return null;
 const fy=+g.contractFrom.slice(0,4),fm=+g.contractFrom.slice(5,7);
 const ty=+g.contractTo.slice(0,4),tm=+g.contractTo.slice(5,7);
-let totalNet=0,taken=0,months=[];
-for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx-yy*12;const r=gardeMonth(yy,mm);totalNet+=r.net;taken+=r.cp;months.push({y:yy,m:mm,net:r.net,cp:r.cp})}
+let totalNet=0,months=[];
+for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx-yy*12;const r=gardeMonth(yy,mm);totalNet+=r.net;months.push({y:yy,m:mm,net:r.net,cp:r.cp})}
+const taken=cpDecompte(cpKeys(fy*12+fm,ty*12+tm));
 const d1=new Date(fy,fm-1,+g.contractFrom.slice(8,10)),d2=new Date(ty,tm-1,+g.contractTo.slice(8,10));
 const moWorked=Math.max(0,(d2-d1)/(1000*3600*24*30.44));
 const acquired=Math.round(moWorked*g.cpDays/12*100)/100;
 const remain=Math.max(0,Math.round((acquired-taken)*100)/100);
 const wkNet=g.plans.length?(()=>{const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];const w=planWeekly(pl);return w.s*g.rate+w.p*g.rateShared})():0;
-const maintien=remain/5*wkNet;const dixieme=totalNet*0.10;
+const maintien=remain/(g.cpMode==='marked'?Math.max(1,(()=>{const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];let n=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};if((+d.s||0)+(+d.p||0)>0)n++}return n})()):5)*wkNet;const dixieme=totalNet*0.10;
 const indem=Math.max(maintien,dixieme);
 const lastM=gardeCost(ty,tm);
 return{months,totalNet,taken,acquired,remain,moWorked,wkNet,maintien,dixieme,indem,method:maintien>=dixieme?'maintien de salaire':'règle du dixième',lastM,total:lastM.toPay+indem}}
@@ -1003,7 +1017,8 @@ ${r.cp>0?'<div class="cost-line"><span>Congés payés posés<small>'+r.cp+' j ·
 <div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(g.rateShared)} €</small></span><b>${f$(Math.round(r.hP*g.rateShared))} €</b></div>
 <div class="cost-line"><span>Congés payés<small>${r.cp} j × ${fh(g.cpHours)} h</small></span><b>${f$(Math.round(r.cp*g.cpHours*g.rate))} €</b></div>`}
 <div class="cost-line"><span>Salaire net<small>${fh(r.paidH)} h à déclarer</small></span><b>${f$(Math.round(r.net*100)/100)} €</b></div>
-${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span class="chip tag-dn" style="font-size:9px">justificatif manquant</span>'}<small>${r.nav.base}</small></span><b style="color:${r.nav.justif?'var(--cyan)':'var(--td)'}">+ ${f$(r.nav.amt)} €</b></div>
+${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span class="chip tag-dn" style="font-size:9px">justificatif manquant</span>'}<small>${r.nav.base}${r.nav.pending?' · non versé tant que le justificatif manque'
+:''}</small></span><b style="color:${r.nav.justif?'var(--cyan)':'var(--td)'}">${r.nav.pending?'('+f$(r.nav.pending)+' € en attente)':'+ '+f$(r.nav.amt)+' €'}</b></div>
 <div class="row rb" style="padding:4px 0 8px"><label style="font-size:11.5px;color:var(--tm);display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" ${r.nav.justif?'checked':''} onchange="navRef('${gY}-${String(gM).padStart(2,'0')}',this.checked)" style="width:17px;height:17px;accent-color:var(--gold)">Justificatif d'abonnement reçu</label></div>`:''}
 <div class="cost-line tot"><span>Total à verser<small>salaire${g.nav.on?' + transport':''} · virement du mois</small></span><b style="color:var(--gold);font-size:19px">${f$(Math.round(r.toPay*100)/100)} €</b></div>
 <div style="font-size:11.5px;color:var(--td);margin-top:8px">Sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} : ${r.partial?'période d\u2019emploi du <b>'+kDate(r.from).toLocaleDateString('fr-FR')+' au '+nd+'/'+String(gM).padStart(2,'0')+'/'+gY+'</b> (dates réelles, pas le mois civil), heures '+fh(r.hS+r.hP)+' h':'heures normales '+fh(mens?r.baseHs+r.baseHp-r.absH:r.hS+r.hP)+' h'+(r.extraS+r.extraP>0?', complémentaires '+fh(r.extraS+r.extraP)+' h':'')+(r.hsH>0?', supplémentaires '+fh(r.hsH)+' h':'')}, salaire <b>net</b>${g.nav.on&&r.nav.amt>0?', frais de transport '+f$(r.nav.amt)+' € en « indemnités complémentaires »':''}. ${mens&&!r.partial?'Année complète : ne pas remplir la case « congés payés ».':''}</div>
@@ -1014,7 +1029,7 @@ ${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span clas
 <div class="gauge-track"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.taken/cs.rights*100)):0}%"></div></div>
 <div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)"><span>${MS[cs.pr.fm]} ${cs.pr.fy} → ${cs.endLbl}</span><span class="mono">acquis ${f$(cs.acquired)} j</span></div>
 <div style="font-size:12px;color:var(--tm);margin-top:6px">À poser d'ici fin ${cs.endLbl} : <b class="mono" style="color:${cs.toPose>0?'var(--gold)':'var(--up)'}">${f$(cs.toPose)} j</b> sur ${cs.remainMonths} mois${cs.toPose>0?' — soit ≈ '+f$(Math.ceil(cs.toPose/cs.remainMonths))+' j/mois':''}. Congé principal mai–oct : ${cs.mainTaken} j posés.</div>
-<div style="font-size:10.5px;color:var(--td);margin-top:5px">Acquisition ${fh(g.cpDays/12)} j/mois (${g.cpDays} j ouvrés/an) depuis le ${kDate(g.contractFrom).toLocaleDateString('fr-FR')}. Marquez un jour « Congé payé » dans le calendrier.</div>
+<div style="font-size:10.5px;color:var(--td);margin-top:5px">Droits proratisés : ${f$(cs.rights)} j sur cette période (${g.cpDays} j/an au prorata de la présence depuis le ${kDate(g.contractFrom).toLocaleDateString('fr-FR')}). Décompte ${g.cpMode==='ouvres'?'en jours ouvrés (règle légale : toute la semaine est décomptée, y compris les jours non travaillés)':'des seuls jours marqués'}. Marquez un jour « Congé payé » dans le calendrier.</div>
 </div></div>
 
 ${(()=>{const st=soldeTout();if(!st)return'';
@@ -1047,8 +1062,14 @@ ${GCOST?`<div class="card-b">
 <div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(r.brut))} €</b></div>
 <div class="cost-line"><span>Cotisations sal. + patronales<small>${f$(Math.round(r.cotSal))} + ${f$(Math.round(r.cotPat))} − abattement ${f$(Math.round(r.abat))}</small></span><b style="color:var(--tm)">${f$(Math.round(r.cotTot))} €</b></div>
 <div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} %, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgCot))} €</b></div>
-<div class="cost-line"><span>Cotisations prélevées par Pajemploi<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
-<div class="cost-line"><span>CMG rémunération (CAF)<small>${Math.round((1-r.fact)*100)} % du net retenu · revenus ${f$(revUsed)} €/mois</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
+<div class="cost-line"><span>Cotisations prélevées par Pajemploi ${r.ovCot?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
+<div class="cost-line"><span>CMG rémunération (CAF) ${r.ovRem?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>${r.ovRem?'montant saisi':Math.round((1-r.fact)*100)+' % du net retenu · revenus '+f$(revUsed)+' €/mois'}</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
+<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:11px;margin:12px 0">
+<div class="eyebrow" style="margin-bottom:7px">Montants réellement constatés · ${MS[gM]} ${gY}</div>
+<div class="prm"><label>Cotisations prélevées par Pajemploi<small>estimation : ${f$(Math.round(r.cotRestEst))} €${r.ovCot?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cotRestEst)}" value="${r.ovCot?r.cotRest:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','cot',this.value)"></div>
+<div class="prm" style="border:none"><label>CMG rémunération reçu de la CAF<small>estimation : ${f$(Math.round(r.cmgRemEst))} €${r.ovRem?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cmgRemEst)}" value="${r.ovRem?r.cmgRem:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','rem',this.value)"></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:7px">Laissez vide pour garder l'estimation. Une valeur saisie remplace le calcul pour ce mois — utile dès le premier relevé Pajemploi et le premier versement CAF.</div>
+</div>
 <div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(r.cash))} €</b></div>
 <div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(r.ci))} €</b></div>
 <div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(r.real))} €</b></div>
@@ -1066,13 +1087,15 @@ ${GPRM?`<div class="card-b">
 <div class="eyebrow" style="margin:12px 0 4px">Transport (Navigo)</div>
 <div class="prm"><label>Prise en charge du transport</label><select class="inp sm" onchange="DB.garde.nav.on=this.value==='1';gSave()"><option value="1"${g.nav.on?' selected':''}>Oui</option><option value="0"${!g.nav.on?' selected':''}>Non</option></select></div>
 <div class="prm"><label>Prix de l'abonnement<small>€/mois · Navigo toutes zones 2026 : 90,80 €</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.price}" onchange="DB.garde.nav.price=+this.value||0;gSave()"></div>
+<div class="prm"><label>Verser uniquement sur justificatif<small>le remboursement est légalement conditionné</small></label><select class="inp sm" onchange="DB.garde.nav.requireJustif=this.value==='1';gSave()"><option value="1"${g.nav.requireJustif?' selected':''}>Oui</option><option value="0"${!g.nav.requireJustif?' selected':''}>Non</option></select></div>
 <div class="prm"><label>Mode de calcul<small>garde partagée : art. 157 CCN, prise en charge intégrale</small></label><select class="inp sm" onchange="DB.garde.nav.mode=this.value;gSave()"><option value="partage"${g.nav.mode==='partage'?' selected':''}>Garde partagée</option><option value="legal"${g.nav.mode==='legal'?' selected':''}>50 % prorata</option><option value="manual"${g.nav.mode==='manual'?' selected':''}>Montant fixe</option></select></div>
 ${g.nav.mode==='partage'?`<div class="prm"><label>Votre quote-part<small>% de l'abonnement · 50 % si partagé avec l'autre famille</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.nav.share}" onchange="DB.garde.nav.share=+this.value||0;gSave()"></div>`:''}
 ${g.nav.mode==='manual'?`<div class="prm"><label>Montant mensuel<small>€</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.manual}" onchange="DB.garde.nav.manual=+this.value||0;gSave()"></div>`:''}
 <div class="eyebrow" style="margin:12px 0 4px">Congés & fériés (CCN 3239)</div>
 <div class="prm"><label>Congés payés par an<small>jours ouvrés</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
 <div class="prm"><label>Début de la période de référence<small>convention : 1er juin</small></label><select class="inp sm" onchange="DB.garde.cpStartM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.cpStartM?' selected':'')+'>1er '+ML[m].toLowerCase()+'</option>').join('')}</select></div>
-<div class="prm"><label>Heures payées par jour de CP<small>mode « au réel » seulement</small></label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
+<div class="prm"><label>Décompte des congés<small>ouvrés = règle légale, une semaine d'absence = 5 j</small></label><select class="inp sm" onchange="DB.garde.cpMode=this.value;gSave()"><option value="ouvres"${g.cpMode==='ouvres'?' selected':''}>Jours ouvrés</option><option value="marked"${g.cpMode==='marked'?' selected':''}>Jours marqués</option></select></div>
+<div class="prm"><label>Heures payées par jour de CP<small>mode « au réel » seulement — sans effet en mensualisé</small></label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
 <div class="prm"><label>Seuil heures sup<small>h / semaine</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.seuil}" onchange="DB.garde.hs.seuil=+this.value||0;gSave()"></div>
 <div class="prm"><label>Majoration HS<small>% sur les ${g.hs.h1} premières h · % au-delà</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj1}" onchange="DB.garde.hs.maj1=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj2}" onchange="DB.garde.hs.maj2=+this.value||0;gSave()"></div></div>
 <div class="prm"><label>Majoration férié travaillé<small>% ordinaire · % 1er mai</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.fer.majOrd}" onchange="DB.garde.fer.majOrd=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.fer.majMai}" onchange="DB.garde.fer.majMai=+this.value||0;gSave()"></div></div>
@@ -1103,6 +1126,9 @@ ${(()=>{const ms=new Set();[g.hours,g.leave,g.abs].forEach(o=>Object.keys(o||{})
 return arr.map(k=>{const [yy,mm]=k.split('-').map(Number);const cc=gardeCost(yy,mm);return'<tr><td style="font-weight:600">'+MS[mm]+' '+yy+'</td><td class="mono">'+fh(cc.h)+' h</td><td class="mono">'+f$(Math.round(cc.net))+' €</td><td class="mono" style="color:'+(cc.nav.justif?'var(--cyan)':'var(--td)')+'">'+(cc.nav.amt?f$(cc.nav.amt)+' €':'—')+'</td><td class="mono" style="color:var(--gold)">'+f$(Math.round(cc.toPay))+' €</td></tr>'}).join('')})()}
 </tbody></table></div></div>`;
 const gi=document.getElementById('g-s');if(gi)setTimeout(()=>gi.focus(),80)}
+function cmgSet(k,f,v){if(!DB.garde.cmgReal)DB.garde.cmgReal={};const o=DB.garde.cmgReal[k]||{};
+if(v===''||v==null)delete o[f];else o[f]=+v;
+if(Object.keys(o).length)DB.garde.cmgReal[k]=o;else delete DB.garde.cmgReal[k];gSave()}
 function navRef(k,v){if(!DB.garde.nav.ref)DB.garde.nav.ref={};if(v)DB.garde.nav.ref[k]=1;else delete DB.garde.nav.ref[k];gSave()}
 function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
 function gSet(s,p){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;DB.garde.hours[GSEL]={s,p};delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];save();gResync();GSEL=null;rGarde()}
