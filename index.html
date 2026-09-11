@@ -804,13 +804,15 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 // Sources : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt 2026 ; CCN IDCC 3239 (HS > 40 h : +25 %/+50 % ; 1er mai +100 % ; férié ordinaire travaillé +10 % ; CP 2,5 j ouvrables/mois ; mensualisation 52/12).
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
 function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},
-plans:[{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0,8],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])}],
+plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
 contractStart:'2026-09',startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
 cpDays:25,cpHours:8,cpStartM:6,hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
 p:{txSal:21.88025,txPat:47.396,abatH:2,abatPart:90,cmgCotPct:50,cmgCotCap:524,capH:15.18,chr:10.50,effort:0.1032,rev:6000,revMin:635,revMax:8500,ciPct:50,ciCap:15000}}}
 function ensureGarde(){const d=defGarde();if(!DB.garde)DB.garde=d;const g=DB.garde;
 Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});['hs','fer','p'].forEach(o=>{if(!g[o])g[o]={};Object.keys(d[o]).forEach(k=>{if(g[o][k]==null)g[o][k]=d[o][k]})});
 if(!Array.isArray(g.plans)||!g.plans.length)g.plans=d.plans;g.plans.forEach(pl=>{if(!pl.d)pl.d=defPlanDays()});
+const oldDef=JSON.stringify([{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0,8],[8,0],[8,0],[8,0],[8,0],[0,0],[0,0]])}]);
+if(JSON.stringify(g.plans)===oldDef)g.plans=d.plans;
 Object.keys(g.hours).forEach(k=>{if(typeof g.hours[k]==='number')g.hours[k]={s:g.hours[k],p:0}})}
 const gKey=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 function todayKey(){const n=new Date();return gKey(n.getFullYear(),n.getMonth()+1,n.getDate())}
