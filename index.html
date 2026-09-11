@@ -220,6 +220,43 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .cal-cell.absd{background:var(--dnDim);border-color:rgba(240,113,111,.45)}
 .cal-cell.hol .dn::after{content:'✦';font-size:7px;color:var(--blue);margin-left:2px;vertical-align:top}
 .cal-cell.cp .dn{color:var(--tx)}
+/* ===== FICHE MENSUELLE ===== */
+#fiche{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;background:var(--bg)}
+#fiche.on{display:flex}
+.fbar{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:rgba(11,14,21,.92);backdrop-filter:blur(12px)}
+.fbar .ft{font-family:var(--serif);font-weight:600;font-size:16px;flex:1}
+.fscroll{flex:1;overflow-y:auto;padding:14px 12px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+.fdoc{background:#fff;color:#14171F;border-radius:12px;padding:20px 18px;max-width:760px;margin:0 auto;font-size:12.5px;line-height:1.45}
+.fhead{border-bottom:2px solid #14171F;padding-bottom:11px;margin-bottom:14px}
+.fhead h1{font-family:var(--serif);font-size:19px;font-weight:600;margin-bottom:7px;letter-spacing:-.01em}
+.fhead .fsub{font-size:11.5px;color:#41485C;line-height:1.6}
+.fhead .fmonth{margin-top:7px;font-size:13px}
+.fhead .warn{color:#B4442F;font-weight:600}
+.fsec{margin-bottom:16px;break-inside:avoid}
+.fsec h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:#14171F;padding:5px 9px;border-radius:5px;margin-bottom:7px}
+.fsec .fnote{font-size:11px;color:#5A6478;margin-bottom:6px;font-style:italic}
+.fdoc table{width:100%;border-collapse:collapse}
+.fdoc td{padding:6px 5px;border-bottom:1px solid #E4E7EE;vertical-align:top}
+.fdoc td:first-child{width:46%}
+.fdoc td.v{width:20%;text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.fdoc td.n{width:34%;font-size:10.5px;color:#6B7488;font-style:italic}
+.fdoc tr.tot td{background:#FBF6E7;font-weight:700}
+.fdoc tr.warnrow td{background:#FDF0EE}
+.fdoc tr.grand td{background:#14171F;color:#fff;font-weight:700;font-size:14px;border:none}
+.fdoc tr.grand td.n{color:#A8B0C4;font-size:10px;font-weight:400}
+.ffoot{margin-top:18px;padding-top:11px;border-top:1px solid #C8CDD9;font-size:10px;color:#5A6478;line-height:1.55}
+.ffoot p{margin-bottom:7px}
+.fsign{display:flex;gap:24px;margin-top:20px;font-size:11px;color:#14171F}
+.fsign div{flex:1;border-top:1px solid #9AA2B4;padding-top:6px}
+@media print{
+  body{background:#fff}
+  #app,#lock,#wiz,#nav,.fbar{display:none!important}
+  #fiche{position:static;display:block!important;background:#fff}
+  .fscroll{overflow:visible;padding:0}
+  .fdoc{border-radius:0;padding:0;max-width:none;font-size:11px}
+  .fsec h2{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fdoc tr.tot td,.fdoc tr.grand td,.fdoc tr.warnrow td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 @media(min-width:640px){.hero .hv{font-size:44px}}
 </style>
 </head>
@@ -259,6 +296,16 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
     <button class="nbtn" data-pg="garde" onclick="go('garde')"><span class="ni">◷</span>Garde</button>
     <button class="nbtn" data-pg="more" onclick="go('more')"><span class="ni">⋯</span>Plus</button>
   </div>
+</div>
+
+<div id="fiche">
+  <div class="fbar">
+    <button class="icobtn" onclick="closeFiche()">✕</button>
+    <div class="ft">Fiche mensuelle</div>
+    <button class="icobtn" onclick="shareFiche()" title="Partager un résumé">↗</button>
+    <button class="btn btn-gold sm" onclick="window.print()">Imprimer / PDF</button>
+  </div>
+  <div class="fscroll" id="fiche-body"></div>
 </div>
 
 <div id="wiz">
@@ -805,8 +852,9 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
 function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},
 plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
-contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'partage',share:50,manual:0,ref:{},requireJustif:true},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
-cpDays:25,cpHours:8,cpStartM:6,cpMode:'ouvres',cmgReal:{},hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
+contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'auto',share:50,manual:0,ref:{},requireJustif:true,label:'Navigo Mois'},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',crecheMigrated:false,
+cpDays:30,cpWeek:6,cpAcq:2.5,cpHours:2.5,cpStartM:6,cpMode:'ouvres',cmgReal:{},
+id:{sal:'',salRole:'assistante parentale',empl:'',addr:'',horaires:'Lundi, mercredi et vendredi de 16h00 à 18h30'},hs:{seuil:40,h1:8,maj1:25,maj2:50},fer:{majOrd:10,majMai:100},
 p:{txSal:21.88025,txPat:47.396,abatH:2,abatPart:90,cmgCotPct:50,cmgCotCap:524,capH:15.18,chr:10.50,effort:0.1032,rev:6000,revMin:635,revMax:8500,ciPct:50,ciCap:15000}}}
 function ensureGarde(){const d=defGarde();if(!DB.garde)DB.garde=d;const g=DB.garde;
 Object.keys(d).forEach(k=>{if(g[k]==null)g[k]=d[k]});['hs','fer','p'].forEach(o=>{if(!g[o])g[o]={};Object.keys(d[o]).forEach(k=>{if(g[o][k]==null)g[o][k]=d[o][k]})});
@@ -815,7 +863,12 @@ const oldDef=JSON.stringify([{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0]
 if(JSON.stringify(g.plans)===oldDef)g.plans=d.plans;
 Object.keys(g.hours).forEach(k=>{if(typeof g.hours[k]==='number')g.hours[k]={s:g.hours[k],p:0}});
 if(!g.contractFrom)g.contractFrom=(g.contractStart||'2026-09')+'-01';delete g.contractStart;
-if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={};if(!g.cmgReal)g.cmgReal={};if(!g.cpMode)g.cpMode='ouvres'}
+if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={};if(!g.cmgReal)g.cmgReal={};if(!g.cpMode)g.cpMode='ouvres';
+if(!g.id)g.id=d.id;Object.keys(d.id).forEach(k=>{if(g.id[k]==null)g.id[k]=d.id[k]});
+if(g.cpWeek==null){g.cpWeek=6;if(g.cpDays===25)g.cpDays=30}
+if(g.cpAcq==null)g.cpAcq=Math.round(g.cpDays/12*100)/100;
+if(g.nav.mode==='partage'&&Math.abs((+g.nav.share||0)-50)>0.01)g.nav.mode='integral';
+if(g.nav.mode==='legal')g.nav.mode='auto';if(g.nav.mode==='partage')g.nav.mode='integral'}
 const gKey=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 function todayKey(){const n=new Date();return gKey(n.getFullYear(),n.getMonth()+1,n.getDate())}
 const kDate=k=>new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8,10));
@@ -876,12 +929,13 @@ function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padSta
 if(!n.on)return{amt:0,justif:false,base:'désactivé'};
 const r=gardeMonth(y,m);if(r.before||r.after)return{amt:0,justif:false,base:'hors contrat'};
 const wkH=r.wk.s+r.wk.p;let amt=0,base='';
-if(n.mode==='manual'){amt=+n.manual||0;base='montant fixé manuellement'}
-else if(n.mode==='partage'){amt=(+n.price||0)*((+n.share||0)/100);base='garde partagée · prise en charge intégrale, votre quote-part '+(+n.share||0)+' %'}
-else{const pr=Math.min(1,wkH/17.5);amt=(+n.price||0)*0.5*pr;base='50 % × '+fh(wkH)+' h / 17,5 h'}
+let pct=0;
+if(n.mode==='manual'){amt=+n.manual||0;pct=(+n.price>0)?amt/n.price*100:0;base='montant fixé manuellement'}
+else if(n.mode==='integral'){pct=+n.share||0;amt=(+n.price||0)*pct/100;base='garde partagée (art. 157 CCN) · quote-part '+fh(pct)+' %'}
+else{pct=Math.min(100,50*wkH/17.5);amt=(+n.price||0)*pct/100;base='Code du travail R3261-9 : 50 % × '+fh(wkH)+' h ÷ 17,5 h = '+fh(Math.round(pct*100)/100)+' %'}
 if(r.partial){const nd=new Date(y,m,0).getDate();const d1=r.from?+r.from.slice(8,10):1;const d2=r.to?+r.to.slice(8,10):nd;amt=amt*Math.max(0,(d2-d1+1))/nd;base+=' · prorata du mois'}
 amt=Math.round(amt*100)/100;const justif=!!(n.ref&&n.ref[k]);const due=justif||!n.requireJustif;
-return{amt:due?amt:0,pending:due?0:amt,justif,req:!!n.requireJustif,base}}
+return{amt:due?amt:0,pending:due?0:amt,justif,req:!!n.requireJustif,base,pct:Math.round(pct*100)/100,price:+n.price||0}}
 function gardeCost(y,m){const g=DB.garde,p=g.p;const r=gardeMonth(y,m);const h=r.paidH;const net=r.net;const nv=navFor(y,m);
 const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
 const abat=Math.min(p.abatH*(p.abatPart/100)*h,cotPat);const cotTot=cotSal+cotPat-abat;
@@ -896,9 +950,25 @@ return Object.assign({},r,{paid:h,brut,cotSal,cotPat,abat,cotTot,cmgCot,cotRest:
 // Congés
 function cpDecompte(keys){const g=DB.garde;if(g.cpMode==='marked')return keys.length;
 const byWeek={};keys.forEach(k=>{const d=kDate(k);const mo=new Date(d);mo.setDate(d.getDate()-((d.getDay()+6)%7));(byWeek[dKey(mo)]=byWeek[dKey(mo)]||[]).push(d)});
-let n=0;Object.keys(byWeek).forEach(w=>{const ds=byWeek[w].sort((a,b)=>a-b);const a=ds[0],b=ds[ds.length-1];
-for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(((d.getDay()+6)%7)<5)n++}});return n}
+const lim=g.cpWeek||6;let n=0;Object.keys(byWeek).forEach(w=>{const ds=byWeek[w].sort((a,b)=>a-b);const a=ds[0];let b=ds[ds.length-1];
+// dernier jour ouvré prévu de la semaine : si l'absence va jusque-là, la semaine se décompte en entier
+const mo=kDate(w);let lastPlan=-1;
+for(let i=0;i<7;i++){const d=new Date(mo);d.setDate(mo.getDate()+i);const pd=planDay(dKey(d));if((pd.s+pd.p)>0)lastPlan=i}
+const bIdx=(b.getDay()+6)%7;
+if(lastPlan>=0&&bIdx>=lastPlan){const e=new Date(mo);e.setDate(mo.getDate()+lim-1);if(e>b)b=e}
+for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(((d.getDay()+6)%7)<lim)n++}});return n}
 function cpKeys(lo,hi){const g=DB.garde;return Object.keys(g.leave||{}).filter(k=>{if(!g.leave[k])return false;const i=+k.slice(0,4)*12+ +k.slice(5,7);return i>=lo&&i<=hi})}
+function cpAcqMonth(y,m){const g=DB.garde;const r=gardeMonth(y,m);if(r.before||r.after)return 0;
+const nd=new Date(y,m,0).getDate();let d1=1,d2=nd;
+if(r.partialIn&&r.from)d1=+r.from.slice(8,10);
+if(r.partialOut&&r.to)d2=+r.to.slice(8,10);
+return Math.round((g.cpAcq||2.5)*Math.max(0,d2-d1+1)/nd*100)/100}
+function cpLedger(y,m){const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm;const cur=y*12+m;
+let acqBefore=0;for(let i=lo;i<cur;i++){const yy=Math.floor((i-1)/12),mm=i-yy*12;acqBefore+=cpAcqMonth(yy,mm)}
+const takenBefore=cur>lo?cpDecompte(cpKeys(lo,cur-1)):0;
+const acq=cpAcqMonth(y,m);const taken=cpDecompte(cpKeys(cur,cur));
+const report=Math.round((acqBefore-takenBefore)*100)/100;
+return{pr,report,acq,taken,solde:Math.round((report+acq-taken)*100)/100,acqTotal:Math.round((acqBefore+acq)*100)/100,takenTotal:takenBefore+taken}}
 function cpPeriod(y,m){const s=DB.garde.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
 function cpStatus(y,m){const g=DB.garde;const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
 const cf=(g.contractFrom||'2026-09-01').split('-').map(Number);const cs=[cf[0],cf[1]];const start=Math.max(lo,cf[0]*12+cf[1]);
@@ -913,12 +983,13 @@ const asOf=new Date(y,m,0);const effAs=(ctD&&ctD<asOf)?ctD:asOf;
 const acquired=Math.max(0,Math.min(rights,Math.round(Math.max(0,effAs-effStart)/MS_*g.cpDays/12*100)/100));
 const ctS=g.contractTo?(+g.contractTo.slice(0,4)*12+ +g.contractTo.slice(5,7)):null;
 const endIdx=ctS?Math.min(hi,ctS):hi;
-const remainMonths=Math.max(1,endIdx-(y*12+m)+1);const toPose=Math.max(0,Math.round((rights-taken)*100)/100);
+const remainMonths=Math.max(1,endIdx-(y*12+m)+1);
+const led=cpLedger(y,m);const toPose=Math.max(0,led.solde);
 const endLbl=MS[pr.tm]+' '+pr.ty;const alerts=[];
-if(toPose>0&&remainMonths<=3)alerts.push({t:'warn',m:'⚠ '+f$(toPose)+' j de congés à poser avant fin '+endLbl+' (≈ '+f$(Math.ceil(toPose/remainMonths))+' j/mois).'});
+if(toPose>0&&remainMonths<=3)alerts.push({t:'warn',m:'⚠ '+f$(toPose)+' j ouvrables de congés au solde, à poser avant fin '+endLbl+' ('+remainMonths+' mois restants).'});
 if(m>=8&&m<=10&&mainTaken<10&&(cs[0]*12+cs[1])<=y*12+5)alerts.push({t:'warn',m:'⚠ Congé principal : au moins 2 semaines à poser entre mai et octobre — '+mainTaken+' j posés cette année.'});
 if(taken>acquired+0.01&&g.mode==='mensualise')alerts.push({t:'info',m:'ℹ '+f$(taken-acquired)+' j pris par anticipation (acquis : '+f$(acquired)+' j).'});
-return{pr,taken,acquired,rights,toPose,remainMonths,mainTaken,endLbl,alerts}}
+return{pr,taken,acquired,rights,toPose,remainMonths,mainTaken,endLbl,alerts,led}}
 function soldeTout(){const g=DB.garde;if(!g.contractTo||!g.contractFrom)return null;
 const fy=+g.contractFrom.slice(0,4),fm=+g.contractFrom.slice(5,7);
 const ty=+g.contractTo.slice(0,4),tm=+g.contractTo.slice(5,7);
@@ -927,10 +998,11 @@ for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx
 const taken=cpDecompte(cpKeys(fy*12+fm,ty*12+tm));
 const d1=new Date(fy,fm-1,+g.contractFrom.slice(8,10)),d2=new Date(ty,tm-1,+g.contractTo.slice(8,10));
 const moWorked=Math.max(0,(d2-d1)/(1000*3600*24*30.44));
-const acquired=Math.round(moWorked*g.cpDays/12*100)/100;
+let acquired=0;for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx-yy*12;acquired+=cpAcqMonth(yy,mm)}
+acquired=Math.round(acquired*100)/100;
 const remain=Math.max(0,Math.round((acquired-taken)*100)/100);
 const wkNet=g.plans.length?(()=>{const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];const w=planWeekly(pl);return w.s*g.rate+w.p*g.rateShared})():0;
-const maintien=remain/(g.cpMode==='marked'?Math.max(1,(()=>{const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];let n=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};if((+d.s||0)+(+d.p||0)>0)n++}return n})()):5)*wkNet;const dixieme=totalNet*0.10;
+const maintien=remain/(g.cpWeek||6)*wkNet;const dixieme=totalNet*0.10;
 const indem=Math.max(maintien,dixieme);
 const lastM=gardeCost(ty,tm);
 return{months,totalNet,taken,acquired,remain,moWorked,wkNet,maintien,dixieme,indem,method:maintien>=dixieme?'maintien de salaire':'règle du dixième',lastM,total:lastM.toPay+indem}}
@@ -999,6 +1071,7 @@ ${cs.alerts.map(a=>'<div class="card" style="border-color:'+(a.t==='warn'?'rgba(
 ${panel}
 </div></div>
 
+<button class="btn btn-gold wide" style="margin-bottom:14px" onclick="openFiche(${gY},${gM})">📄 Fiche mensuelle · ${ML[gM]} ${gY}</button>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
 ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" style="margin:0 0 10px">📌 ${r.partialIn?'Mois d\u2019embauche':'Mois de fin de contrat'} : salaire calculé sur les heures réelles du ${r.from?kDate(r.from).toLocaleDateString('fr-FR'):'1'+'/'+String(gM).padStart(2,'0')} au ${r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(gM).padStart(2,'0')}, pas sur la mensualisation.</div></div>
@@ -1024,12 +1097,15 @@ ${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span clas
 <div style="font-size:11.5px;color:var(--td);margin-top:8px">Sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} : ${r.partial?'période d\u2019emploi du <b>'+kDate(r.from).toLocaleDateString('fr-FR')+' au '+nd+'/'+String(gM).padStart(2,'0')+'/'+gY+'</b> (dates réelles, pas le mois civil), heures '+fh(r.hS+r.hP)+' h':'heures normales '+fh(mens?r.baseHs+r.baseHp-r.absH:r.hS+r.hP)+' h'+(r.extraS+r.extraP>0?', complémentaires '+fh(r.extraS+r.extraP)+' h':'')+(r.hsH>0?', supplémentaires '+fh(r.hsH)+' h':'')}, salaire <b>net</b>${g.nav.on&&r.nav.amt>0?', frais de transport '+f$(r.nav.amt)+' € en « indemnités complémentaires »':''}. ${mens&&!r.partial?'Année complète : ne pas remplir la case « congés payés ».':''}</div>
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Congés payés<span class="aux mono">${f$(cs.taken)} / ${f$(cs.rights)} j</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Compteur de congés payés<span class="aux" style="font-size:10.5px;color:var(--td)">jours ouvrables, lundi → samedi</span></div>
 <div class="card-b">
-<div class="gauge-track"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.taken/cs.rights*100)):0}%"></div></div>
-<div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)"><span>${MS[cs.pr.fm]} ${cs.pr.fy} → ${cs.endLbl}</span><span class="mono">acquis ${f$(cs.acquired)} j</span></div>
-<div style="font-size:12px;color:var(--tm);margin-top:6px">À poser d'ici fin ${cs.endLbl} : <b class="mono" style="color:${cs.toPose>0?'var(--gold)':'var(--up)'}">${f$(cs.toPose)} j</b> sur ${cs.remainMonths} mois${cs.toPose>0?' — soit ≈ '+f$(Math.ceil(cs.toPose/cs.remainMonths))+' j/mois':''}. Congé principal mai–oct : ${cs.mainTaken} j posés.</div>
-<div style="font-size:10.5px;color:var(--td);margin-top:5px">Droits proratisés : ${f$(cs.rights)} j sur cette période (${g.cpDays} j/an au prorata de la présence depuis le ${kDate(g.contractFrom).toLocaleDateString('fr-FR')}). Décompte ${g.cpMode==='ouvres'?'en jours ouvrés (règle légale : toute la semaine est décomptée, y compris les jours non travaillés)':'des seuls jours marqués'}. Marquez un jour « Congé payé » dans le calendrier.</div>
+<div class="cost-line"><span>Solde reporté du mois précédent</span><b>${f$(cs.led.report)} j</b></div>
+<div class="cost-line"><span>Droits acquis ce mois<small>${f$(g.cpAcq)} j ouvrables par mois travaillé (art. 48)${r.partial?' · au prorata du mois':''}</small></span><b style="color:var(--up)">+ ${f$(cs.led.acq)} j</b></div>
+<div class="cost-line"><span>Congés pris ce mois<small>${r.cp?r.cp+' jour'+(r.cp>1?'s':'')+' marqué'+(r.cp>1?'s':'')+' → '+f$(cs.led.taken)+' j ouvrables décomptés':'aucun'}</small></span><b style="color:${cs.led.taken?'var(--dn)':'var(--td)'}">${cs.led.taken?'− '+f$(cs.led.taken)+' j':'0 j'}</b></div>
+<div class="cost-line tot"><span>Nouveau solde<small>période ${MS[cs.pr.fm]} ${cs.pr.fy} → ${cs.endLbl}</small></span><b style="color:var(--gold);font-size:17px">${f$(cs.led.solde)} j</b></div>
+<div class="gauge-track" style="margin-top:10px"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.led.takenTotal/cs.rights*100)):0}%"></div></div>
+<div class="row rb" style="margin-top:7px;font-size:11.5px;color:var(--tm)"><span>${f$(cs.led.takenTotal)} j pris sur la période</span><span class="mono">droits estimés ${f$(cs.rights)} j</span></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:5px">Vous marquez les jours où elle aurait dû travailler ; le décompte applique la règle légale et compte ${g.cpMode==='ouvres'?'tous les jours ouvrables de l\u2019absence, y compris ceux qu\u2019elle ne travaille pas — une semaine complète = '+(g.cpWeek||6)+' j':'uniquement les jours marqués'}. Congé principal mai–oct : ${cs.mainTaken} j.</div>
 </div></div>
 
 ${(()=>{const st=soldeTout();if(!st)return'';
@@ -1079,6 +1155,12 @@ ${GCOST?`<div class="card-b">
 
 <div class="card"><div class="card-h" style="cursor:pointer" onclick="GPRM=!GPRM;rGarde()"><span class="dot" style="background:var(--cyan)"></span>Paramètres<span class="aux" style="color:var(--td)">${GPRM?'▾':'▸'}</span></div>
 ${GPRM?`<div class="card-b">
+<div class="eyebrow" style="margin:0 0 4px">Identité (fiche mensuelle)</div>
+<div class="prm"><label>Salariée</label><input class="inp sm" value="${g.id.sal||''}" placeholder="Mme …" onchange="DB.garde.id.sal=this.value;gSave()"></div>
+<div class="prm"><label>Employeur</label><input class="inp sm" value="${g.id.empl||''}" placeholder="M. …" onchange="DB.garde.id.empl=this.value;gSave()"></div>
+<div class="prm"><label>Adresse du lieu de garde</label><input class="inp sm" value="${g.id.addr||''}" onchange="DB.garde.id.addr=this.value;gSave()"></div>
+<div class="prm"><label>Jours et horaires au contrat<small>texte affiché sur la fiche</small></label><input class="inp sm" value="${g.id.horaires||''}" onchange="DB.garde.id.horaires=this.value;gSave()"></div>
+<div class="eyebrow" style="margin:12px 0 4px">Rémunération</div>
 <div class="prm"><label>Taux net solo<small>€/h</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rate}" onchange="DB.garde.rate=+this.value||0;gSave()"></div>
 <div class="prm"><label>Taux net garde partagée<small>€/h · votre part</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rateShared}" onchange="DB.garde.rateShared=+this.value||0;gSave()"></div>
 <div class="prm"><label>Mode de paie<small>mensualisé = planning × 52/12 + écarts</small></label><select class="inp sm" onchange="DB.garde.mode=this.value;gSave()"><option value="mensualise"${mens?' selected':''}>Mensualisé</option><option value="reel"${!mens?' selected':''}>Au réel</option></select></div>
@@ -1088,13 +1170,17 @@ ${GPRM?`<div class="card-b">
 <div class="prm"><label>Prise en charge du transport</label><select class="inp sm" onchange="DB.garde.nav.on=this.value==='1';gSave()"><option value="1"${g.nav.on?' selected':''}>Oui</option><option value="0"${!g.nav.on?' selected':''}>Non</option></select></div>
 <div class="prm"><label>Prix de l'abonnement<small>€/mois · Navigo toutes zones 2026 : 90,80 €</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.price}" onchange="DB.garde.nav.price=+this.value||0;gSave()"></div>
 <div class="prm"><label>Verser uniquement sur justificatif<small>le remboursement est légalement conditionné</small></label><select class="inp sm" onchange="DB.garde.nav.requireJustif=this.value==='1';gSave()"><option value="1"${g.nav.requireJustif?' selected':''}>Oui</option><option value="0"${!g.nav.requireJustif?' selected':''}>Non</option></select></div>
-<div class="prm"><label>Mode de calcul<small>garde partagée : art. 157 CCN, prise en charge intégrale</small></label><select class="inp sm" onchange="DB.garde.nav.mode=this.value;gSave()"><option value="partage"${g.nav.mode==='partage'?' selected':''}>Garde partagée</option><option value="legal"${g.nav.mode==='legal'?' selected':''}>50 % prorata</option><option value="manual"${g.nav.mode==='manual'?' selected':''}>Montant fixe</option></select></div>
-${g.nav.mode==='partage'?`<div class="prm"><label>Votre quote-part<small>% de l'abonnement · 50 % si partagé avec l'autre famille</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.nav.share}" onchange="DB.garde.nav.share=+this.value||0;gSave()"></div>`:''}
+<div class="prm"><label>Libellé de l'abonnement<small>apparaît sur la fiche</small></label><input class="inp sm" value="${g.nav.label||''}" onchange="DB.garde.nav.label=this.value;gSave()"></div>
+<div class="prm"><label>Mode de calcul<small>auto = R3261-9, recalculé si les horaires changent</small></label><select class="inp sm" onchange="DB.garde.nav.mode=this.value;gSave()"><option value="auto"${g.nav.mode==='auto'?' selected':''}>Auto — R3261-9</option><option value="integral"${g.nav.mode==='integral'?' selected':''}>Quote-part fixe</option><option value="manual"${g.nav.mode==='manual'?' selected':''}>Montant fixe</option></select></div>
+${g.nav.mode==='auto'?`<div class="prm" style="border:none"><label style="color:var(--gold)">Part employeur calculée<small>50 % × ${fh(r.wk.s+r.wk.p)} h ÷ 17,5 h</small></label><div class="mono" style="text-align:right;font-weight:700;color:var(--gold)">${fh(r.nav.pct)} %</div></div>`:''}
+${g.nav.mode==='integral'?`<div class="prm"><label>Votre quote-part<small>% de l'abonnement</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.share}" onchange="DB.garde.nav.share=+this.value||0;gSave()"></div>`:''}
 ${g.nav.mode==='manual'?`<div class="prm"><label>Montant mensuel<small>€</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.manual}" onchange="DB.garde.nav.manual=+this.value||0;gSave()"></div>`:''}
 <div class="eyebrow" style="margin:12px 0 4px">Congés & fériés (CCN 3239)</div>
-<div class="prm"><label>Congés payés par an<small>jours ouvrés</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
+<div class="prm"><label>Acquisition par mois travaillé<small>jours ouvrables · art. 48 CCN : 2,5</small></label><input class="inp sm mono" type="number" step="0.1" inputmode="decimal" value="${g.cpAcq}" onchange="DB.garde.cpAcq=+this.value||0;gSave()"></div>
+<div class="prm"><label>Congés payés par an<small>jours ouvrables · 30 = 5 semaines</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.cpDays}" onchange="DB.garde.cpDays=+this.value||0;gSave()"></div>
+<div class="prm"><label>Jours décomptés par semaine<small>6 = ouvrables (lun→sam) · 5 = ouvrés</small></label><select class="inp sm" onchange="DB.garde.cpWeek=+this.value;gSave()"><option value="6"${(g.cpWeek||6)===6?' selected':''}>6 — ouvrables</option><option value="5"${g.cpWeek===5?' selected':''}>5 — ouvrés</option></select></div>
 <div class="prm"><label>Début de la période de référence<small>convention : 1er juin</small></label><select class="inp sm" onchange="DB.garde.cpStartM=+this.value;gSave()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===g.cpStartM?' selected':'')+'>1er '+ML[m].toLowerCase()+'</option>').join('')}</select></div>
-<div class="prm"><label>Décompte des congés<small>ouvrés = règle légale, une semaine d'absence = 5 j</small></label><select class="inp sm" onchange="DB.garde.cpMode=this.value;gSave()"><option value="ouvres"${g.cpMode==='ouvres'?' selected':''}>Jours ouvrés</option><option value="marked"${g.cpMode==='marked'?' selected':''}>Jours marqués</option></select></div>
+<div class="prm"><label>Décompte des congés<small>ouvrés = règle légale, une semaine d'absence = 5 j</small></label><select class="inp sm" onchange="DB.garde.cpMode=this.value;gSave()"><option value="ouvres"${g.cpMode==='ouvres'?' selected':''}>Semaine entière (légal)</option><option value="marked"${g.cpMode==='marked'?' selected':''}>Jours marqués</option></select></div>
 <div class="prm"><label>Heures payées par jour de CP<small>mode « au réel » seulement — sans effet en mensualisé</small></label><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" value="${g.cpHours}" onchange="DB.garde.cpHours=+this.value||0;gSave()"></div>
 <div class="prm"><label>Seuil heures sup<small>h / semaine</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.seuil}" onchange="DB.garde.hs.seuil=+this.value||0;gSave()"></div>
 <div class="prm"><label>Majoration HS<small>% sur les ${g.hs.h1} premières h · % au-delà</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj1}" onchange="DB.garde.hs.maj1=+this.value||0;gSave()"><input class="inp sm mono" type="number" inputmode="decimal" value="${g.hs.maj2}" onchange="DB.garde.hs.maj2=+this.value||0;gSave()"></div></div>
@@ -1140,6 +1226,113 @@ DB.garde.plans.push({from,d:JSON.parse(JSON.stringify(src.d))});GPI=-1;gSave()}
 function gSave(){save();gResync();rGarde()}
 function gResync(){DB.bm.forEach(b=>syncMonth(b))}
 
+/* ================= FICHE MENSUELLE (à remettre à la salariée) ================= */
+function fEur(n){return (Math.round(n*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function fH(n){return fh(Math.round(n*100)/100)+' h'}
+function openFiche(y,m){FY=y;FM=m;document.getElementById('fiche').classList.add('on');rFiche();window.scrollTo(0,0)}
+function closeFiche(){document.getElementById('fiche').classList.remove('on')}
+let FY=0,FM=0;
+function ficheText(){const r=gardeCost(FY,FM);const cs=cpStatus(FY,FM);const g=DB.garde;
+return 'Garde à domicile — '+ML[FM]+' '+FY+'\n'
++'Heures travaillées : '+fh(r.h)+' h\n'
++'Salaire net : '+fEur(r.net)+'\n'
++(g.nav.on&&r.nav.amt?'Transport : '+fEur(r.nav.amt)+'\n':'')
++'TOTAL VERSÉ : '+fEur(r.toPay)+'\n'
++'Solde congés payés : '+fh(cs.led.solde)+' j ouvrables'}
+function shareFiche(){const t=ficheText();
+if(navigator.share){navigator.share({title:'Fiche '+ML[FM]+' '+FY,text:t}).catch(()=>{})}
+else if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>alert('Résumé copié dans le presse-papier'))}
+else alert(t)}
+function rFiche(){
+const g=DB.garde,y=FY,m=FM;const r=gardeCost(y,m);const cs=cpStatus(y,m);const led=cs.led;
+const nd=new Date(y,m,0).getDate();const p=g.p;
+const pl=planFor(gKey(y,m,nd))||g.plans[g.plans.length-1];const wk=planWeekly(pl);
+const hebdo=wk.s+wk.p;const moy=hebdo>0?(wk.s*g.rate+wk.p*g.rateShared)/hebdo:0;
+const brutRate=moy/(1-p.txSal/100);
+const creneaux=(()=>{let n=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};if((+d.s||0)+(+d.p||0)>0)n++}return n})();
+// Comptage des jours du mois
+let prevDays=0,worked=0,cpD=0,holOffD=0,absD=0;
+for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
+ if(i.status==='before'||i.status==='after')continue;
+ const pv=planDay(k);if((pv.s+pv.p)>0)prevDays++;
+ if(i.status==='cp')cpD++;else if(i.status==='abs')absD++;else if(i.status==='holoff')holOffD++;
+ else if((i.eff.s+i.eff.p)>0)worked++}
+const hPrev=r.partial?r.hS+r.hP:r.baseHs+r.baseHp;
+const hNonTrav=Math.max(0,hPrev-r.hS-r.hP+ (r.partial?0:0));
+const periode=r.partial?(r.from?kDate(r.from).toLocaleDateString('fr-FR'):'01/'+String(m).padStart(2,'0')+'/'+y)+' → '+(r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(m).padStart(2,'0')+'/'+y):'mois civil complet';
+const row=(l,v,note,cls)=>'<tr class="'+(cls||'')+'"><td>'+l+'</td><td class="v">'+v+'</td><td class="n">'+(note||'')+'</td></tr>';
+
+document.getElementById('fiche-body').innerHTML=`
+<div class="fdoc" id="fdoc">
+<div class="fhead">
+  <h1>Fiche mensuelle de garde à domicile</h1>
+  <div class="fsub"><b>Salariée :</b> ${g.id.sal||'—'}${g.id.salRole?', '+g.id.salRole:''} &nbsp;·&nbsp; <b>Employeur :</b> ${g.id.empl||'—'}${g.id.addr?', '+g.id.addr:''}</div>
+  <div class="fmonth">Mois concerné : <b>${ML[m].toLowerCase()} ${y}</b>${r.partial?' <span class="warn">— '+(r.partialIn?'mois d\u2019embauche':'mois de fin de contrat')+', période du '+periode+'</span>':''}</div>
+</div>
+
+<div class="fsec"><h2>1 · Paramètres du contrat</h2><table>
+${row('Jours et horaires prévus au contrat',g.id.horaires||'—','')}
+${row('Heures hebdo auprès des seuls enfants de l\u2019employeur',fH(wk.s),'à '+fEur(g.rate)+' net de l\u2019heure')}
+${row('Heures hebdo en garde partagée',fH(wk.p),'à '+fEur(g.rateShared)+' net de l\u2019heure')}
+${row('Durée hebdomadaire totale',fH(hebdo),creneaux+' créneau'+(creneaux>1?'x':'')+' par semaine','tot')}
+${row('Taux horaire net moyen du contrat',fEur(moy),'moyenne pondérée des deux taux')}
+${row('Taux horaire brut correspondant',fEur(brutRate),'minimum conventionnel à vérifier')}
+${row('Heures mensualisées',fH(r.baseHs+r.baseHp),'durée hebdo × 52 ÷ 12 — identique chaque mois')}
+${row('Salaire mensuel net de base',fEur(r.base),'versé en totalité chaque mois, congés compris','tot')}
+${row('Salaire mensuel brut de base',fEur(r.base/(1-p.txSal/100)),'')}
+${row('Part employeur de l\u2019abonnement de transport',fh(r.nav.pct)+' %',r.nav.base)}
+</table></div>
+
+<div class="fsec"><h2>2 · Jours du mois</h2><table>
+${row('Jours de garde prévus au contdrat'.replace('contdrat','contrat'),prevDays+' j','jours du planning tombant dans le mois')}
+${row('dont jours effectivement travaillés',worked+' j','')}
+${row('dont jours de congés payés',cpD+' j','décomptés : '+fh(led.taken)+' j ouvrables')}
+${row('dont jours fériés chômés',holOffD+' j','rémunérés normalement, sans retenue')}
+${row('dont absences non rémunérées',absD+' j','seules absences donnant lieu à retenue')}
+</table></div>
+
+<div class="fsec"><h2>3 · Heures du mois</h2><table>
+${row('Heures effectivement travaillées',fH(r.h),fH(r.hS)+' en solo · '+fH(r.hP)+' en garde partagée')}
+${row('Heures non travaillées mais rémunérées',fH(Math.max(0,(r.partial?0:r.baseHs+r.baseHp)-r.hS-r.hP)),'congés payés, fériés chômés')}
+${row('Heures non travaillées et non rémunérées',fH(r.absH),absD?'retenue appliquée':'—')}
+${row('Heures complémentaires',fH(r.extraS+r.extraP),(r.extraS+r.extraP)>0?'demandées par l\u2019employeur, au taux normal':'—')}
+${r.hsH>0?row('Heures supplémentaires',fH(r.hsH),'au-delà de '+g.hs.seuil+' h/semaine, majorées'):''}
+${r.holWorked>0?row('Jours fériés travaillés',r.holWorked+' j','majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)'):''}
+</table></div>
+
+${g.nav.on?`<div class="fsec"><h2>4 · Abonnement de transport</h2><table>
+${row('Abonnement présenté par la salariée',g.nav.label||'—','')}
+${row('Justificatif reçu pour ce mois',r.nav.justif?'Oui':'Non',r.nav.justif?'':'sans justificatif, aucune prise en charge n\u2019est due')}
+${row('Coût mensuel de l\u2019abonnement',fEur(r.nav.price),'')}
+${row('Prise en charge par l\u2019employeur',fEur(r.nav.amt||r.nav.pending),'frais professionnels : exonérés de cotisations, hors salaire',r.nav.pending?'warnrow':'tot')}
+</table></div>`:''}
+
+<div class="fsec"><h2>${g.nav.on?'5':'4'} · Rémunération du mois</h2><table>
+${row(r.partial?'Salaire au réel sur la période':'Salaire mensualisé de base',fEur(r.partial?r.payReal:r.base),r.partial?fH(r.hS+r.hP)+' effectivement travaillées':'')}
+${r.absEur>0?row('Retenue pour absences non rémunérées','− '+fEur(r.absEur),fH(r.absH)+' × taux horaire moyen'):''}
+${r.extraEur>0?row('Heures complémentaires','+ '+fEur(r.extraEur),''):''}
+${r.hsEur>0?row('Majoration heures supplémentaires','+ '+fEur(r.hsEur),''):''}
+${r.holMaj>0?row('Majoration jours fériés travaillés','+ '+fEur(r.holMaj),''):''}
+${row('Salaire net à déclarer sur Pajemploi',fEur(r.net),'montant net — pajemploi.urssaf.fr','tot')}
+${g.nav.on?row('Remboursement de l\u2019abonnement de transport',r.nav.pending?'en attente du justificatif':'+ '+fEur(r.nav.amt),r.nav.pending?'sera versé dès réception':'versé en plus du salaire, non déclaré comme salaire'):''}
+${row('TOTAL VERSÉ À LA SALARIÉE',fEur(r.toPay),'virement du mois','grand')}
+</table></div>
+
+<div class="fsec"><h2>${g.nav.on?'6':'5'} · Compteur de congés payés</h2>
+<div class="fnote">En jours ouvrables (du lundi au samedi) — période de référence ${MS[cs.pr.fm]} ${cs.pr.fy} → ${MS[cs.pr.tm]} ${cs.pr.ty}</div>
+<table>
+${row('Solde reporté du mois précédent',fh(led.report)+' j','')}
+${row('Droits acquis ce mois','+ '+fh(led.acq)+' j',fh(g.cpAcq)+' j ouvrables par mois de travail effectif'+(r.partial?' — au prorata de la période':''))}
+${row('Congés pris ce mois',led.taken?'− '+fh(led.taken)+' j':'0 j',cpD?cpD+' jour'+(cpD>1?'s':'')+' d\u2019absence marqué'+(cpD>1?'s':'')+' → une semaine complète se décompte '+(g.cpWeek||6)+' j ouvrables':'aucun congé posé')}
+${row('Nouveau solde de congés payés',fh(led.solde)+' j','soit environ '+fh(Math.round(led.solde/(g.cpWeek||6)*10)/10)+' semaine(s)','grand')}
+</table></div>
+
+<div class="ffoot">
+<p><b>Rappels.</b> Le salaire est mensualisé : il est identique chaque mois, y compris pendant les vacances de la salariée et les jours fériés chômés. Seules les absences non rémunérées donnent lieu à retenue. Les heures complémentaires demandées par l'employeur s'ajoutent au salaire du mois concerné. Le remboursement de l'abonnement de transport est un frais professionnel : il n'est pas soumis à cotisations et ne constitue pas un élément de salaire.</p>
+<p>Convention collective nationale des particuliers employeurs et de l'emploi à domicile (IDCC 3239) · Prise en charge des frais de transport : article R3261-9 du Code du travail · Congés payés : 2,5 jours ouvrables par mois de travail effectif.</p>
+<div class="fsign"><div>Fait le ……………………<br><br>Signature de l'employeur</div><div>Signature de la salariée</div></div>
+</div>
+</div>`}
 /* ================= PLUS (hub) ================= */
 function rMore(){
 const el=document.getElementById('pg-more');
