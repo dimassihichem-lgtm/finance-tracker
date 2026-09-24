@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
@@ -227,27 +228,21 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .fbar .ft{font-family:var(--serif);font-weight:600;font-size:16px;flex:1}
 .fscroll{flex:1;overflow-y:auto;padding:14px 12px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
 .fdoc{background:#fff;color:#14171F;border-radius:12px;padding:20px 18px;max-width:760px;margin:0 auto;font-size:12.5px;line-height:1.45}
-.fhead{border-bottom:2px solid #14171F;padding-bottom:11px;margin-bottom:14px}
-.fhead h1{font-family:var(--serif);font-size:19px;font-weight:600;margin-bottom:7px;letter-spacing:-.01em}
-.fhead .fsub{font-size:11.5px;color:#41485C;line-height:1.6}
-.fhead .fmonth{margin-top:7px;font-size:13px}
-.fhead .warn{color:#B4442F;font-weight:600}
-.fsec{margin-bottom:16px;break-inside:avoid}
-.fsec h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:#14171F;padding:5px 9px;border-radius:5px;margin-bottom:7px}
-.fsec .fnote{font-size:11px;color:#5A6478;margin-bottom:6px;font-style:italic}
+.fhead{border-bottom:2px solid #14171F;padding-bottom:12px;margin-bottom:18px}
+.fhead h1{font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px}
+.fhead .fmonth{font-size:15px;font-weight:600;color:#41485C;margin-bottom:5px}
+.fhead .fsub{font-size:11.5px;color:#5A6478;line-height:1.6}
+.fsec{margin-bottom:20px;break-inside:avoid}
+.fsec h2{font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:#fff;background:#14171F;padding:6px 10px;border-radius:5px;margin-bottom:9px}
+.fsec .fintro{font-size:11.5px;color:#41485C;font-style:italic;line-height:1.5;margin-bottom:9px}
 .fdoc table{width:100%;border-collapse:collapse}
-.fdoc td{padding:6px 5px;border-bottom:1px solid #E4E7EE;vertical-align:top}
-.fdoc td:first-child{width:46%}
-.fdoc td.v{width:20%;text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
-.fdoc td.n{width:34%;font-size:10.5px;color:#6B7488;font-style:italic}
-.fdoc tr.tot td{background:#FBF6E7;font-weight:700}
-.fdoc tr.warnrow td{background:#FDF0EE}
-.fdoc tr.grand td{background:#14171F;color:#fff;font-weight:700;font-size:14px;border:none}
-.fdoc tr.grand td.n{color:#A8B0C4;font-size:10px;font-weight:400}
-.ffoot{margin-top:18px;padding-top:11px;border-top:1px solid #C8CDD9;font-size:10px;color:#5A6478;line-height:1.55}
-.ffoot p{margin-bottom:7px}
-.fsign{display:flex;gap:24px;margin-top:20px;font-size:11px;color:#14171F}
-.fsign div{flex:1;border-top:1px solid #9AA2B4;padding-top:6px}
+.fdoc td{padding:8px 4px;border-bottom:1px solid #E4E7EE;vertical-align:top;font-size:13px}
+.fdoc td.v{width:34%;text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.fdoc td .rn{font-size:10.5px;color:#6B7488;font-style:italic;margin-top:2px;font-family:var(--sans)}
+.fdoc tr.grand td{background:#F4EFE0;font-weight:700;font-size:15px;border-bottom:none}
+.ffootnote{font-size:10.5px;color:#6B7488;line-height:1.55;margin-top:9px;font-style:italic}
+.fsign{display:flex;gap:26px;margin-top:26px;font-size:11.5px;color:#14171F}
+.fsign div{flex:1;border-top:1px solid #9AA2B4;padding-top:7px}
 @media print{
   body{background:#fff}
   #app,#lock,#wiz,#nav,.fbar{display:none!important}
@@ -303,7 +298,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
     <button class="icobtn" onclick="closeFiche()">✕</button>
     <div class="ft">Fiche mensuelle</div>
     <button class="icobtn" onclick="shareFiche()" title="Partager un résumé">↗</button>
-    <button class="btn btn-gold sm" onclick="window.print()">Imprimer / PDF</button>
+    <button class="btn btn-gold sm" onclick="downloadPdf()">⤓ PDF</button>
   </div>
   <div class="fscroll" id="fiche-body"></div>
 </div>
@@ -338,7 +333,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v18';const VTAG='heures compl. au taux normal';
+const VERSION='v19';const VTAG='fiche simplifiée + PDF';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -929,11 +924,12 @@ const after=!!ct&&(y*12+m)>(ctY*12+ctM);
 const partialIn=!!cf&&y===cfY&&m===cfM&&cfD>1;
 const partialOut=!!ct&&y===ctY&&m===ctM&&ctD<nd;
 const partial=partialIn||partialOut;
-if(before||after)return{base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null};
+if(before||after)return{base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null};
 const plEnd=planFor(gKey(y,m,nd));const wk=plEnd?planWeekly(plEnd):{s:0,p:0};
 const baseHs=wk.s*52/12,baseHp=wk.p*52/12;const base=baseHs*g.rate+baseHp*g.rateShared;
-let hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0;
+let planH=0,hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0;
 for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
+if(i.status!=='before'&&i.status!=='after')planH+=i.prev.s+i.prev.p;
 if(i.cp){cp++;continue}if(i.abs){abs++;absH+=i.prev.s+i.prev.p;absEur+=payOf(i.prev,g);continue}
 if(i.status==='holoff'){holOff++;holOffH+=i.prev.s+i.prev.p;holOffEur+=payOf(i.prev,g);continue}
 const t=i.eff.s+i.eff.p;if(t>0){days++;hS+=i.eff.s;hP+=i.eff.p;payReal+=payOf(i.eff,g)}
@@ -958,7 +954,7 @@ let net,paidH;
 if(partial){net=payReal+holMaj+hsEur+compEur;paidH=hS+hP;extraH=0;extraEur=0;reclassEur=0}
 else if(g.mode==='mensualise'){net=base+extraEur+reclassEur+holMaj+hsEur+compEur-absEur;paidH=baseHs+baseHp-absH+extraH}
 else{net=hS*g.rate+hP*g.rateShared+cp*g.cpHours*g.rate+(g.holOffPaid===false?0:holOffEur)+holMaj+hsEur+compEur;paidH=hS+hP+cp*g.cpHours+(g.holOffPaid===false?0:holOffH)}
-return{base,baseHs,baseHp,wk,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
 function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
 function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padStart(2,'0');
 if(!n.on)return{amt:0,justif:false,base:'désactivé'};
@@ -1296,118 +1292,128 @@ function gSave(){save();gResync();rGarde()}
 function gResync(){DB.bm.forEach(b=>syncMonth(b))}
 
 /* ================= FICHE MENSUELLE (à remettre à la salariée) ================= */
-function fEur(n){return (Math.round(n*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function fEur(n){return (Math.round(n*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20AC'}
 function fH(n){return fh(Math.round(n*100)/100)+' h'}
+let FY=0,FM=0;
 function openFiche(y,m){FY=y;FM=m;document.getElementById('fiche').classList.add('on');rFiche();window.scrollTo(0,0)}
 function closeFiche(){document.getElementById('fiche').classList.remove('on')}
-let FY=0,FM=0;
-function ficheText(){const r=gardeCost(FY,FM);const cs=cpStatus(FY,FM);const g=DB.garde;
-return 'Garde à domicile — '+ML[FM]+' '+FY+'\n'
-+'Heures travaillées : '+fh(r.h)+' h\n'
-+'Salaire net : '+fEur(r.net)+'\n'
-+(g.nav.on&&r.nav.amt?'Transport : '+fEur(r.nav.amt)+'\n':'')
-+'TOTAL VERSÉ : '+fEur(r.toPay)+'\n'
-+'Solde congés payés : '+fh(cs.led.solde)+' j ouvrables'}
-function shareFiche(){const t=ficheText();
-if(navigator.share){navigator.share({title:'Fiche '+ML[FM]+' '+FY,text:t}).catch(()=>{})}
-else if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>alert('Résumé copié dans le presse-papier'))}
-else alert(t)}
+
+function ficheData(y,m){
+const g=DB.garde;const r=gardeCost(y,m);const L=cpLedger(y,m);const pr=cpPeriod(y,m);
+const nd=new Date(y,m,0).getDate();
+const pl=planFor(gKey(y,m,nd))||g.plans[g.plans.length-1];const wk=pl?planWeekly(pl):{s:0,p:0};
+const hebdo=wk.s+wk.p;const mens=g.mode==='mensualise'&&!r.partial;const B=[];
+
+const pay=[{l:'Salaire net',v:fEur(r.net)}];
+if(g.nav.on){
+ if(r.nav.pending>0)pay.push({l:'Remboursement transport',v:'en attente',note:'versé dès réception de votre justificatif d\u2019abonnement'});
+ else if(r.nav.amt>0)pay.push({l:'Remboursement transport',v:fEur(r.nav.amt),note:'frais professionnels, non imposables'});}
+pay.push({l:'TOTAL VERSÉ',v:fEur(r.toPay),strong:true});
+B.push({t:'Ce que vous percevez ce mois',rows:pay});
+
+const calc=[];let intro='';
+if(r.partial&&r.partialIn){
+ intro='Votre contrat a débuté le '+kDate(r.from).toLocaleDateString('fr-FR')+'. Ce premier mois est payé sur les heures réellement travaillées. Dès le mois suivant, vous percevrez chaque mois le même salaire de '+fEur(r.base)+', congés et jours fériés compris.';
+ calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
+ if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
+}else if(r.partial){
+ intro='Votre contrat se termine le '+kDate(r.to).toLocaleDateString('fr-FR')+'. Ce dernier mois est payé sur les heures réellement travaillées.';
+ calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
+ if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
+}else if(mens){
+ intro='Votre salaire est identique chaque mois : '+fh(hebdo)+' h par semaine lissées sur l\u2019année, congés payés et jours fériés compris.';
+ calc.push({l:'Salaire mensuel convenu',v:fEur(r.base)});
+ if(r.extraEur>0)calc.push({l:'Heures en plus : '+fH(r.extraH),v:'+ '+fEur(r.extraEur)});
+ if(r.reclassEur>0)calc.push({l:'Heures prévues en garde partagée effectuées seule',v:'+ '+fEur(r.reclassEur),note:'payées '+fEur(g.rate)+' au lieu de '+fEur(g.rateShared)});
+ if(r.absEur>0)calc.push({l:'Absences non rémunérées : '+fH(r.absH),v:'\u2212 '+fEur(r.absEur)});
+}else{
+ intro='Votre salaire est calculé chaque mois sur les heures réellement effectuées.';
+ calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
+ if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
+ if(r.cp>0)calc.push({l:'Congés payés : '+r.cp+' j',v:fEur(r.cp*g.cpHours*g.rate)});
+ if(r.holOff>0&&g.holOffPaid!==false)calc.push({l:'Jours fériés chômés : '+r.holOff+' j',v:fEur(r.holOffEur)});}
+if(r.holMaj>0)calc.push({l:'Majoration jours fériés travaillés',v:'+ '+fEur(r.holMaj)});
+if(r.hsEur>0)calc.push({l:'Majoration au-delà de '+g.hs.seuil+' h/semaine',v:'+ '+fEur(r.hsEur)});
+if(r.compEur>0)calc.push({l:'Majoration heures complémentaires',v:'+ '+fEur(r.compEur)});
+calc.push({l:'Salaire net',v:fEur(r.net),strong:true});
+B.push({t:'Comment votre salaire est calculé',intro,rows:calc});
+
+const ec=Math.round((r.h-r.planH)*100)/100;
+const hr=[{l:'Heures travaillées ce mois',v:fH(r.h)},{l:'Heures prévues au contrat',v:fH(r.planH)}];
+if(Math.abs(ec)>0.001)hr.push({l:ec>0?'Heures effectuées en plus':'Heures non effectuées',v:fH(Math.abs(ec)),strong:true});
+B.push({t:'Vos heures',rows:hr,
+ foot:'Les heures effectuées en plus vous sont payées au taux horaire normal. La majoration de '+g.hs.maj1+' % ne s\u2019applique qu\u2019au-delà de '+g.hs.seuil+' heures par semaine (convention collective des particuliers employeurs, IDCC 3239).'});
+
+B.push({t:'Vos congés payés',rows:[
+ {l:'Solde du mois précédent',v:fh(L.report)+' j'},
+ {l:'Acquis ce mois',v:'+ '+fh(L.acq)+' j'},
+ {l:'Pris ce mois',v:L.taken?'\u2212 '+fh(L.taken)+' j':'0 j',note:r.cp?r.cp+' jour'+(r.cp>1?'s':'')+' d\u2019absence = '+fh(L.taken)+' jours ouvrables décomptés':''},
+ {l:'SOLDE',v:fh(L.solde)+' j',strong:true}],
+ foot:'En jours ouvrables (du lundi au samedi). Vous acquérez '+fh(g.cpAcq)+' jours par mois travaillé, soit 5 semaines par an. Période de référence : '+MS[pr.fm]+' '+pr.fy+' \u2192 '+MS[pr.tm]+' '+pr.ty+'.'});
+
+return{month:ML[m]+' '+y,sal:g.id.sal||'',empl:g.id.empl||'',blocks:B,net:r.net,toPay:r.toPay,solde:L.solde};}
+
 function rFiche(){
-const g=DB.garde,y=FY,m=FM;const r=gardeCost(y,m);const cs=cpStatus(y,m);const led=cs.led;
-const nd=new Date(y,m,0).getDate();const p=g.p;
-const pl=planFor(gKey(y,m,nd))||g.plans[g.plans.length-1];const wk=planWeekly(pl);
-const hebdo=wk.s+wk.p;const moy=hebdo>0?(wk.s*g.rate+wk.p*g.rateShared)/hebdo:0;
-const brutRate=moy/(1-p.txSal/100);
-const creneaux=(()=>{let n=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};if((+d.s||0)+(+d.p||0)>0)n++}return n})();
-// Comptage des jours du mois
-let prevDays=0,worked=0,cpD=0,holOffD=0,absD=0;
-for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
- if(i.status==='before'||i.status==='after')continue;
- const pv=planDay(k);if((pv.s+pv.p)>0)prevDays++;
- if(i.status==='cp')cpD++;else if(i.status==='abs')absD++;else if(i.status==='holoff')holOffD++;
- else if((i.eff.s+i.eff.p)>0)worked++}
-const hPrev=r.partial?r.hS+r.hP:r.baseHs+r.baseHp;
-const hNonTrav=Math.max(0,hPrev-r.hS-r.hP+ (r.partial?0:0));
-const periode=r.partial?(r.from?kDate(r.from).toLocaleDateString('fr-FR'):'01/'+String(m).padStart(2,'0')+'/'+y)+' → '+(r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(m).padStart(2,'0')+'/'+y):'mois civil complet';
-const row=(l,v,note,cls)=>'<tr class="'+(cls||'')+'"><td>'+l+'</td><td class="v">'+v+'</td><td class="n">'+(note||'')+'</td></tr>';
-
+const d=ficheData(FY,FM);
 document.getElementById('fiche-body').innerHTML=`
-<div class="fdoc" id="fdoc">
+<div class="fdoc">
 <div class="fhead">
-  <h1>Fiche mensuelle de garde à domicile</h1>
-  <div class="fsub"><b>Salariée :</b> ${g.id.sal||'—'}${g.id.salRole?', '+g.id.salRole:''} &nbsp;·&nbsp; <b>Employeur :</b> ${g.id.empl||'—'}${g.id.addr?', '+g.id.addr:''}</div>
-  <div class="fmonth">Mois concerné : <b>${ML[m].toLowerCase()} ${y}</b>${r.partial?' <span class="warn">— '+(r.partialIn?'mois d\u2019embauche':'mois de fin de contrat')+', période du '+periode+'</span>':''}</div>
+  <h1>Fiche de paie simplifiée</h1>
+  <div class="fmonth">${d.month}</div>
+  <div class="fsub">${d.sal?'<b>Salariée :</b> '+d.sal:''}${d.empl?' &nbsp;·&nbsp; <b>Employeur :</b> '+d.empl:''}</div>
 </div>
-
-<div class="fsec"><h2>1 · Paramètres du contrat</h2><table>
-${row('Jours et horaires prévus au contrat',g.id.horaires||'—','')}
-${row('Heures hebdo auprès des seuls enfants de l\u2019employeur',fH(wk.s),'à '+fEur(g.rate)+' net de l\u2019heure')}
-${row('Heures hebdo en garde partagée',fH(wk.p),'à '+fEur(g.rateShared)+' net de l\u2019heure')}
-${row('Durée hebdomadaire totale',fH(hebdo),creneaux+' créneau'+(creneaux>1?'x':'')+' par semaine','tot')}
-${row('Taux horaire net moyen du contrat',fEur(moy),'moyenne pondérée des deux taux')}
-${row('Taux horaire brut correspondant',fEur(brutRate),'minimum conventionnel à vérifier')}
-${row('Heures mensualisées',fH(r.baseHs+r.baseHp),'durée hebdo × 52 ÷ 12 — identique chaque mois')}
-${row('Salaire mensuel net de base',fEur(r.base),'versé en totalité chaque mois, congés compris','tot')}
-${row('Salaire mensuel brut de base',fEur(r.base/(1-p.txSal/100)),'')}
-${row('Part employeur de l\u2019abonnement de transport',fh(r.nav.pct)+' %',r.nav.base)}
-</table></div>
-
-<div class="fsec"><h2>2 · Jours du mois</h2><table>
-${row('Jours de garde prévus au contdrat'.replace('contdrat','contrat'),prevDays+' j','jours du planning tombant dans le mois')}
-${row('dont jours effectivement travaillés',worked+' j','')}
-${row('dont jours de congés payés',cpD+' j','décomptés : '+fh(led.taken)+' j ouvrables')}
-${row('dont jours fériés chômés',holOffD+' j','rémunérés normalement, sans retenue')}
-${row('dont absences non rémunérées',absD+' j','seules absences donnant lieu à retenue')}
-</table></div>
-
-<div class="fsec"><h2>3 · Heures du mois</h2><table>
-${row('Heures effectivement travaillées',fH(r.h),fH(r.hS)+' en solo · '+fH(r.hP)+' en garde partagée')}
-${row('Heures non travaillées mais rémunérées',fH(Math.max(0,(r.partial?0:r.baseHs+r.baseHp)-r.hS-r.hP)),'congés payés, fériés chômés')}
-${row('Heures non travaillées et non rémunérées',fH(r.absH),absD?'retenue appliquée':'—')}
-${row('Heures complémentaires',fH(Math.max(r.compH,r.extraH)),r.compH>0?'au-delà de la durée contractuelle de '+fh(r.wk.s+r.wk.p)+' h/semaine':'—')}
-${r.hsH>0?row('Heures supplémentaires',fH(r.hsH),'au-delà de '+g.hs.seuil+' h/semaine, majorées'):''}
-${r.holWorked>0?row('Jours fériés travaillés',r.holWorked+' j','majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)'):''}
-</table></div>
-
-${g.nav.on?`<div class="fsec"><h2>4 · Abonnement de transport</h2><table>
-${row('Abonnement présenté par la salariée',g.nav.label||'—','')}
-${row('Justificatif reçu pour ce mois',r.nav.justif?'Oui':'Non',r.nav.justif?'':'sans justificatif, aucune prise en charge n\u2019est due')}
-${row('Coût mensuel de l\u2019abonnement',fEur(r.nav.price),'')}
-${row('Prise en charge par l\u2019employeur',fEur(r.nav.amt||r.nav.pending),'frais professionnels : exonérés de cotisations, hors salaire',r.nav.pending?'warnrow':'tot')}
-</table></div>`:''}
-
-<div class="fsec"><h2>${g.nav.on?'5':'4'} · Rémunération du mois</h2><table>
-${r.partial?row('Salaire au réel sur la période',fEur(r.payReal),fH(r.hS+r.hP)+' effectivement travaillées')
-:(g.mode==='mensualise'?row('Salaire mensualisé de base',fEur(r.base),fH(r.baseHs+r.baseHp)+' · identique chaque mois')
-:row('Heures solo',fEur(r.hS*g.rate),fH(r.hS)+' × '+fEur(g.rate))+(r.hP>0?row('Heures partagées',fEur(r.hP*g.rateShared),fH(r.hP)+' × '+fEur(g.rateShared)):'')
-+(r.cp>0?row('Congés payés',fEur(r.cp*g.cpHours*g.rate),r.cp+' j marqué'+(r.cp>1?'s':'')+' × '+fh(g.cpHours)+' h'):'')
-+(r.holOff>0?row('Jours fériés chômés',g.holOffPaid===false?fEur(0):fEur(r.holOffEur),r.holOff+' j · maintien de salaire'):''))}
-${r.absEur>0?row('Retenue pour absences non rémunérées','− '+fEur(r.absEur),fH(r.absH)+' × taux horaire moyen'):''}
-${r.extraEur>0?row('Heures complémentaires','+ '+fEur(r.extraEur),fH(r.extraH)+' au-delà du planning'):''}
-${r.reclassEur>0?row('Ajustement solo / partagé','+ '+fEur(r.reclassEur),'heures prévues en garde partagée effectuées en solo'):''}
-${r.compEur>0?row('Majoration heures complémentaires','+ '+fEur(r.compEur),fH(r.compH)+' · majoration contractuelle'):''}
-${r.hsEur>0?row('Majoration heures supplémentaires','+ '+fEur(r.hsEur),''):''}
-${r.holMaj>0?row('Majoration jours fériés travaillés','+ '+fEur(r.holMaj),''):''}
-${row('Salaire net à déclarer sur Pajemploi',fEur(r.net),'montant net — pajemploi.urssaf.fr','tot')}
-${g.nav.on?row('Remboursement de l\u2019abonnement de transport',r.nav.pending?'en attente du justificatif':'+ '+fEur(r.nav.amt),r.nav.pending?'sera versé dès réception':'versé en plus du salaire, non déclaré comme salaire'):''}
-${row('TOTAL VERSÉ À LA SALARIÉE',fEur(r.toPay),'virement du mois','grand')}
-</table></div>
-
-<div class="fsec"><h2>${g.nav.on?'6':'5'} · Compteur de congés payés</h2>
-<div class="fnote">En jours ouvrables (du lundi au samedi) — période de référence ${MS[cs.pr.fm]} ${cs.pr.fy} → ${MS[cs.pr.tm]} ${cs.pr.ty}</div>
-<table>
-${row('Solde reporté du mois précédent',fh(led.report)+' j','')}
-${row('Droits acquis ce mois','+ '+fh(led.acq)+' j',fh(g.cpAcq)+' j ouvrables par mois de travail effectif'+(r.partial?' — au prorata de la période':''))}
-${row('Congés pris ce mois',led.taken?'− '+fh(led.taken)+' j':'0 j',cpD?cpD+' jour'+(cpD>1?'s':'')+' d\u2019absence marqué'+(cpD>1?'s':'')+' → une semaine complète se décompte '+(g.cpWeek||6)+' j ouvrables':'aucun congé posé')}
-${row('Nouveau solde de congés payés',fh(led.solde)+' j','soit environ '+fh(Math.round(led.solde/(g.cpWeek||6)*10)/10)+' semaine(s)','grand')}
-</table></div>
-
-<div class="ffoot">
-<p><b>Rappels.</b> Le salaire est mensualisé : il est identique chaque mois, y compris pendant les vacances de la salariée et les jours fériés chômés. Seules les absences non rémunérées donnent lieu à retenue. Les heures complémentaires demandées par l'employeur s'ajoutent au salaire du mois concerné. Le remboursement de l'abonnement de transport est un frais professionnel : il n'est pas soumis à cotisations et ne constitue pas un élément de salaire.</p>
-<p>Convention collective nationale des particuliers employeurs et de l'emploi à domicile (IDCC 3239) · Prise en charge des frais de transport : article R3261-9 du Code du travail · Congés payés : 2,5 jours ouvrables par mois de travail effectif.</p>
+${d.blocks.map(b=>`<div class="fsec"><h2>${b.t}</h2>
+${b.intro?'<div class="fintro">'+b.intro+'</div>':''}
+<table>${b.rows.map(r=>'<tr class="'+(r.strong?'grand':'')+'"><td>'+r.l+(r.note?'<div class="rn">'+r.note+'</div>':'')+'</td><td class="v">'+r.v+'</td></tr>').join('')}</table>
+${b.foot?'<div class="ffootnote">'+b.foot+'</div>':''}</div>`).join('')}
 <div class="fsign"><div>Fait le ……………………<br><br>Signature de l'employeur</div><div>Signature de la salariée</div></div>
-</div>
-</div>`}
+</div>`;}
+
+function shareFiche(){const d=ficheData(FY,FM);
+const t='Fiche de paie \u2014 '+d.month+'\n\nTotal versé : '+fEur(d.toPay)+'\nSolde de congés payés : '+fh(d.solde)+' jours ouvrables';
+if(navigator.share)navigator.share({title:'Fiche '+d.month,text:t}).catch(()=>{});
+else if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>alert('Résumé copié'));
+else alert(t);}
+
+function downloadPdf(){
+const J=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+if(!J){alert('Le module PDF n\u2019a pas pu être chargé. Vérifiez votre connexion.');return}
+const d=ficheData(FY,FM);const doc=new J({unit:'mm',format:'a4'});
+const M=18,W=210,RW=W-2*M;let y=22;
+const line=(txt,size,style,color,gap)=>{doc.setFont('helvetica',style||'normal');doc.setFontSize(size);
+ doc.setTextColor(color||'#14171F');const ls=doc.splitTextToSize(txt,RW);ls.forEach(l=>{doc.text(l,M,y);y+=size*0.42});y+=(gap||0)};
+doc.setFont('helvetica','bold');doc.setFontSize(17);doc.setTextColor('#14171F');
+doc.text('Fiche de paie simplifiée',M,y);y+=7;
+doc.setFont('helvetica','normal');doc.setFontSize(12);doc.text(d.month,M,y);y+=6;
+if(d.sal||d.empl){doc.setFontSize(9);doc.setTextColor('#5A6478');
+ doc.text((d.sal?'Salariée : '+d.sal:'')+(d.empl?'     Employeur : '+d.empl:''),M,y);y+=5}
+doc.setDrawColor('#14171F');doc.setLineWidth(.5);doc.line(M,y,W-M,y);y+=8;
+d.blocks.forEach(b=>{
+ if(y>252){doc.addPage();y=22}
+ doc.setFillColor('#14171F');doc.rect(M,y-4.6,RW,6.6,'F');
+ doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor('#FFFFFF');
+ doc.text(b.t.toUpperCase(),M+2.5,y);y+=8;
+ if(b.intro){doc.setFont('helvetica','italic');doc.setFontSize(8.3);doc.setTextColor('#41485C');
+  doc.splitTextToSize(b.intro,RW).forEach(l=>{doc.text(l,M,y);y+=3.9});y+=2.5}
+ b.rows.forEach(r=>{
+  if(y>276){doc.addPage();y=22}
+  if(r.strong){doc.setFillColor('#F4EFE0');doc.rect(M,y-4,RW,6.2,'F')}
+  doc.setFont('helvetica',r.strong?'bold':'normal');doc.setFontSize(r.strong?10:9.3);
+  doc.setTextColor('#14171F');doc.text(r.l,M+1.5,y);
+  doc.text(r.v,W-M-1.5,y,{align:'right'});y+=5.2;
+  if(r.note){doc.setFont('helvetica','italic');doc.setFontSize(7.6);doc.setTextColor('#6B7488');
+   doc.splitTextToSize(r.note,RW-4).forEach(l=>{doc.text(l,M+1.5,y);y+=3.4});y+=.8}
+  doc.setDrawColor('#E4E7EE');doc.setLineWidth(.2);doc.line(M,y-3.4,W-M,y-3.4)});
+ if(b.foot){y+=1.5;doc.setFont('helvetica','italic');doc.setFontSize(7.8);doc.setTextColor('#6B7488');
+  doc.splitTextToSize(b.foot,RW).forEach(l=>{doc.text(l,M,y);y+=3.5})}
+ y+=7});
+if(y>250){doc.addPage();y=22}
+y+=6;doc.setDrawColor('#9AA2B4');doc.setLineWidth(.3);
+doc.line(M,y,M+70,y);doc.line(W-M-70,y,W-M,y);y+=4.5;
+doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor('#14171F');
+doc.text('Signature de l\u2019employeur',M,y);doc.text('Signature de la salariée',W-M-70,y);
+doc.save('fiche-'+String(FM).padStart(2,'0')+'-'+FY+'.pdf');}
+
 /* ================= PLUS (hub) ================= */
 function rMore(){
 const el=document.getElementById('pg-more');
