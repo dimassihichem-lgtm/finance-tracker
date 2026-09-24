@@ -223,6 +223,15 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .cal-cell.zerod{border-color:var(--dn);border-style:dashed}
 .cal-cell.hol .dn::after{content:'✦';font-size:7px;color:var(--blue);margin-left:2px;vertical-align:top}
 .cal-cell.cp .dn{color:var(--tx)}
+/* ===== MODE CONFIDENTIALITÉ ===== */
+body.privacy .mono,body.privacy .hv,body.privacy .sv,body.privacy .sf,body.privacy .av,body.privacy .hb,body.privacy .aux,
+body.privacy .cost-line b,body.privacy .wiz-recap-line b,body.privacy .sv2,body.privacy .wiz-ref b,
+body.privacy .chip.tag-up,body.privacy .chip.tag-dn,body.privacy canvas,body.privacy input[type=number],
+body.privacy .prm .mono,body.privacy td.mono,body.privacy .stat .sv{filter:blur(7px);user-select:none;transition:filter .15s}
+body.privacy input[type=number]:focus{filter:none}
+body.privacy #fiche *{filter:none!important}
+body.privacy .hdr .brand::after{content:' · privé';font-size:11px;color:var(--td);font-style:normal;letter-spacing:.04em}
+#privbtn.on{border-color:var(--gold);color:var(--gold);background:var(--goldDim)}
 /* ===== FICHE MENSUELLE ===== */
 #fiche{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;background:var(--bg)}
 #fiche.on{display:flex}
@@ -273,6 +282,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
       <div class="sub" id="hdr-sub"></div>
     </div>
     <div class="sp">
+      <button class="icobtn" id="privbtn" onclick="togPriv()" title="Masquer / afficher les montants">👁</button>
       <span class="sync" id="ss">…</span>
       <button class="icobtn" onclick="xport()" title="Exporter une sauvegarde">⤓</button>
       <label class="icobtn" title="Restaurer une sauvegarde" style="cursor:pointer">⤒<input type="file" accept=".json" style="display:none" onchange="imp(event)"></label>
@@ -336,7 +346,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v20';const VTAG='audit complet';
+const VERSION='v21';const VTAG='mode confidentialité';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -426,7 +436,11 @@ function ud(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.togg
 /* ===== ROUTER / INIT ===== */
 let PG='home',SUB='hub',bY,bM,iY,iM,CHS={};
 let dF={fy:2025,fm:12,ty:2026,tm:12},iCf={fy:2025,fm:12,ty:2026,tm:12},bCf={fy:2025,fm:12,ty:2026,tm:12};
-function initApp(){const n=new Date();
+let PRIV=false;
+function applyPriv(){document.body.classList.toggle('privacy',PRIV);const b=document.getElementById('privbtn');if(b){b.textContent=PRIV?'🙈':'👁';b.classList.toggle('on',PRIV)}}
+function togPriv(){PRIV=!PRIV;try{localStorage.setItem('hft7_priv',PRIV?'1':'0')}catch(e){}applyPriv()}
+function initPriv(){try{PRIV=localStorage.getItem('hft7_priv')==='1'}catch(e){}applyPriv()}
+function initApp(){initPriv();const n=new Date();
 const lastB=sBM();const lb=lastB.length?lastB[lastB.length-1]:{y:n.getFullYear(),m:n.getMonth()+1};
 bY=lb.y;bM=lb.m;
 const lastI=sIM();const li=lastI.length?lastI[lastI.length-1]:{y:bY,m:bM};
