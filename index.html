@@ -219,6 +219,8 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .nbtn{font-size:10px}
 .cal-cell.cp{background:var(--upDim);border-color:rgba(63,207,142,.45)}
 .cal-cell.absd{background:var(--dnDim);border-color:rgba(240,113,111,.45)}
+.cal-cell.sickd{background:rgba(167,139,250,.14);border-color:rgba(167,139,250,.45)}
+.cal-cell.zerod{border-color:var(--dn);border-style:dashed}
 .cal-cell.hol .dn::after{content:'✦';font-size:7px;color:var(--blue);margin-left:2px;vertical-align:top}
 .cal-cell.cp .dn{color:var(--tx)}
 /* ===== FICHE MENSUELLE ===== */
@@ -308,7 +310,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
     <div class="row rb">
       <div>
         <div class="eyebrow">Mise à jour mensuelle</div>
-        <div class="serif" style="font-size:19px;font-weight:600" id="wiz-month"></div>
+        <div class="row" style="gap:8px"><button class="icobtn" style="width:28px;height:28px;font-size:12px" onclick="wizShift(-1)">◀</button><div class="serif" style="font-size:19px;font-weight:600" id="wiz-month"></div><button class="icobtn" style="width:28px;height:28px;font-size:12px" onclick="wizShift(1)">▶</button></div>
       </div>
       <button class="icobtn" onclick="wizClose()">✕</button>
     </div>
@@ -326,6 +328,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 const ML=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const MS=['','Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
 const f$=n=>typeof n==='number'?n.toLocaleString('fr-FR'):n;
+const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fk=n=>(n/1000).toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1})+'k';
 const cyc=s=>({a_faire:'en_cours',en_cours:'fait',fait:'a_faire'})[s];
 const pM=(y,m)=>m===1?{y:y-1,m:12}:{y,m:m-1};
@@ -333,7 +336,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v19';const VTAG='fiche simplifiée + PDF';
+const VERSION='v20';const VTAG='audit complet';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -363,7 +366,7 @@ else{el.textContent='…';el.style.color='var(--td)'}}
 
 /* ===== STORAGE (clé hft7 conservée) ===== */
 let DB,svT=null;
-function ensure(){if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
+function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
 if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde()}
 function load(){
 try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}
@@ -373,7 +376,7 @@ if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok')}).catch(e=>{postLoad();sss('error')})}else postLoad()}
 function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
-function save(){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
+function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
 function s2c(){if(!fdb)return;sss('saving');const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).then(()=>sss('ok')).catch(e=>sss('error'))}
@@ -445,7 +448,7 @@ const NOLEG={plugins:{legend:{display:false}},responsive:true,maintainAspectRati
 /* ================= ACCUEIL ================= */
 function rHome(){
 const el=document.getElementById('pg-home');
-const B=sBM();const last=B.length?B[B.length-1]:null;const prev=B.length>1?B[B.length-2]:null;
+const B=sBM().filter(d=>d.sav>0||d.sap>0);const last=B.length?B[B.length-1]:null;const prev=B.length>1?B[B.length-2]:null;
 const lastI=last?gIM(last.y,last.m):null;const prevI=prev?gIM(prev.y,prev.m):null;
 const patri=calcPatri(last,lastI);const patriP=calcPatri(prev,prevI);
 const gain=patriP>0?patri-patriP:0;const dC=(last&&prev)?(last.sav-prev.sav):0;
@@ -537,7 +540,11 @@ let WZ={on:false,y:0,m:0,step:0,steps:[]};
 function whereHint(name){const n=(name||'').toLowerCase();
 if(n.includes('amundi')||n.includes('pee')||n.includes('perco'))return'📍 App Amundi / ERES';
 return'📍 App Boursorama'}
-function wizStart(){const n=new Date();wizStartFor(n.getFullYear(),n.getMonth()+1)}
+function wizStart(){const n=new Date();let y=n.getFullYear(),m=n.getMonth()+1;
+// les 5 premiers jours du mois, on clôture d'abord le mois précédent s'il ne l'est pas
+if(n.getDate()<=5){const pv=pM(y,m);const b=gBM(pv.y,pv.m);if(!b||!b.cl){y=pv.y;m=pv.m}}
+wizStartFor(y,m)}
+function wizShift(d){const r=d>0?nM(WZ.y,WZ.m):pM(WZ.y,WZ.m);wizStartFor(r.y,r.m)}
 function wizStartFor(y,m){
 WZ.y=y;WZ.m=m;WZ.step=0;
 gOBM(y,m);const im=gOIM(y,m);syncMonth(gBM(y,m));
@@ -643,11 +650,11 @@ body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Récapitulatif</div>
 <button class="btn btn-ghost wide" style="margin-top:16px" onclick="gOBM(WZ.y,WZ.m).cl=true;gOIM(WZ.y,WZ.m).cl=true;save();wizClose()">✓ Enregistrer & clôturer le mois</button>`}
 const fi=body.querySelector('.wiz-input');if(fi&&st.t!=='recap')setTimeout(()=>fi.focus(),120)}
 
-function wzContribsHtml(im){return im.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOIM(WZ.y,WZ.m).contribs.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucun versement</div>'}
+function wzContribsHtml(im){return im.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOIM(WZ.y,WZ.m).contribs.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucun versement</div>'}
 function wzAddContrib(){const l=document.getElementById('wzc-l').value.trim();if(!l)return;gOIM(WZ.y,WZ.m).contribs.push({l,v:+document.getElementById('wzc-v').value||0});save();wizRender()}
-function wzRevHtml(cm){return (cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).rev.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune aide</div>'}
+function wzRevHtml(cm){return (cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).rev.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune aide</div>'}
 function wzAddRev(){const l=document.getElementById('wzr-l').value.trim();if(!l)return;const d=gOBM(WZ.y,WZ.m);if(!d.rev)d.rev=[];d.rev.push({l,v:+document.getElementById('wzr-v').value||0});save();wizRender()}
-function wzChargesHtml(cm){return cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
+function wzChargesHtml(cm){return cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
 function wzAddCharge(){const l=document.getElementById('wzch-l').value.trim();if(!l)return;gOBM(WZ.y,WZ.m).ch.push({l,v:+document.getElementById('wzch-v').value||0});save();wizRender()}
 function wzExcepHtml(cm){return cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:14px">'+d.l+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ex.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Rien pour l\u2019instant — c\u2019est bon signe</div>'}
 function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();const v=+document.getElementById('wze-v').value;if(!l||!v)return;gOBM(WZ.y,WZ.m).ex.push({l,v});save();wizRender()}
@@ -662,7 +669,7 @@ return `<div class="mtools">
 <button class="btn btn-danger xs" onclick="${onPurge}">Purger…</button>
 </div>`}
 
-function rBudget(){
+function rBudget(){if(!bY){const n=new Date();bY=n.getFullYear();bM=n.getMonth()+1}
 const el=document.getElementById('pg-budget');
 const cm=gBM(bY,bM)||defBM(bY,bM);const exists=!!gBM(bY,bM);if(exists)syncMonth(cm);
 const pv=pM(bY,bM);const pvD=gBM(pv.y,pv.m);
@@ -693,6 +700,7 @@ ${monthTools('b',bY,bM,"var y=+document.getElementById('bAY').value,m=+document.
 <div class="stat"><div class="sl">Revenus</div><div class="sv mono" style="color:var(--blue)">${f$(Math.round(sal+tRev))}€</div><div class="sf">${f$(Math.round(sal))} sal.${tRev?' + '+f$(Math.round(tRev))+' aides':''}</div></div>
 </div>
 
+${cm.sav>0&&cm.sap>0&&cm.sap<cm.sav?'<div class="al ala" style="margin-bottom:10px">⚠ Le solde après salaire est inférieur au solde avant salaire — vérifiez les deux saisies, le salaire du mois ne peut pas être calculé.</div>':''}
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Soldes du compte</div>
 <div class="card-b"><div class="grid2">
 <div style="background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px;opacity:.75">
@@ -716,20 +724,20 @@ ${monthTools('b',bY,bM,"var y=+document.getElementById('bAY').value,m=+document.
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Revenus complémentaires<span class="aux mono" style="color:var(--up)">${f$(tRev)} €</span></div>
 <div class="card-b">
 <div style="font-size:11px;color:var(--td);margin-bottom:7px">Aides CAF perçues ce mois — s'ajoutent au salaire dans le reste à vivre.</div>
-${(cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+c.l+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto · Garde ›</span></span><span class="mono" style="font-weight:600;width:92px;text-align:right;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(bY,bM).rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).rev['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).rev.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucune aide saisie</div>'}
+${(cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto · Garde ›</span></span><span class="mono" style="font-weight:600;width:92px;text-align:right;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(bY,bM).rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).rev['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).rev.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucune aide saisie</div>'}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nr-l" placeholder="Aide, allocation…"><input class="inp sm mono" id="nr-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nr-l').value.trim();if(!l)return;var d=gOBM(bY,bM);if(!d.rev)d.rev=[];d.rev.push({l,v:+document.getElementById('nr-v').value||0});save();rBudget()">+</button></div>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Charges<span class="aux mono" style="color:var(--dn)">${f$(tCh)} €</span></div>
 <div class="card-b">
-${cm.ch.map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+c.l+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto · Garde ›</span></span><span class="mono" style="font-weight:600;width:92px;text-align:right">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>').join('')}
+${cm.ch.map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto · Garde ›</span></span><span class="mono" style="font-weight:600;width:92px;text-align:right">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>').join('')}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nc-l" placeholder="Nouvelle charge"><input class="inp sm mono" id="nc-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nc-l').value.trim();if(!l)return;gOBM(bY,bM).ch.push({l,v:+document.getElementById('nc-v').value||0});save();rBudget()">+</button></div>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Investissements<span class="aux mono" style="color:var(--violet)">${f$(inv)} €</span></div>
 <div class="card-b">
 <div style="font-size:11.5px;color:var(--td);margin-bottom:6px">Auto depuis l'onglet Invest <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="iY=bY;iM=bM;go('invest')">→ modifier</span></div>
-${im?im.contribs.map(c=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+c.l+'</span><span class="mono" style="color:var(--violet);font-weight:600">'+f$(c.v)+' €</span></div>').join(''):'<div class="empty">Mois Invest non créé</div>'}
+${im?im.contribs.map(c=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+'</span><span class="mono" style="color:var(--violet);font-weight:600">'+f$(c.v)+' €</span></div>').join(''):'<div class="empty">Mois Invest non créé</div>'}
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Livret A<span class="aux mono" style="color:${cm.lv-tRt>=0?'var(--up)':'var(--dn)'}">net ${cm.lv-tRt>=0?'+':''}${f$(cm.lv-tRt)} €</span></div>
@@ -742,12 +750,12 @@ ${cm.lr.map((r,i)=>'<div class="list-item"><span class="mono" style="color:var(-
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--pink)"></span>Exceptionnel<span class="aux mono" style="color:var(--pink)">${f$(tEx)} €</span></div>
 <div class="card-b">
-${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+d.l+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(bY,bM).ex.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Rien ce mois</div>'}
+${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(d.l)+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(bY,bM).ex.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Rien ce mois</div>'}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="e-l" placeholder="Libellé"><input class="inp sm mono" id="e-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('e-l').value;var v=+document.getElementById('e-v').value;if(!l||!v)return;gOBM(bY,bM).ex.push({l,v});save();rBudget()">+</button></div>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Notes du mois</div>
-<div class="card-b"><textarea class="note-ta" style="min-height:70px" onchange="gOBM(bY,bM).nt=this.value;save()">${cm.nt||''}</textarea></div></div>
+<div class="card-b"><textarea class="note-ta" style="min-height:70px" onchange="gOBM(bY,bM).nt=this.value;save()">${esc(cm.nt||'')}</textarea></div></div>
 
 <button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="var d=gOBM(bY,bM);d.cl=!d.cl;save();rBudget()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[bM]}</button>
 
@@ -776,9 +784,10 @@ save();const s=sBM();if(s.length){bY=s[s.length-1].y;bM=s[s.length-1].m}rBudget(
 
 /* ================= INVEST ================= */
 function compressImg(file,cb){const r=new FileReader();r.onload=function(e){const img=new Image();img.onload=function(){const c=document.createElement('canvas');const sc=Math.min(1,260/img.width);c.width=img.width*sc;c.height=img.height*sc;c.getContext('2d').drawImage(img,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.6))};img.src=e.target.result};r.readAsDataURL(file)}
-function uploadImg(si,di,input){const f=input.files[0];if(!f)return;compressImg(f,d=>{gOIM(iY,iM).supports[si].det[di].img=d;save();rInvest()})}
+function uploadImg(si,di,input){const f=input.files[0];if(!f)return;compressImg(f,d=>{gOIM(iY,iM).supports[si].det[di].img=d;save();
+const sz=JSON.stringify(DB).length;if(sz>3.5e6)alert('Attention : '+(sz/1e6).toFixed(1)+' Mo de données locales (limite ~5 Mo). Les captures ne sont pas synchronisées dans le cloud — pensez à en retirer d\u2019anciennes.');rInvest()})}
 let ACC_OPEN={};
-function rInvest(){
+function rInvest(){if(!iY){const n=new Date();iY=n.getFullYear();iM=n.getMonth()+1}
 const el=document.getElementById('pg-invest');
 const cm=gIM(iY,iM)||defIM(iY,iM);const exists=!!gIM(iY,iM);
 const cT2=cm.contribs.reduce((s,c)=>s+c.v,0);const sT=supT(cm);
@@ -810,12 +819,12 @@ return '<div class="acc'+(open?' open':'')+'" id="acc'+si+'">'+
 '<div class="acc-h" onclick="ACC_OPEN['+si+']=!(ACC_OPEN['+si+']||false);if(ACC_OPEN['+si+']===false)ACC_OPEN['+si+']=false;this.parentElement.classList.toggle(\'open\')">'+
 '<span class="car">▶</span><span class="an">'+s.n+'</span><span class="av">'+f$(s.v)+' €</span></div>'+
 '<div class="acc-b">'+
-'<div class="row" style="margin-top:11px"><input class="inp sm" style="flex:1" value="'+s.n+'" onchange="gOIM(iY,iM).supports['+si+'].n=this.value;save();rInvest()">'+
+'<div class="row" style="margin-top:11px"><input class="inp sm" style="flex:1" value=\"'+esc(s.n)+'\" onchange="gOIM(iY,iM).supports['+si+'].n=this.value;save();rInvest()">'+
 '<input class="inp sm mono" type="number" inputmode="decimal" style="width:110px;text-align:right" value="'+(s.v||'')+'" onchange="gOIM(iY,iM).supports['+si+'].v=+this.value||0;save();rInvest()">'+
 '<span class="xdel" onclick="if(confirm(\'Supprimer ce support ?\')){gOIM(iY,iM).supports.splice('+si+',1);save();rInvest()}">×</span></div>'+
 '<div class="dl-head"><span style="flex:1">Ligne</span><span style="width:74px;text-align:right">€</span><span style="width:34px;text-align:right">Pds</span><span style="width:38px;text-align:right">Cible</span><span style="width:34px;text-align:right">Écart</span><span style="width:16px"></span></div>'+
 (s.det||[]).map((d,di)=>{const p=s.v>0?Math.round((d.v||0)/s.v*100):0;const c2=d.cible||0;const ec=p-c2;const ecC=Math.abs(ec)<=5?'var(--up)':ec>0?'var(--gold)':'var(--dn)';
-return '<div class="dline"><input class="inp sm" style="flex:1" value="'+d.l+'" onchange="gOIM(iY,iM).supports['+si+'].det['+di+'].l=this.value;save()">'+
+return '<div class="dline"><input class="inp sm" style="flex:1" value=\"'+esc(d.l)+'\" onchange="gOIM(iY,iM).supports['+si+'].det['+di+'].l=this.value;save()">'+
 '<input class="inp sm mono" type="number" inputmode="decimal" style="width:74px;text-align:right" value="'+(d.v||'')+'" onchange="gOIM(iY,iM).supports['+si+'].det['+di+'].v=+this.value||0;save();rInvest()">'+
 '<span class="mono" style="width:34px;text-align:right;font-size:11px;color:var(--blue)">'+p+'%</span>'+
 '<input class="inp sm mono" type="number" inputmode="decimal" style="width:38px;text-align:right;padding:6px 4px;font-size:11px" value="'+c2+'" onchange="gOIM(iY,iM).supports['+si+'].det['+di+'].cible=+this.value||0;save();rInvest()">'+
@@ -831,7 +840,7 @@ return '<div class="dline"><input class="inp sm" style="flex:1" value="'+d.l+'" 
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Versements du mois<span class="aux mono" style="color:var(--violet)">${f$(cT2)} € → Budget</span></div>
 <div class="card-b">
-${cm.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value="'+c.l+'" onchange="gOIM(iY,iM).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(iY,iM).contribs['+i+'].v=+this.value||0;save();rInvest()"><span class="xdel" onclick="gOIM(iY,iM).contribs.splice('+i+',1);save();rInvest()">×</span></div>').join('')}
+${cm.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOIM(iY,iM).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:92px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(iY,iM).contribs['+i+'].v=+this.value||0;save();rInvest()"><span class="xdel" onclick="gOIM(iY,iM).contribs.splice('+i+',1);save();rInvest()">×</span></div>').join('')}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nic-l" placeholder="Support"><input class="inp sm mono" id="nic-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nic-l').value.trim();if(!l)return;gOIM(iY,iM).contribs.push({l,v:+document.getElementById('nic-v').value||0});save();rInvest()">+</button></div>
 </div></div>
 
@@ -868,7 +877,7 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 /* ================= GARDE À DOMICILE (nounou) ================= */
 // Sources : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt 2026 ; CCN IDCC 3239 (HS > 40 h : +25 %/+50 % ; 1er mai +100 % ; férié ordinaire travaillé +10 % ; CP 2,5 j ouvrables/mois ; mensualisation 52/12).
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
-function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},
+function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},sick:{},endReason:'licenciement',preavisPaid:false,
 plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
 contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'auto',share:50,manual:0,ref:{},requireJustif:true,label:'Navigo Mois'},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',cotLine:true,cotLag:2,cmgLine:true,cmgLag:1,crecheMigrated:false,
 cpDays:30,cpWeek:6,cpAcq:2.5,cpHours:2.5,cpStartM:6,cpMode:'ouvres',holOffPaid:true,cmgReal:{},
@@ -908,15 +917,23 @@ function planDay(k){const p=planFor(k);if(!p)return{s:0,p:0};const d=p.d[dowOf(k
 function planWeekly(pl){let s=0,p=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};s+=+d.s||0;p+=+d.p||0}return{s,p}}
 function realDay(k){const v=DB.garde.hours[k];if(v==null)return null;if(typeof v==='number')return{s:v,p:0};return{s:+v.s||0,p:+v.p||0}}
 function dayInfo(k){const g=DB.garde;const hol=holName(k);const mai1=k.slice(5)==='05-01';
-if(g.contractFrom&&k<g.contractFrom)return{prev:{s:0,p:0},real:null,hol,mai1,cp:false,abs:false,eff:{s:0,p:0},status:'before'};
-if(g.contractTo&&k>g.contractTo)return{prev:{s:0,p:0},real:null,hol,mai1,cp:false,abs:false,eff:{s:0,p:0},status:'after'};
-const prev=planDay(k);const real=realDay(k);
-const cp=!!g.leave[k],abs=!!g.abs[k];let eff={s:0,p:0},status='off';
-if(cp)status='cp';else if(abs)status='abs';else if(real){eff=real;status=(eff.s+eff.p)>0?'work':'off'}else if(hol&&(prev.s+prev.p)>0){status='holoff'}else{eff=prev;status=(eff.s+eff.p)>0?'plan':'off'}
-return{prev,real,hol,mai1,cp,abs,eff,status}}
+const Z={s:0,p:0};
+if(g.contractFrom&&k<g.contractFrom)return{prev:Z,real:null,hol,mai1,cp:false,abs:false,sick:false,eff:Z,status:'before',planned:false};
+if(g.contractTo&&k>g.contractTo)return{prev:Z,real:null,hol,mai1,cp:false,abs:false,sick:false,eff:Z,status:'after',planned:false};
+const prev=planDay(k);const real=realDay(k);const planned=(prev.s+prev.p)>0;
+const cp=!!g.leave[k]&&planned,abs=!!g.abs[k]&&planned,sick=!!(g.sick&&g.sick[k])&&planned;
+let eff=Z,status='off';
+if(hol&&planned&&!real)status='holoff';
+else if(cp)status='cp';else if(sick)status='sick';else if(abs)status='abs';
+else if(real){eff=real;status=(eff.s+eff.p)>0?'work':(planned?'zero':'off')}
+else{eff=prev;status=planned?'plan':'off'}
+return{prev,real,hol,mai1,cp,abs,sick,eff,status,planned}}
+
 const payOf=(e,g)=>e.s*g.rate+e.p*g.rateShared;
 // Calcul du mois
-function gardeMonth(y,m){const g=DB.garde;const nd=new Date(y,m,0).getDate();
+let GM_CACHE={};
+function gardeMonth(y,m){const ck=y*12+m;if(GM_CACHE[ck])return GM_CACHE[ck];const r=gardeMonthCalc(y,m);GM_CACHE[ck]=r;return r}
+function gardeMonthCalc(y,m){const g=DB.garde;const nd=new Date(y,m,0).getDate();
 const cf=g.contractFrom||'';const cfY=+cf.slice(0,4),cfM=+cf.slice(5,7),cfD=+cf.slice(8,10);
 const before=cf&&(y*12+m)<(cfY*12+cfM);
 const ct=g.contractTo||'';const ctY=+ct.slice(0,4),ctM=+ct.slice(5,7),ctD=+ct.slice(8,10);
@@ -924,14 +941,20 @@ const after=!!ct&&(y*12+m)>(ctY*12+ctM);
 const partialIn=!!cf&&y===cfY&&m===cfM&&cfD>1;
 const partialOut=!!ct&&y===ctY&&m===ctM&&ctD<nd;
 const partial=partialIn||partialOut;
-if(before||after)return{base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null};
+const Z0={base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,sick:0,sickH:0,sickEur:0,zeroDays:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null,planChanged:false};
+if(before||after)return Z0;
 const plEnd=planFor(gKey(y,m,nd));const wk=plEnd?planWeekly(plEnd):{s:0,p:0};
-const baseHs=wk.s*52/12,baseHp=wk.p*52/12;const base=baseHs*g.rate+baseHp*g.rateShared;
-let planH=0,hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0;
+let baseHs=0,baseHp=0,planChanged=false,firstPlan=null;
+let planH=0,hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,sick=0,sickH=0,sickEur=0,zeroDays=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0;
 for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
-if(i.status!=='before'&&i.status!=='after')planH+=i.prev.s+i.prev.p;
-if(i.cp){cp++;continue}if(i.abs){abs++;absH+=i.prev.s+i.prev.p;absEur+=payOf(i.prev,g);continue}
+if(i.status==='before'||i.status==='after')continue;
+const pw=planFor(k);if(pw){if(firstPlan&&firstPlan!==pw)planChanged=true;firstPlan=firstPlan||pw;const w=planWeekly(pw);baseHs+=w.s*52/12/nd;baseHp+=w.p*52/12/nd}
+planH+=i.prev.s+i.prev.p;
 if(i.status==='holoff'){holOff++;holOffH+=i.prev.s+i.prev.p;holOffEur+=payOf(i.prev,g);continue}
+if(i.cp){cp++;continue}
+if(i.sick){sick++;sickH+=i.prev.s+i.prev.p;sickEur+=payOf(i.prev,g);continue}
+if(i.abs){abs++;absH+=i.prev.s+i.prev.p;absEur+=payOf(i.prev,g);continue}
+if(i.status==='zero')zeroDays++;
 const t=i.eff.s+i.eff.p;if(t>0){days++;hS+=i.eff.s;hP+=i.eff.p;payReal+=payOf(i.eff,g)}
 if(i.real){const pT=i.prev.s+i.prev.p,rT=i.real.s+i.real.p;
 const pP=payOf(i.prev,g),rP=payOf(i.real,g);
@@ -939,7 +962,7 @@ const dH=Math.max(0,rT-pT),dP=Math.max(0,rP-pP);
 const rt=rT>0?rP/rT:0;const hE=Math.min(dP,dH*rt);
 extraH+=dH;extraEur+=hE;reclassEur+=dP-hE}
 if(i.hol&&t>0){holWorked++;holMaj+=payOf(i.eff,g)*(i.mai1?g.fer.majMai:g.fer.majOrd)/100}}
-// Heures supplémentaires par semaine (semaine rattachée au mois de son jeudi)
+const base=baseHs*g.rate+baseHp*g.rateShared;
 let hsH=0,hsEur=0,compH=0,compEur=0;const mon=new Date(y,m-1,1);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
 for(let w=0;w<6;w++){const th=new Date(mon);th.setDate(mon.getDate()+3);if(th.getMonth()+1===m&&th.getFullYear()===y){let tot=0,pay=0;
 for(let j=0;j<7;j++){const dd=new Date(mon);dd.setDate(mon.getDate()+j);const i=dayInfo(dKey(dd));const t=i.eff.s+i.eff.p;if(['work','plan'].includes(i.status)&&t>0){tot+=t;pay+=payOf(i.eff,g)}}
@@ -952,9 +975,10 @@ const hs=Math.max(0,tot-g.hs.seuil);if(hs>0){const h1=Math.min(hs,g.hs.h1),h2=hs
 mon.setDate(mon.getDate()+7)}
 let net,paidH;
 if(partial){net=payReal+holMaj+hsEur+compEur;paidH=hS+hP;extraH=0;extraEur=0;reclassEur=0}
-else if(g.mode==='mensualise'){net=base+extraEur+reclassEur+holMaj+hsEur+compEur-absEur;paidH=baseHs+baseHp-absH+extraH}
+else if(g.mode==='mensualise'){net=base+extraEur+reclassEur+holMaj+hsEur+compEur-absEur-sickEur;paidH=baseHs+baseHp-absH-sickH+extraH}
 else{net=hS*g.rate+hP*g.rateShared+cp*g.cpHours*g.rate+(g.holOffPaid===false?0:holOffEur)+holMaj+hsEur+compEur;paidH=hS+hP+cp*g.cpHours+(g.holOffPaid===false?0:holOffH)}
-return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,sick,sickH,sickEur,zeroDays,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,planChanged,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+
 function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
 function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padStart(2,'0');
 if(!n.on)return{amt:0,justif:false,base:'désactivé'};
@@ -984,24 +1008,28 @@ return Object.assign({},r,{paid:h,brut,cotSal,cotPat,cotBrut,abat,cotTot,cmgCot,
 function cpDecompte(keys){const g=DB.garde;if(g.cpMode==='marked')return keys.length;
 const byWeek={};keys.forEach(k=>{const d=kDate(k);const mo=new Date(d);mo.setDate(d.getDate()-((d.getDay()+6)%7));(byWeek[dKey(mo)]=byWeek[dKey(mo)]||[]).push(d)});
 const lim=g.cpWeek||6;let n=0;Object.keys(byWeek).forEach(w=>{const ds=byWeek[w].sort((a,b)=>a-b);const a=ds[0];let b=ds[ds.length-1];
-// décompte jusqu'à la veille de la reprise : jour ouvrable précédant le prochain jour travaillé prévu
 const mo=kDate(w);const bIdx=(b.getDay()+6)%7;let nextPlan=-1;
 for(let i=bIdx+1;i<7;i++){const d=new Date(mo);d.setDate(mo.getDate()+i);const pd=planDay(dKey(d));if((pd.s+pd.p)>0){nextPlan=i;break}}
 const endIdx=nextPlan>=0?nextPlan-1:lim-1;
 if(endIdx>bIdx){const e=new Date(mo);e.setDate(mo.getDate()+endIdx);b=e}
-for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(((d.getDay()+6)%7)<lim)n++}});return n}
-function cpKeys(lo,hi){const g=DB.garde;return Object.keys(g.leave||{}).filter(k=>{if(!g.leave[k])return false;const i=+k.slice(0,4)*12+ +k.slice(5,7);return i>=lo&&i<=hi})}
+for(const d=new Date(a);d<=b;d.setDate(d.getDate()+1)){if(((d.getDay()+6)%7)<lim&&!holName(dKey(d)))n++}});return n}
+
+function cpKeys(lo,hi){const g=DB.garde;return Object.keys(g.leave||{}).filter(k=>{if(!g.leave[k])return false;const i=+k.slice(0,4)*12+ +k.slice(5,7);if(i<lo||i>hi)return false;return dayInfo(k).status==='cp'})}
+
 function cpAcqMonth(y,m){const g=DB.garde;const r=gardeMonth(y,m);if(r.before||r.after)return 0;
 const nd=new Date(y,m,0).getDate();let d1=1,d2=nd;
 if(r.partialIn&&r.from)d1=+r.from.slice(8,10);
 if(r.partialOut&&r.to)d2=+r.to.slice(8,10);
 return Math.round((g.cpAcq||2.5)*Math.max(0,d2-d1+1)/nd*100)/100}
-function cpLedger(y,m){const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm;const cur=y*12+m;
+function cpLedger(y,m){const g=DB.garde;const pr=cpPeriod(y,m);const cur=y*12+m;
+const cf=g.contractFrom||'2026-09-01';const lo=+cf.slice(0,4)*12+ +cf.slice(5,7);
 let acqBefore=0;for(let i=lo;i<cur;i++){const yy=Math.floor((i-1)/12),mm=i-yy*12;acqBefore+=cpAcqMonth(yy,mm)}
 const takenBefore=cur>lo?cpDecompte(cpKeys(lo,cur-1)):0;
 const acq=cpAcqMonth(y,m);const taken=cpDecompte(cpKeys(cur,cur));
 const report=Math.round((acqBefore-takenBefore)*100)/100;
-return{pr,report,acq,taken,solde:Math.round((report+acq-taken)*100)/100,acqTotal:Math.round((acqBefore+acq)*100)/100,takenTotal:takenBefore+taken}}
+const plo=pr.fy*12+pr.fm;const takenPeriod=cpDecompte(cpKeys(Math.max(lo,plo),cur));
+return{pr,report,acq,taken,solde:Math.round((report+acq-taken)*100)/100,acqTotal:Math.round((acqBefore+acq)*100)/100,takenTotal:takenBefore+taken,takenPeriod}}
+
 function cpPeriod(y,m){const s=DB.garde.cpStartM||1;const py=m>=s?y:y-1;return{fy:py,fm:s,ty:s===1?py:py+1,tm:s===1?12:s-1}}
 function cpStatus(y,m){const g=DB.garde;const pr=cpPeriod(y,m);const lo=pr.fy*12+pr.fm,hi=pr.ty*12+pr.tm;
 const cf=(g.contractFrom||'2026-09-01').split('-').map(Number);const cs=[cf[0],cf[1]];const start=Math.max(lo,cf[0]*12+cf[1]);
@@ -1040,15 +1068,26 @@ let totalNet=0,months=[];
 for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx-yy*12;const r=gardeMonth(yy,mm);totalNet+=r.net;months.push({y:yy,m:mm,net:r.net,cp:r.cp})}
 const taken=cpDecompte(cpKeys(fy*12+fm,ty*12+tm));
 const d1=new Date(fy,fm-1,+g.contractFrom.slice(8,10)),d2=new Date(ty,tm-1,+g.contractTo.slice(8,10));
-const moWorked=Math.max(0,(d2-d1)/(1000*3600*24*30.44));
+const moWorked=Math.max(0,(d2-d1)/(1000*3600*24*30.4375));
 let acquired=0;for(let idx=fy*12+fm;idx<=ty*12+tm;idx++){const yy=Math.floor((idx-1)/12),mm=idx-yy*12;acquired+=cpAcqMonth(yy,mm)}
 acquired=Math.round(acquired*100)/100;
 const remain=Math.max(0,Math.round((acquired-taken)*100)/100);
-const wkNet=g.plans.length?(()=>{const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];const w=planWeekly(pl);return w.s*g.rate+w.p*g.rateShared})():0;
+const pl=planFor(g.contractTo)||g.plans[g.plans.length-1];const w=pl?planWeekly(pl):{s:0,p:0};const wkNet=w.s*g.rate+w.p*g.rateShared;
 const maintien=remain/(g.cpWeek||6)*wkNet;const dixieme=totalNet*0.10;
 const indem=Math.max(maintien,dixieme);
+const reason=g.endReason||'licenciement';
+let preavisW=0,preavisLbl='aucun';
+if(reason==='licenciement'||reason==='deces'){preavisW=moWorked<6?1:moWorked<24?52/12:2*52/12;preavisLbl=moWorked<6?'1 semaine':moWorked<24?'1 mois':'2 mois'}
+else if(reason==='demission'){preavisW=moWorked<6?1:moWorked<24?2:52/12;preavisLbl=(moWorked<6?'1 semaine':moWorked<24?'2 semaines':'1 mois')+' (dû par la salariée)'}
+const preavisEur=(g.preavisPaid&&(reason==='licenciement'||reason==='deces'))?preavisW*wkNet:0;
+const last12=months.slice(-12);const avgNet=last12.length?last12.reduce((a,x)=>a+x.net,0)/last12.length:0;
+const avgBrut=avgNet/(1-(g.p.txSal||21.88)/100);
+let indemLic=0;const years=moWorked/12;
+if(['licenciement','deces','rupture_conv'].includes(reason)&&moWorked>=8)indemLic=(Math.min(years,10)*0.25+Math.max(0,years-10)/3)*avgBrut;
 const lastM=gardeCost(ty,tm);
-return{months,totalNet,taken,acquired,remain,moWorked,wkNet,maintien,dixieme,indem,method:maintien>=dixieme?'maintien de salaire':'règle du dixième',lastM,total:lastM.toPay+indem}}
+return{months,totalNet,taken,acquired,remain,moWorked,wkNet,maintien,dixieme,indem,method:maintien>=dixieme?'maintien de salaire':'règle du dixième',
+reason,preavisW,preavisLbl,preavisEur,indemLic,avgBrut,years,lastM,total:lastM.toPay+indem+preavisEur+indemLic}}
+
 function gardeSrc(y,m){let r={y,m};for(let i=0;i<(DB.garde.lag||0);i++)r=pM(r.y,r.m);return r}
 function migrateGarde(){const g=DB.garde;if(g.crecheMigrated)return;let ch=false;
 DB.bm.filter(b=>(b.y*12+b.m)>=2026*12+9).forEach(b=>{if(!b.ch.some(c=>/cr[eè]che/i.test(c.l))){b.ch.push({l:'Micro-crèche Zayn',v:1350});ch=true}});
@@ -1071,7 +1110,7 @@ if(ch)save()}
 /* ---- page Garde ---- */
 let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false,GPLAN=false,GPI=-1;
 const fh=h=>(Math.round(h*100)/100).toLocaleString('fr-FR');
-function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';
+function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';if(i.status==='sick')return'<span class="hb" style="color:var(--violet)">MAL</span>';if(i.status==='zero')return'<span class="hb" style="color:var(--dn)">0h ?</span>';
 if(i.status==='holoff')return'<span class="hb" style="color:var(--blue)">férié</span>';const e=i.eff;if(e.s+e.p<=0)return'';
 const txt=(e.s?fh(e.s):'')+(e.s&&e.p?'+':'')+(e.p?fh(e.p)+'p':'');return'<span class="hb"'+(i.status==='plan'?' style="color:var(--td);font-weight:500"':'')+'>'+txt+'</span>'}
 function rGarde(){
@@ -1082,17 +1121,18 @@ const first=new Date(gY,gM-1,1);const off=(first.getDay()+6)%7;const nd=new Date
 const tk=todayKey();const nx=nM(gY,gM);const mens=g.mode==='mensualise';
 let cells='';for(let i=0;i<off;i++)cells+='<div class="cal-cell blank"></div>';
 for(let d=1;d<=nd;d++){const k=gKey(gY,gM,d);const i=dayInfo(k);const dow=(off+d-1)%7;
-cells+='<div class="cal-cell'+(i.status==='work'?' has':'')+(i.status==='cp'?' cp':'')+(i.status==='abs'?' absd':'')+(i.hol?' hol':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(k>tk?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+cellBadge(i)+'</div>'}
+cells+='<div class="cal-cell'+(i.status==='work'?' has':'')+(i.status==='cp'?' cp':'')+(i.status==='abs'?' absd':'')+(i.status==='sick'?' sickd':'')+(i.status==='zero'?' zerod':'')+(i.hol?' hol':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(k>tk?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+cellBadge(i)+'</div>'}
 let panel='';
 if(GSEL){const i=dayInfo(GSEL);const dt=kDate(GSEL);const cur=i.real||i.prev;
 panel=`<div class="cal-panel">
 <div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
-<div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
+<div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.sick?'<span class="chip" style="color:var(--violet)">Arrêt maladie</span>':''}${!i.planned?'<span class="chip">Jour non travaillé au planning</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
 <div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(g.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
 <div><div class="lbl">Partagé (h) · ${f$(g.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
 <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value)">Enregistrer</button>
-<button class="btn btn-ghost sm" onclick="gMark('leave')">${i.cp?'Retirer le CP':'Congé payé'}</button><button class="btn btn-ghost sm" onclick="gMark('abs')">${i.abs?'Retirer l\u2019absence':'Absence'}</button>
-${(i.real||i.cp||i.abs)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
+${i.planned?`<button class="btn btn-ghost sm" onclick="gMark('leave')">${i.cp?'Retirer le CP':'Congé payé'}</button><button class="btn btn-ghost sm" onclick="gMark('abs')">${i.abs?'Retirer l\u2019absence':'Absence'}</button><button class="btn btn-ghost sm" onclick="gMark('sick')">${i.sick?'Retirer l\u2019arrêt':'Arrêt maladie'}</button>`:''}
+${(i.real||i.cp||i.abs||i.sick)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
+${i.status==='zero'?'<div class="al ala" style="margin-top:10px">0 h saisie sur un jour prévu au planning. En mensualisé, elle reste payée. S\u2019il s\u2019agit d\u2019un congé, d\u2019une absence ou d\u2019un arrêt, utilisez les boutons ci-dessus.</div>':''}
 </div>`}
 const budgetSrc=[];sBM().forEach(b=>{const s=gardeSrc(b.y,b.m);if(s.y===gY&&s.m===gM&&g.budgetLine&&(b.y*12+b.m)>=g.startY*12+g.startM)budgetSrc.push(MS[b.m]+' '+b.y)});
 const p=g.p;const revUsed=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
@@ -1130,13 +1170,15 @@ ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" st
 ${r.compEur>0?'<div class="cost-line"><span>Majoration heures complémentaires<small>'+fh(r.compH)+' h · '+g.hc.maj1+' %</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.compEur*100)/100)+' €</b></div>':''}
 ${r.holWorked>0?'<div class="cost-line"><span>Jours fériés travaillés<small>majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.holMaj*100)/100)+' €</b></div>':''}
 ${r.partialIn?'<div class="cost-line"><span>Mensualisation à partir de '+MS[nM(gY,gM).m]+'<small>'+fh(r.wk.s)+' h solo + '+fh(r.wk.p)+' h partagé / semaine × 52 ÷ 12</small></span><b style="color:var(--td)">'+f$(Math.round(r.base))+' €</b></div>':''}`
-:mens?`<div class="cost-line"><span>Salaire mensualisé<small>${fh(r.wk.s)} h solo + ${fh(r.wk.p)} h partagé / semaine × 52 ÷ 12 = ${fh(r.baseHs+r.baseHp)} h</small></span><b>${f$(Math.round(r.base))} €</b></div>
+:mens?`<div class="cost-line"><span>Salaire mensualisé<small>${r.planChanged?'changement de planning en cours de mois — base proratisée au jour':fh(r.wk.s)+' h solo + '+fh(r.wk.p)+' h partagé / semaine × 52 ÷ 12 = '+fh(r.baseHs+r.baseHp)+' h'}</small></span><b>${f$(Math.round(r.base*100)/100)} €</b></div>
 ${r.extraEur>0?'<div class="cost-line"><span>Heures complémentaires<small>'+fh(r.extraH)+' h au-delà du planning, au taux normal</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.extraEur*100)/100)+' €</b></div>':''}
 ${r.reclassEur>0?'<div class="cost-line"><span>Ajustement solo / partagé<small>heures prévues en garde partagée effectuées en solo</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.reclassEur*100)/100)+' €</b></div>':''}
 ${r.compEur>0?'<div class="cost-line"><span>Majoration heures complémentaires<small>'+fh(r.compH)+' h · '+g.hc.maj1+' % puis '+g.hc.maj2+' %</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.compEur*100)/100)+' €</b></div>':''}
 ${r.hsH>0?'<div class="cost-line"><span>Heures supplémentaires<small>'+fh(r.hsH)+' h au-delà de '+g.hs.seuil+' h/semaine : majoration '+g.hs.maj1+' % / '+g.hs.maj2+' %</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.hsEur))+' €</b></div>':''}
 ${r.holWorked>0?'<div class="cost-line"><span>Jours fériés travaillés<small>'+r.holWorked+' jour'+(r.holWorked>1?'s':'')+' · majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.holMaj))+' €</b></div>':''}
 ${r.abs>0?'<div class="cost-line"><span>Absences non rémunérées<small>'+r.abs+' jour'+(r.abs>1?'s':'')+' · '+fh(r.absH)+' h</small></span><b style="color:var(--dn)">− '+f$(Math.round(r.absEur))+' €</b></div>':''}
+${r.sick>0?'<div class="cost-line"><span>Arrêt maladie<small>'+r.sick+' jour'+(r.sick>1?'s':'')+' · '+fh(r.sickH)+' h · non rémunéré par l\u2019employeur (IJSS)</small></span><b style="color:var(--dn)">− '+f$(Math.round(r.sickEur))+' €</b></div>':''}
+${r.zeroDays>0?'<div class="al ala">'+r.zeroDays+' jour'+(r.zeroDays>1?'s':'')+' saisi'+(r.zeroDays>1?'s':'')+' à 0 h sans motif — payé'+(r.zeroDays>1?'s':'')+' normalement. Marquez congé, absence ou arrêt si nécessaire.</div>':''}
 ${r.holOff>0?'<div class="cost-line"><span>Fériés chômés<small>'+r.holOff+' · salaire maintenu, inclus dans la mensualisation</small></span><b style="color:var(--td)">0 €</b></div>':''}
 ${r.cp>0?'<div class="cost-line"><span>Congés payés posés<small>'+r.cp+' j · inclus dans la mensualisation (année complète)</small></span><b style="color:var(--td)">0 €</b></div>':''}`
 :`<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(g.rate)} €</small></span><b>${f$(Math.round(r.hS*g.rate))} €</b></div>
@@ -1159,8 +1201,8 @@ ${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span clas
 <div class="cost-line"><span>Droits acquis ce mois<small>${f$(g.cpAcq)} j ouvrables par mois travaillé (art. 48)${r.partial?' · au prorata du mois':''}</small></span><b style="color:var(--up)">+ ${f$(cs.led.acq)} j</b></div>
 <div class="cost-line"><span>Congés pris ce mois<small>${r.cp?r.cp+' jour'+(r.cp>1?'s':'')+' marqué'+(r.cp>1?'s':'')+' → '+f$(cs.led.taken)+' j ouvrables décomptés':'aucun'}</small></span><b style="color:${cs.led.taken?'var(--dn)':'var(--td)'}">${cs.led.taken?'− '+f$(cs.led.taken)+' j':'0 j'}</b></div>
 <div class="cost-line tot"><span>Nouveau solde<small>période ${MS[cs.pr.fm]} ${cs.pr.fy} → ${cs.endLbl}</small></span><b style="color:var(--gold);font-size:17px">${f$(cs.led.solde)} j</b></div>
-<div class="gauge-track" style="margin-top:10px"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.led.takenTotal/cs.rights*100)):0}%"></div></div>
-<div class="row rb" style="margin-top:7px;font-size:11.5px;color:var(--tm)"><span>${f$(cs.led.takenTotal)} j pris sur la période</span><span class="mono">droits estimés ${f$(cs.rights)} j</span></div>
+<div class="gauge-track" style="margin-top:10px"><div class="gauge-fill ok" style="width:${cs.rights?Math.min(100,Math.round(cs.led.takenPeriod/cs.rights*100)):0}%"></div></div>
+<div class="row rb" style="margin-top:7px;font-size:11.5px;color:var(--tm)"><span>${f$(cs.led.takenPeriod)} j pris sur la période</span><span class="mono">droits estimés ${f$(cs.rights)} j</span></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:5px">Vous marquez les jours où elle aurait dû travailler ; le décompte applique la règle légale et compte ${g.cpMode==='ouvres'?'tous les jours ouvrables de l\u2019absence, y compris ceux qu\u2019elle ne travaille pas — une semaine complète = '+(g.cpWeek||6)+' j':'uniquement les jours marqués'}. Congé principal mai–oct : ${cs.mainTaken} j.</div>
 </div></div>
 
@@ -1172,8 +1214,11 @@ return `<div class="card" style="border-color:rgba(229,195,106,.4)"><div class="
 <div class="cost-line"><span>Méthode du maintien de salaire<small>${f$(st.remain)} j ÷ 5 × ${f$(Math.round(st.wkNet*100)/100)} € / semaine</small></span><b style="color:${st.maintien>=st.dixieme?'var(--gold)':'var(--td)'}">${f$(Math.round(st.maintien*100)/100)} €</b></div>
 <div class="cost-line"><span>Règle du dixième<small>10 % de ${f$(Math.round(st.totalNet))} € versés sur le contrat</small></span><b style="color:${st.dixieme>st.maintien?'var(--gold)':'var(--td)'}">${f$(Math.round(st.dixieme*100)/100)} €</b></div>
 <div class="cost-line"><span>Indemnité compensatrice de CP<small>le plus favorable : ${st.method} · soumise à cotisations</small></span><b style="color:var(--gold)">${f$(Math.round(st.indem*100)/100)} €</b></div>
-<div class="cost-line tot"><span>Total du solde<small>hors préavis et indemnité de licenciement</small></span><b style="color:var(--gold);font-size:19px">${f$(Math.round(st.total*100)/100)} €</b></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:9px">Non calculés ici, à ajouter selon le motif de rupture : <b>indemnité de préavis</b> (si vous en dispensez la salariée) et <b>indemnité de licenciement</b> (dès 8 mois d'ancienneté, hors démission). Le simulateur officiel findecontrat-pajemploi.urssaf.fr produit les documents.</div>
+<div class="cost-line"><span>Motif de rupture<small>ancienneté ${st.moWorked.toFixed(1)} mois au ${kDate(g.contractTo).toLocaleDateString('fr-FR')}</small></span><select class="inp sm" style="width:auto" onchange="DB.garde.endReason=this.value;gSave()">${[['licenciement','Licenciement'],['demission','Démission'],['rupture_conv','Rupture conventionnelle'],['essai','Fin de période d\u2019essai'],['faute_grave','Faute grave'],['deces','Décès de l\u2019employeur']].map(x=>'<option value="'+x[0]+'"'+(st.reason===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')}</select></div>
+<div class="cost-line"><span>Préavis<small>${st.preavisLbl}${(st.reason==='licenciement'||st.reason==='deces')?' · <label style="cursor:pointer"><input type="checkbox" '+(g.preavisPaid?'checked':'')+' onchange="DB.garde.preavisPaid=this.checked;gSave()" style="vertical-align:middle;accent-color:var(--gold)"> dispensé et payé</label>':''}</small></span><b style="color:${st.preavisEur?'var(--gold)':'var(--td)'}">${st.preavisEur?f$(Math.round(st.preavisEur*100)/100)+' €':'—'}</b></div>
+<div class="cost-line"><span>Indemnité de licenciement<small>${st.indemLic>0?'¼ de mois brut par année (brut moyen '+f$(Math.round(st.avgBrut))+' €) · exonérée de cotisations':st.moWorked<8&&['licenciement','deces','rupture_conv'].includes(st.reason)?'non due avant 8 mois d\u2019ancienneté':'non due pour ce motif'}</small></span><b style="color:${st.indemLic?'var(--gold)':'var(--td)'}">${st.indemLic?f$(Math.round(st.indemLic*100)/100)+' €':'—'}</b></div>
+<div class="cost-line tot"><span>Total du solde de tout compte</span><b style="color:var(--gold);font-size:19px">${f$(Math.round(st.total*100)/100)} €</b></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:9px">Barème CCN 3239 (socle salarié du particulier employeur) : préavis licenciement 1 sem. / 1 mois / 2 mois selon ancienneté &lt; 6 mois / &lt; 2 ans / ≥ 2 ans ; démission 1 sem. / 2 sem. / 1 mois ; indemnité de licenciement dès 8 mois. La régularisation mensualisation ↔ heures réelles n'est pas calculée. Le simulateur officiel findecontrat-pajemploi.urssaf.fr produit les documents définitifs.</div>
 </div></div>`})()}
 <div class="card"><div class="card-h" style="cursor:pointer" onclick="GPLAN=!GPLAN;rGarde()"><span class="dot" style="background:var(--violet)"></span>Planning type<span class="aux" style="color:var(--td)">${fh(wk.s)} h solo · ${fh(wk.p)} h partagé / sem. · ${GPLAN?'▾':'▸'}</span></div>
 ${GPLAN?`<div class="card-b">
@@ -1282,10 +1327,10 @@ if(v===''||v==null)delete o[f];else o[f]=+v;
 if(Object.keys(o).length)DB.garde.cmgReal[k]=o;else delete DB.garde.cmgReal[k];gSave()}
 function navRef(k,v){if(!DB.garde.nav.ref)DB.garde.nav.ref={};if(v)DB.garde.nav.ref[k]=1;else delete DB.garde.nav.ref[k];gSave()}
 function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
-function gSet(s,p){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;DB.garde.hours[GSEL]={s,p};delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];save();gResync();GSEL=null;rGarde()}
-function gMark(t){if(!GSEL)return;const g=DB.garde;const o=t==='leave'?g.leave:g.abs;const other=t==='leave'?g.abs:g.leave;
-if(o[GSEL])delete o[GSEL];else{o[GSEL]=1;delete other[GSEL];delete g.hours[GSEL]}save();gResync();GSEL=null;rGarde()}
-function gClear(){if(!GSEL)return;delete DB.garde.hours[GSEL];delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];save();gResync();GSEL=null;rGarde()}
+function gSet(s,p){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;DB.garde.hours[GSEL]={s,p};delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];if(DB.garde.sick)delete DB.garde.sick[GSEL];save();gResync();GSEL=null;rGarde()}
+function gMark(t){if(!GSEL)return;const g=DB.garde;if(!g.sick)g.sick={};const maps={leave:g.leave,abs:g.abs,sick:g.sick};const o=maps[t];
+if(o[GSEL])delete o[GSEL];else{Object.values(maps).forEach(x=>{delete x[GSEL]});o[GSEL]=1;delete g.hours[GSEL]}save();gResync();GSEL=null;rGarde()}
+function gClear(){if(!GSEL)return;const g=DB.garde;delete g.hours[GSEL];delete g.leave[GSEL];delete g.abs[GSEL];if(g.sick)delete g.sick[GSEL];save();gResync();GSEL=null;rGarde()}
 function gPlanNew(i){const src=DB.garde.plans[i];const from=prompt('Date d\u2019effet du nouveau planning (AAAA-MM-JJ) :',todayKey());if(!from||!/^\d{4}-\d{2}-\d{2}$/.test(from))return;
 DB.garde.plans.push({from,d:JSON.parse(JSON.stringify(src.d))});GPI=-1;gSave()}
 function gSave(){save();gResync();rGarde()}
@@ -1326,6 +1371,7 @@ if(r.partial&&r.partialIn){
  if(r.extraEur>0)calc.push({l:'Heures en plus : '+fH(r.extraH),v:'+ '+fEur(r.extraEur)});
  if(r.reclassEur>0)calc.push({l:'Heures prévues en garde partagée effectuées seule',v:'+ '+fEur(r.reclassEur),note:'payées '+fEur(g.rate)+' au lieu de '+fEur(g.rateShared)});
  if(r.absEur>0)calc.push({l:'Absences non rémunérées : '+fH(r.absH),v:'\u2212 '+fEur(r.absEur)});
+ if(r.sickEur>0)calc.push({l:'Arrêt maladie : '+fH(r.sickH),v:'\u2212 '+fEur(r.sickEur),note:'non rémunéré par l\u2019employeur — indemnités journalières de la Sécurité sociale'});
 }else{
  intro='Votre salaire est calculé chaque mois sur les heures réellement effectuées.';
  calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
@@ -1339,8 +1385,11 @@ calc.push({l:'Salaire net',v:fEur(r.net),strong:true});
 B.push({t:'Comment votre salaire est calculé',intro,rows:calc});
 
 const ec=Math.round((r.h-r.planH)*100)/100;
-const hr=[{l:'Heures travaillées ce mois',v:fH(r.h)},{l:'Heures prévues au contrat',v:fH(r.planH)}];
-if(Math.abs(ec)>0.001)hr.push({l:ec>0?'Heures effectuées en plus':'Heures non effectuées',v:fH(Math.abs(ec)),strong:true});
+const hr=[{l:'Heures travaillées ce mois',v:fH(r.h)}];
+if(r.extraH>0||(r.partial&&r.compH>0))hr.push({l:'dont heures en plus du planning',v:fH(r.partial?r.compH:r.extraH),strong:true});
+if(r.cp>0||r.holOff>0)hr.push({l:'Jours payés non travaillés',v:(r.cp+r.holOff)+' j',note:(r.cp?r.cp+' congé'+(r.cp>1?'s':''):'')+(r.cp&&r.holOff?' + ':'')+(r.holOff?r.holOff+' férié'+(r.holOff>1?'s':''):'')});
+if(r.absH>0)hr.push({l:'Absences non rémunérées',v:fH(r.absH)});
+if(r.sickH>0)hr.push({l:'Arrêt maladie',v:fH(r.sickH)});
 B.push({t:'Vos heures',rows:hr,
  foot:'Les heures effectuées en plus vous sont payées au taux horaire normal. La majoration de '+g.hs.maj1+' % ne s\u2019applique qu\u2019au-delà de '+g.hs.seuil+' heures par semaine (convention collective des particuliers employeurs, IDCC 3239).'});
 
@@ -1435,7 +1484,7 @@ if(SUB==='analyses'){rAnalyses(el);return}
 if(SUB==='notes'){
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button>
 <div class="pagetitle">Notes</div>
-<div class="card"><div class="card-b"><textarea class="note-ta" style="min-height:300px" onchange="DB.gn=this.value;save()">${DB.gn||''}</textarea></div></div>`;
+<div class="card"><div class="card-b"><textarea class="note-ta" style="min-height:300px" onchange="DB.gn=this.value;save()">${esc(DB.gn||'')}</textarea></div></div>`;
 return}
 if(SUB==='config'){rConfig(el);return}}
 
@@ -1498,7 +1547,7 @@ ${DB.fiscal.map(f=>'<div class="list-item" style="align-items:flex-start"><div s
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Dépenses déductibles</div><div class="card-b">
-${DB.deductibles.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+d.l+'</span><span class="mono" style="color:var(--up);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="DB.deductibles.splice('+i+',1);save();rMore()">×</span></div>').join('')||'<div class="empty">Aucune</div>'}
+${DB.deductibles.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(d.l)+'</span><span class="mono" style="color:var(--up);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="DB.deductibles.splice('+i+',1);save();rMore()">×</span></div>').join('')||'<div class="empty">Aucune</div>'}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="dd-l" placeholder="Libellé"><input class="inp sm mono" id="dd-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('dd-l').value;var v=+document.getElementById('dd-v').value;if(!l||!v)return;DB.deductibles.push({l,v,cat:'Divers'});save();rMore()">+</button></div>
 </div></div>`}
 
@@ -1569,16 +1618,16 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Indicateurs calculés</div><div class="card-b">
 ${DB.kpis.map((k,i)=>'<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:10px;margin-bottom:8px">'+
-'<div class="row"><input class="inp sm" style="flex:1;font-weight:600" value="'+k.label+'" onchange="DB.kpis['+i+'].label=this.value;save()"><span class="xdel" onclick="DB.kpis.splice('+i+',1);save();rMore()">×</span></div>'+
-'<input class="inp sm mono" style="margin-top:6px;font-size:12px" value="'+k.formula+'" onchange="DB.kpis['+i+'].formula=this.value;save()">'+
-'<input class="inp sm" style="margin-top:6px;font-size:12px;color:var(--tm)" value="'+k.desc+'" onchange="DB.kpis['+i+'].desc=this.value;save()">'+
+'<div class="row"><input class="inp sm" style="flex:1;font-weight:600" value=\"'+esc(k.label)+'\" onchange="DB.kpis['+i+'].label=this.value;save()"><span class="xdel" onclick="DB.kpis.splice('+i+',1);save();rMore()">×</span></div>'+
+'<input class="inp sm mono" style="margin-top:6px;font-size:12px" value=\"'+esc(k.formula)+'\" onchange="DB.kpis['+i+'].formula=this.value;save()">'+
+'<input class="inp sm" style="margin-top:6px;font-size:12px;color:var(--tm)" value=\"'+esc(k.desc)+'\" onchange="DB.kpis['+i+'].desc=this.value;save()">'+
 '</div>').join('')}
 <button class="btn btn-ghost sm wide" onclick="DB.kpis.push({id:'c'+Date.now(),label:'Nouvel indicateur',formula:'À définir (voir IDs ci-dessus)',desc:'Description'});save();rMore()">+ Ajouter un indicateur</button>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Graphes personnalisés</div><div class="card-b">
 ${DB.customCharts.map((gc,gi)=>'<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:10px;margin-bottom:10px">'+
-'<div class="row"><input class="inp sm" style="flex:1;font-weight:600" value="'+gc.title+'" onchange="DB.customCharts['+gi+'].title=this.value;save();rMore()"><span class="xdel" onclick="DB.customCharts.splice('+gi+',1);save();rMore()">×</span></div>'+
+'<div class="row"><input class="inp sm" style="flex:1;font-weight:600" value=\"'+esc(gc.title)+'\" onchange="DB.customCharts['+gi+'].title=this.value;save();rMore()"><span class="xdel" onclick="DB.customCharts.splice('+gi+',1);save();rMore()">×</span></div>'+
 '<div class="row" style="margin:7px 0"><span style="font-size:11px;color:var(--td)">Type</span><select class="inp sm" style="width:auto" onchange="DB.customCharts['+gi+'].type=this.value;save();rMore()">'+['line','bar','doughnut'].map(t=>'<option'+(t===gc.type?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
 '<div class="pillselect">'+reg.series.map(s=>'<span class="'+(gc.seriesIds.includes(s.id)?'on':'')+'" onclick="togChSeries('+gi+',\''+s.id+'\')">'+s.name.split('(')[0].trim()+'</span>').join('')+'</div>'+
 '<div class="chartbox s" style="margin-top:9px"><canvas id="cc-'+gi+'"></canvas></div>'+
