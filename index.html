@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v24';const VTAG='parseur CSV BoursoBank FR';
+const VERSION='v26';const VTAG='catégories L1 · L2 · L3';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1545,8 +1545,38 @@ add(50,'GENERALI VIE','invest','AV');add(50,'E CIE VIE','invest','AV enfants');a
 add(60,'HENNER','fixe','Mutuelle',{sign:'debit'});
 [['AMAZON','Amazon'],['AMZN','Amazon'],['DELIVEROO','Livraison repas'],['UBER','Transport / livraison'],['CARREFOUR','Courses'],['MONOPRIX','Courses'],['FRANPRIX','Courses'],['LIDL','Courses'],['AUCHAN','Courses'],['PICARD','Courses'],['SNCF','Transport'],['RATP','Transport'],['TOTAL','Carburant'],['ESSO','Carburant'],['PHARMA','Santé'],['DOCTOLIB','Santé'],['AIR FRANCE','Voyages'],['BOOKING','Voyages'],['AIRBNB','Voyages'],['REVOLUT','Transferts'],['PAYPAL','Achats en ligne'],['FDJ','Loisirs'],['RETRAIT','Retrait espèces']].forEach(x=>add(70,x[0],'variable',x[1]));
 add(70,'SALMA','variable','Virement conjoint',{sign:'debit'});return R}
-function ensureV2(){if(!DB.params)DB.params=defParams();const d=defParams();Object.keys(d).forEach(k=>{if(DB.params[k]==null)DB.params[k]=d[k]});
+function defCats(){return{
+'Logement':['Loyer','Charges copropriété','Énergie','Eau','Internet & télécom','Assurance habitation','Maison & entretien','Mobilier'],
+'Enfants & éducation':['École','Crèche','Nounou salaire','Nounou cotisations','Nounou net de CMG','Activités enfants','Vêtements enfants','Cadeaux enfants'],
+'Santé':['Mutuelle','Pharmacie','Médecin','Remboursement santé'],
+'Alimentation':['Courses','Restaurants','Livraison repas','Boulangerie'],
+'Transport':['Carburant','Transports en commun','Train','Taxi / VTC','Assurance auto','Crédit auto','Entretien auto','Péage / parking'],
+'Loisirs & culture':['Sport','Sorties','Voyages','Livres','Jeux','Vêtements'],
+'Abonnements & numérique':['Streaming','Cloud & logiciels','Amazon','Achats en ligne'],
+'Assurances & banque':['Assurance','Frais bancaires','Impôts'],
+'Famille & transferts':['Virement conjoint','Compte joint','Cadeaux','Transferts','Don'],
+'Revenus':['Salaire','CAF','Remboursement impôts','Remboursement frais','Avoir','Intérêts','Autre entrée'],
+'Épargne & investissement':['PEA','AV','AV enfants','PER','PEE / PERCO','Livret A','LDDS','Vers propres comptes'],
+'Divers':['Retrait espèces','Divers']}}
+function catTree(){const t=JSON.parse(JSON.stringify(DB.cats||defCats()));(DB.rules||[]).forEach(r=>{if(!r.sub)return;const g=r.grp||grpOf(r.sub)||'Divers';if(!t[g])t[g]=[];if(!t[g].includes(r.sub))t[g].push(r.sub)});
+Object.keys(t).forEach(g=>t[g].sort((a,b)=>a.localeCompare(b,'fr')));return t}
+function grpOf(sub){const t=DB.cats||defCats();for(const g of Object.keys(t))if(t[g].includes(sub))return g;return null}
+function catAdd(grp,sub){grp=String(grp||'').trim()||'Divers';sub=String(sub||'').trim();if(!sub)return;if(!DB.cats)DB.cats=defCats();if(!DB.cats[grp])DB.cats[grp]=[];if(!DB.cats[grp].includes(sub))DB.cats[grp].push(sub)}
+function catSelect(id,curGrp,curSub){const t=catTree();const gs=Object.keys(t).sort((a,b)=>a.localeCompare(b,'fr'));
+const opts=gs.map(g=>'<optgroup label="'+esc(g)+'">'+t[g].map(c=>'<option value="'+esc(g+'|'+c)+'"'+((g===curGrp&&c===curSub)?' selected':'')+'>'+esc(c)+'</option>').join('')+'</optgroup>').join('');
+return'<select class="inp sm" id="'+id+'c" style="flex:1;min-width:150px" onchange="document.getElementById(\''+id+'z\').style.display=this.value===\'__autre\'?\'flex\':\'none\'"><option value="">— catégorie (famille › détail) —</option>'+opts+'<option value="__autre">Autre…</option></select>'+
+'<div id="'+id+'z" class="row" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px;width:100%"><select class="inp sm" id="'+id+'g" style="flex:1;min-width:130px">'+gs.map(g=>'<option value="'+esc(g)+'">'+esc(g)+'</option>').join('')+'<option value="__new">Nouvelle famille…</option></select><input class="inp sm" id="'+id+'gn" placeholder="Nom de la famille" style="flex:1;min-width:120px"><input class="inp sm" id="'+id+'x" placeholder="Nouveau détail" style="flex:1;min-width:120px"></div>'}
+function catRead(id){const sel=document.getElementById(id+'c');const ty=document.getElementById(id+'t');
+if(sel.value==='__autre'){const gsel=document.getElementById(id+'g');const grp=gsel.value==='__new'?(document.getElementById(id+'gn').value.trim()||'Divers'):gsel.value;const sub=document.getElementById(id+'x').value.trim();catAdd(grp,sub);return{type:ty.value,grp,sub}}
+if(!sel.value)return{type:ty.value,grp:'',sub:''};const [grp,sub]=sel.value.split('|');return{type:ty.value,grp,sub}}
+
+function ensureV2(){if(!DB.params)DB.params=defParams();
+if(!DB.cats||!DB.cats['Logement'])DB.cats=defCats();
+const d=defParams();Object.keys(d).forEach(k=>{if(DB.params[k]==null)DB.params[k]=d[k]});
 if(!Array.isArray(DB.rules)||!DB.rules.length)DB.rules=seedRules();
+const REN={'Logement':'Loyer','Télécom':'Internet & télécom','Abonnement':'Streaming','Banque':'Frais bancaires','Transport / livraison':'Taxi / VTC','Transport':'Transports en commun','Loisirs':'Sorties','vers propres comptes':'Vers propres comptes','Impôts|entree':'Remboursement impôts','Santé|entree':'Remboursement santé','Santé|variable':'Pharmacie','compte épargne':'Livret A','Sport':'Sport','Don':'Don'};
+const BYP={'CLAUDE':'Cloud & logiciels','ANTHROPIC':'Cloud & logiciels','GOOGLE ONE':'Cloud & logiciels','APPLE.COM/BILL':'Cloud & logiciels','WHOOP':'Sport','DISNEY':'Streaming','YOUTUBE':'Streaming'};
+DB.rules.forEach(r=>{if(r.source==='seed'){const k2=r.sub+'|'+r.type;if(BYP[r.pattern])r.sub=BYP[r.pattern];else if(REN[k2])r.sub=REN[k2];else if(REN[r.sub])r.sub=REN[r.sub]}if(!r.grp||!grpOf(r.sub)&&r.grp==='Divers')r.grp=grpOf(r.sub)||(r.sub?'Divers':'')});
 DB.bm.forEach(b=>{if(!Array.isArray(b.entrees))b.entrees=[];if(b.cashFin===undefined)b.cashFin=null;if(!b.cash)b.cash={cc:null,la:null,ldds:null};if(b.imp===undefined)b.imp=null;b.ch.forEach(c=>{if(c.fixe==null)c.fixe=false;if(c.payOffset==null)c.payOffset=0})});
 DB.im.forEach(m=>m.supports.forEach(s=>{if(!s.owner)s.owner=/livret|ldds/i.test(s.n)?'cash':'moi'}));
 if(!DB.params.v2mig){DB.params.v2mig=true;
@@ -1563,8 +1593,8 @@ function ruleMatch(r,tx){if(r.active===false)return false;const L=normLbl(tx.l);
 const credit=tx.v>0,abs=Math.abs(tx.v);if(r.sign==='credit'&&!credit)return false;if(r.sign==='debit'&&credit)return false;
 if(r.amountCond){const c=r.amountCond;const ok=c.op==='>'?abs>c.v:c.op==='>='?abs>=c.v:c.op==='<'?abs<c.v:abs<=c.v;if(!ok)return false}return true}
 function classify(tx){const rules=(DB.rules||[]).slice().sort((a,b)=>a.priority-b.priority);
-for(const r of rules)if(ruleMatch(r,tx))return{type:r.type,sub:r.sub||'',ruleId:r.id,unmatched:false};
-return{type:tx.v>0?'entree':'variable',sub:'non reconnu',ruleId:null,unmatched:true}}
+for(const r of rules)if(ruleMatch(r,tx))return{type:r.type,sub:r.sub||'',grp:r.grp||grpOf(r.sub)||'Divers',ruleId:r.id,unmatched:false};
+return{type:tx.v>0?'entree':'variable',sub:'non reconnu',grp:'Divers',ruleId:null,unmatched:true}}
 const STOP=new Set(['CARTE','VIR','SEPA','PRLV','VERS','DEPUIS','VIREMENT','CB','DE','DU','DES','LA','LE','LES','ET','SA','SAS','SARL','EU','PAIEMENT','ACHAT','FACTURE','ECH','INST','INSTANT']);
 function suggestPattern(l){const w=normLbl(l).replace(/[^A-Z0-9 .\/*-]/g,' ').split(' ').filter(x=>x&&!STOP.has(x)&&!/^\d+$/.test(x)&&!/^\d{2}\/\d{2}/.test(x));return w.slice(0,2).join(' ')}
 /* ---- CSV ---- */
@@ -1607,19 +1637,19 @@ const dt=g('DTPOSTED').slice(0,8);const amt=parseFloat(g('TRNAMT').replace(',','
 if(dt.length===8&&!isNaN(amt))out.push({d:dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8),l,v:amt})}
 return out.length?{tx:out}:null}
 function buildImport(txs,force){force=force||{};const t={salaire:0,entree:0,interneLivret:0,interneAutre:0,invest:0,fixe:0,variable:0};
-const bySub={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[];let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0;
+const bySub={fixe:{},variable:{},entree:{},invest:{}};const byGrp={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[];let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0;
 const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
-txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'compte épargne',ruleId:'acc',unmatched:false}:classify(x));const a=Math.abs(x.v);if(x.v<0)debits+=a;
+txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};const a=Math.abs(x.v);if(x.v<0)debits+=a;
 if(c.type==='salaire'){t.salaire+=x.v;salaireCount++;entrees.push({l:x.l,v:x.v,cat:'salaire'})}
-else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v)}}
+else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v);G('entree',x.v)}}
 else if(c.type==='interneLivret'){t.interneLivret+=x.v;if(!/livret|ldds/i.test(x.acc||'')){if(x.v>0)livretIn+=a;else livretOut+=a}}
 else if(c.type==='interneAutre'){t.interneAutre+=x.v;if(x.v<0)internesOut+=a;else internesIn+=a}
-else if(c.type==='invest'){if(x.v<0){t.invest+=a;add(bySub.invest,c.sub,a)}}
-else if(c.type==='fixe'){if(x.v<0){t.fixe+=a;add(bySub.fixe,c.sub,a)}}
-else{if(x.v<0){t.variable+=a;add(bySub.variable,c.sub,a);if(a>=100)big.push({l:x.l,v:a,sub:c.sub||'',d:x.d})}}
+else if(c.type==='invest'){if(x.v<0){t.invest+=a;add(bySub.invest,c.sub,a);G('invest',a)}}
+else if(c.type==='fixe'){if(x.v<0){t.fixe+=a;add(bySub.fixe,c.sub,a);G('fixe',a)}}
+else{if(x.v<0){t.variable+=a;add(bySub.variable,c.sub,a);G('variable',a);if(a>=100)big.push({l:x.l,v:a,sub:c.sub||'',grp:c.grp||'',d:x.d})}}
 if(c.unmatched)unmatched.push({l:x.l,v:x.v,d:x.d})});
 unmatched.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));big.sort((a,b)=>b.v-a.v);
-return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,unmatched,big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,consoCsv:t.fixe+t.variable}}
+return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,consoCsv:t.fixe+t.variable}}
 /* ---- calcul mensuel ---- */
 function prevuConso(y,m){let fixe=0,varb=0;const idx=y*12+m;
 for(let o=0;o<=2;o++){const i=idx-o;const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b)continue;b.ch.forEach(c=>{if(((+c.payOffset)||0)===o){if(c.fixe)fixe+=c.v;else varb+=c.v}})}
@@ -1649,9 +1679,9 @@ const byM={};r.tx.forEach(x=>{(byM[x.d.slice(0,7)]=byM[x.d.slice(0,7)]||[]).push
 IMP_STATE={months:Object.keys(byM).sort(),byM,sel:Object.keys(byM).sort()[0],unRes:{},res:{},cols:r.cols||null,check:r.check||null,accounts:[...new Set(r.tx.map(x=>x.acc).filter(Boolean))]};impRebuild();
 SUB='import';PG='more';go('more');SUB='import';rMore()}
 function impRebuild(){if(!IMP_STATE)return;IMP_STATE.months.forEach(k=>{IMP_STATE.res[k]=buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)})}
-function impSetUnmatched(k,i,type,sub,mk,pattern){const u=IMP_STATE.res[k].unmatched[i];if(!u)return;
-if(mk&&pattern){DB.rules.push({id:'u'+Date.now()+'_'+i,pattern:pattern.toUpperCase().trim(),type,sub:sub||'',priority:type==='salaire'?12:type==='entree'?25:type==='interneLivret'?35:type==='interneAutre'?45:type==='invest'?55:type==='fixe'?65:75,source:'user',active:true,createdAt:new Date().toISOString().slice(0,10)});save()}
-else{IMP_STATE.unRes[k+'|'+u.l+'|'+u.v]={type,sub}}
+function impSetUnmatched(k,i,type,sub,mk,pattern,grp){const u=IMP_STATE.res[k].unmatched[i];if(!u)return;grp=grp||grpOf(sub)||'Divers';
+if(mk&&pattern){DB.rules.push({id:'u'+Date.now()+'_'+i,pattern:pattern.toUpperCase().trim(),type,sub:sub||'',grp,priority:type==='salaire'?12:type==='entree'?25:type==='interneLivret'?35:type==='interneAutre'?45:type==='invest'?55:type==='fixe'?65:75,source:'user',active:true,createdAt:new Date().toISOString().slice(0,10)});save()}
+else{IMP_STATE.unRes[k+'|'+u.l+'|'+u.v]={type,sub,grp}}
 impRebuild();rMore()}
 function impValidate(k){const [y,m]=k.split('-').map(Number);const b=gOBM(y,m);
 const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)));clean.big=clean.big.slice(0,25);
@@ -1693,7 +1723,7 @@ ${row('<b>Épargne</b>',null,mr.epargne,null)}
 <div style="font-size:10.5px;color:var(--td);margin-top:7px">Réel = début + salaire + entrées − investi − fin. Fixes ${mr.fixesSrc==='import'?'depuis l\u2019import':'prévisionnels (pas d\u2019import)'}. Investi ${mr.investSrc==='import'?'depuis l\u2019import':'programmé'}.</div>
 ${varReel!=null?'<div class="row rb" style="margin-top:9px;font-size:12px"><span>Variables vs cible <b class="mono">'+f$(cible)+' €</b></span><span class="mono" style="color:'+(varReel<=cible?'var(--up)':'var(--dn)')+'">'+(varReel>cible?'+':'')+Math.round((varReel/cible-1)*100)+' %'+(m3?' · moy. 3 mois '+fS(m3.v):'')+'</span></div>':''}
 ${mr.imp&&mr.imp.big.length?'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Variables ≥ 100 € ('+mr.imp.big.length+')</summary>'+mr.imp.big.map(x=>'<div class="list-item" style="padding:5px 0"><span style="flex:1;font-size:12px">'+esc(x.l.slice(0,44))+'<div style="font-size:10px;color:var(--td)">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.sub)+'</div></span><span class="mono" style="font-size:12px">'+fS(x.v)+'</span></div>').join('')+'</details>':''}
-${mr.imp?'<details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Détail par catégorie</summary>'+['fixe','variable','invest','entree'].map(t=>{const o=mr.imp.bySub[t]||{};const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);return ks.length?'<div class="eyebrow" style="margin:7px 0 3px">'+TYPE_LBL[t]+'</div>'+ks.map(k=>'<div class="row rb" style="font-size:12px;padding:2px 0"><span>'+esc(k)+'</span><span class="mono">'+fS(o[k])+'</span></div>').join(''):''}).join('')+'</details>':''}
+${mr.imp?'<details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Dépenses par famille</summary>'+['fixe','variable'].map(t=>{const o=(mr.imp.byGrp||{})[t]||{};const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);const tot=ks.reduce((a,k)=>a+o[k],0);return ks.length?'<div class="eyebrow" style="margin:7px 0 3px">'+TYPE_LBL[t]+' · '+fS(tot)+'</div>'+ks.map(k=>'<div class="row rb" style="font-size:12px;padding:2px 0"><span>'+esc(k)+'</span><span class="mono">'+fS(o[k])+' <span style="color:var(--td);font-size:10px">'+Math.round(o[k]/tot*100)+' %</span></span></div>').join(''):''}).join('')+'</details><details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Détail fin</summary>'+['fixe','variable','invest','entree'].map(t=>{const o=mr.imp.bySub[t]||{};const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);return ks.length?'<div class="eyebrow" style="margin:7px 0 3px">'+TYPE_LBL[t]+'</div>'+ks.map(k=>'<div class="row rb" style="font-size:12px;padding:2px 0"><span>'+esc(grpOf(k)?grpOf(k)+' › ':'')+esc(k)+'</span><span class="mono">'+fS(o[k])+'</span></div>').join(''):''}).join('')+'</details>':''}
 </div></div>`}
 /* ---- page Import ---- */
 function rImport(el){
@@ -1727,8 +1757,9 @@ ${R.salaireCount!==1?'<div class="al ala" style="margin-top:8px">'+R.salaireCoun
 <div class="card-b">${R.unmatched.length?R.unmatched.map((u,i)=>{const sug=suggestPattern(u.l);const id='um'+i;return'<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:10px;margin-bottom:8px">'+
 '<div class="row rb"><span style="flex:1;font-size:12.5px;font-weight:500">'+esc(u.l.slice(0,60))+'</span><b class="mono" style="color:'+(u.v<0?'var(--dn)':'var(--up)')+'">'+fS(u.v)+'</b></div><div style="font-size:10px;color:var(--td)">'+u.d+'</div>'+
 '<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><select class="inp sm" id="'+id+'t" style="width:auto">'+TYPES.map(t=>'<option value="'+t+'"'+((u.v<0?'variable':'entree')===t?' selected':'')+'>'+TYPE_LBL[t]+'</option>').join('')+'</select>'+
-'<input class="inp sm" id="'+id+'s" placeholder="Sous-catégorie" style="flex:1;min-width:100px"></div>'+
-'<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><label style="font-size:11.5px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="'+id+'r" checked style="accent-color:var(--gold)">Créer une règle</label><input class="inp sm mono" id="'+id+'p" value="'+esc(sug)+'" style="flex:1;min-width:120px;font-size:11px"><button class="btn btn-gold xs" onclick="impSetUnmatched(\''+k+'\','+i+',document.getElementById(\''+id+'t\').value,document.getElementById(\''+id+'s\').value,document.getElementById(\''+id+'r\').checked,document.getElementById(\''+id+'p\').value)">OK</button></div></div>'}).join(''):'<div class="al alg">Tout est reconnu.</div>'}</div></div>
+catSelect(id,'','')+'</div>'+
+'<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><label style="font-size:11.5px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="'+id+'r" checked style="accent-color:var(--gold)">Créer une règle</label><input class="inp sm mono" id="'+id+'p" value="'+esc(sug)+'" style="flex:1;min-width:120px;font-size:11px"><button class="btn btn-gold xs" onclick="var c=catRead(\''+id+'\');impSetUnmatched(\''+k+'\','+i+',c.type,c.sub,document.getElementById(\''+id+'r\').checked,document.getElementById(\''+id+'p\').value,c.grp)">OK</button></div>'+
+'<div style="font-size:10px;color:var(--td);margin-top:5px">Type = nature comptable (fixe, variable, entrée…) · Catégorie = famille › détail.</div></div>'}).join(''):'<div class="al alg">Tout est reconnu.</div>'}</div></div>
 ${R.big.length?'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Variables ≥ 100 € à relire<span class="aux">'+R.big.length+'</span></div><div class="card-b">'+R.big.map(x=>'<div class="list-item" style="padding:5px 0"><span style="flex:1;font-size:12px">'+esc(x.l.slice(0,46))+'<div style="font-size:10px;color:var(--td)">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.sub)+'</div></span><span class="mono" style="font-size:12px">'+fS(x.v)+'</span></div>').join('')+'</div></div>':''}
 <div class="card" style="border-color:rgba(229,195,106,.4)"><div class="card-b">
 <div class="lbl" style="margin-bottom:6px">Soldes fin ${MS[m]}, après paie <span class="hint">trois comptes, depuis l\u2019app bancaire</span></div>
@@ -1747,7 +1778,7 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 ${list.map(r=>{const idx=DB.rules.indexOf(r);const hits=last?last.filter(t=>ruleMatch(r,t)).length:null;return'<div class="card" style="margin-bottom:8px;opacity:'+(r.active===false?.5:1)+'"><div class="card-b" style="padding:10px 14px">'+
 '<div class="row" style="gap:6px"><input class="inp sm mono" style="flex:1;font-size:12px" value="'+esc(r.pattern)+'" onchange="DB.rules['+idx+'].pattern=this.value.toUpperCase().trim();save();rMore()"><span class="chip" style="font-size:9.5px">'+r.priority+'</span></div>'+
 '<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><select class="inp sm" style="width:auto;font-size:11px" onchange="DB.rules['+idx+'].type=this.value;save();rMore()">'+TYPES.map(t=>'<option value="'+t+'"'+(r.type===t?' selected':'')+'>'+TYPE_LBL[t]+'</option>').join('')+'</select>'+
-'<input class="inp sm" style="flex:1;min-width:90px;font-size:11px" value="'+esc(r.sub||'')+'" placeholder="Sous-catégorie" onchange="DB.rules['+idx+'].sub=this.value;save()">'+
+(()=>{const t=catTree();const gs=Object.keys(t).sort((a,b)=>a.localeCompare(b,'fr'));return'<select class="inp sm" style="flex:1;min-width:130px;font-size:11px" onchange="if(this.value===\'__autre\'){var g=prompt(\'Famille (ex. Santé) :\');var v=g?prompt(\'Détail :\'):null;if(g&&v){catAdd(g.trim(),v.trim());DB.rules['+idx+'].grp=g.trim();DB.rules['+idx+'].sub=v.trim();save()}}else if(this.value){var p=this.value.split(\'|\');DB.rules['+idx+'].grp=p[0];DB.rules['+idx+'].sub=p[1];save()}rMore()"><option value="">— famille › détail —</option>'+gs.map(g=>'<optgroup label="'+esc(g)+'">'+t[g].map(c=>'<option value="'+esc(g+'|'+c)+'"'+((r.grp||grpOf(r.sub))===g&&c===(r.sub||'')?' selected':'')+'>'+esc(c)+'</option>').join('')+'</optgroup>').join('')+'<option value="__autre">Autre…</option></select>'})()+
 (r.sign?'<span class="chip" style="font-size:9.5px">'+(r.sign==='credit'?'crédits':'débits')+'</span>':'')+(r.amountCond?'<span class="chip mono" style="font-size:9.5px">'+r.amountCond.op+' '+r.amountCond.v+'</span>':'')+
 (hits!=null?'<span class="chip '+(hits?'tag-gold':'')+'" style="font-size:9.5px">'+hits+' ligne'+(hits>1?'s':'')+'</span>':'')+
 '<span class="chip" style="font-size:9.5px">'+r.source+'</span>'+
@@ -1769,6 +1800,9 @@ if(same>=1&&!confirm('Un régime existe déjà pour '+yr+'. Un changement de ré
 DB.params.regimes.push({from,label:label.trim(),motif:motif.trim()});jrnl('regime',null,from+' '+label,motif);rMore()}
 function rGouv(el){const P=DB.params;const n=new Date();const inWin=P.fenetre.mois.includes(n.getMonth()+1)&&n.getDate()>=P.fenetre.jours[0]&&n.getDate()<=P.fenetre.jours[1];
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Gouvernance</div>
+<div class="card" style="border-color:rgba(229,195,106,.35)"><div class="card-b" style="font-size:12.5px;line-height:1.55">
+<b>À quoi sert cet écran.</b> C'est le seul endroit où les paramètres qui pilotent le KPI et le réel peuvent changer — et chaque changement exige un motif, daté, non effaçable. Le but est de vous empêcher d'ajuster une cible pour faire passer un mauvais mois. <b>En usage courant, vous n'y touchez pas.</b><br><br>
+<b>Quand y venir :</b> à l'adhésion Pajemploi+ (renseigner le mois de départ) · si Pajemploi propose l'avance immédiate · à la revue IPS de janvier pour recalibrer la cible variables sur quatre mois réels · en cas de rupture structurelle (déménagement, changement de garde, changement d'emploi) pour ouvrir un nouveau régime.</div></div>
 <div class="card"><div class="card-b"><div class="row rb"><span class="chip tag-gold">Paramètres v${P.version||1}</span><span style="font-size:11.5px;color:${inWin?'var(--up)':'var(--tm)'}">${inWin?'Fenêtre de révision ouverte':'Hors fenêtre — modification journalisée « hors fenêtre »'}</span></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:6px">Fenêtres : du 1er au 7 de janvier, avril, juillet, octobre. Toute modification exige un motif et s\u2019applique aux mois non clos ; les mois clos gardent leurs paramètres.</div></div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Motif de modification</div><div class="card-b"><input class="inp sm" id="gv-motif" placeholder="Obligatoire — ex. : revue IPS janvier 2027, calibration sur 4 mois post-crèche" value="${esc(GV_MOTIF)}" oninput="GV_MOTIF=this.value"></div></div>
