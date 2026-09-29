@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v32';const VTAG='relecture éditable';
+const VERSION='v33';const VTAG='amorce du réel';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1704,7 +1704,7 @@ const invest=imp?imp.t.invest:invT4M(y,m);const ok=cashDeb!=null&&cashFin!=null;
 const reelConso=ok?cashDeb+salaire+autres-invest-cashFin:null;const prevu=prevuConso(y,m);
 const fixes=imp?imp.t.fixe:prevu.fixe;const variables=reelConso!=null?reelConso-fixes:null;
 const epargne=ok?(cashFin-cashDeb)+invest:null;const recon=(imp&&reelConso!=null)?imp.consoCsv-reelConso:null;
-const missing=[],warn=[];if(!imp)missing.push('import CSV');if(cashFin==null)missing.push('solde fin de mois');if(cashDeb==null)missing.push('solde fin '+MS[pv.m]);
+const missing=[],warn=[];if(!imp)missing.push('import CSV');if(cashFin==null)missing.push('solde fin de mois');if(cashDeb==null)missing.push('solde fin '+MS[pv.m]+' (point de départ, à saisir dans Réel vs prévu)');
 if(imp&&imp.unmatched.length)missing.push(imp.unmatched.length+' non reconnu'+(imp.unmatched.length>1?'s':''));
 if(imp&&imp.salaireCount!==1)warn.push(imp.salaireCount+' salaire'+(imp.salaireCount>1?'s':'')+' détecté'+(imp.salaireCount>1?'s':'')+' — paie décalée ?');
 if(recon!=null&&reelConso&&Math.abs(recon)/Math.abs(reelConso)>0.02)warn.push('écart de réconciliation CSV / soldes : '+f$(Math.round(recon))+' €');
@@ -1768,7 +1768,8 @@ const row=(l,p,r,e,cls)=>'<tr class="'+(cls||'')+'"><td>'+l+'</td><td class="mon
 const varPrev=mr.prevu.variable,varReel=mr.variables;const cible=P.cibleVariables;const m3=variablesMoy3(y,m);
 return`<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel vs prévu · ${MS[m]}<span class="aux" style="font-size:10.5px;color:var(--td)">${mr.regime?mr.regime.label:''}${b.reconst?' · reconstitué':''}</span></div>
 <div class="card-b">
-<div class="lbl" style="margin-bottom:6px">Soldes le dernier jour du mois, après paie <span class="hint">pas le total Boursorama — PEA, AV, PER sont dans Invest</span></div>
+${mr.cashDeb==null?(()=>{const pv=pM(y,m);gOBM(pv.y,pv.m);return'<div style="background:var(--goldDim);border:1px solid rgba(229,195,106,.4);border-radius:12px;padding:10px;margin-bottom:12px"><div class="lbl" style="margin-bottom:6px;color:var(--gold)">Point de départ : soldes fin '+MS[pv.m]+' '+pv.y+' <span class="hint">nécessaire pour calculer '+MS[m]+' — à saisir une seule fois</span></div>'+cashInputs(pv.y,pv.m)+'</div>'})():''}
+<div class="lbl" style="margin-bottom:6px">Soldes fin ${MS[m]}, après paie <span class="hint">pas le total Boursorama — PEA, AV, PER sont dans Invest</span></div>
 ${cashInputs(y,m)}<div class="hr"></div>
 <div class="row rb" style="font-size:11.5px;color:var(--tm);margin-bottom:8px"><span>Début (fin ${MS[pM(y,m).m]}) : <b class="mono">${mr.cashDeb!=null?fS(mr.cashDeb):'—'}</b></span><span>Salaire : <b class="mono">${mr.salaire?fS(mr.salaire):'—'}</b></span><span>Entrées : <b class="mono">${fS(mr.autres)}</b></span></div>
 <table><thead><tr><th></th><th style="text-align:right">Prévu</th><th style="text-align:right">Réel</th><th style="text-align:right">Écart</th></tr></thead><tbody>
