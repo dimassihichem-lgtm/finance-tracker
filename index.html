@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v31';const VTAG='virements sortants à la ligne';
+const VERSION='v32';const VTAG='relecture éditable';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1678,9 +1678,10 @@ const dt=g('DTPOSTED').slice(0,8);const amt=parseFloat(g('TRNAMT').replace(',','
 if(dt.length===8&&!isNaN(amt))out.push({d:dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8),l,v:amt})}
 return out.length?{tx:out}:null}
 function buildImport(txs,force){force=force||{};const t={salaire:0,entree:0,interneLivret:0,interneAutre:0,invest:0,fixe:0,variable:0};
-const bySub={fixe:{},variable:{},entree:{},invest:{}};const byGrp={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[];let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0;const bourso={};
+const bySub={fixe:{},variable:{},entree:{},invest:{}};const byGrp={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[];let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0;const bourso={};const groups={};
 const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
-txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const a=Math.abs(x.v);const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};if(c.via==='bourso'){viaBourso++;const key=(x.s||normLbl(x.l))+'|'+c.type+'|'+c.grp+'|'+c.sub;(bourso[key]=bourso[key]||{s:x.s||normLbl(x.l),type:c.type,grp:c.grp,sub:c.sub,n:0,tot:0,l:x.l}).n++;bourso[key].tot+=a}if(x.v<0)debits+=a;
+txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const a=Math.abs(x.v);const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};if(c.via==='bourso')viaBourso++;
+if(!c.unmatched){const mk=(x.s||suggestPattern(x.l)).toUpperCase();const key=mk+'|'+c.type+'|'+(c.grp||'')+'|'+(c.sub||'');const src=c.ruleId==='manual'?'manuel':c.via==='bourso'?'bourso':c.ruleId==='acc'?'compte':'règle';(groups[key]=groups[key]||{key,s:mk,type:c.type,grp:c.grp||'',sub:c.sub||'',src,n:0,tot:0,lines:[]}).n++;groups[key].tot+=x.v;groups[key].lines.push({d:x.d,l:x.l,v:x.v})}if(x.v<0)debits+=a;
 if(c.type==='salaire'){t.salaire+=x.v;salaireCount++;entrees.push({l:x.l,v:x.v,cat:'salaire'})}
 else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v);G('entree',x.v)}}
 else if(c.type==='interneLivret'){t.interneLivret+=x.v;if(!/livret|ldds/i.test(x.acc||'')){if(x.v>0)livretIn+=a;else livretOut+=a}}
@@ -1690,7 +1691,7 @@ else if(c.type==='fixe'){if(x.v<0){t.fixe+=a;add(bySub.fixe,c.sub,a);G('fixe',a)
 else{if(x.v<0){t.variable+=a;add(bySub.variable,c.sub,a);G('variable',a);if(a>=100)big.push({l:x.l,v:a,sub:c.sub||'',grp:c.grp||'',d:x.d})}}
 if(c.unmatched)unmatched.push({l:x.l,v:x.v,d:x.d,s:x.s||'',cat:x.cat||''})});
 unmatched.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));big.sort((a,b)=>b.v-a.v);
-return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,bourso:Object.values(bourso).sort((a,b)=>b.tot-a.tot),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,consoCsv:t.fixe+t.variable}}
+return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,groups:Object.values(groups).sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot)),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,consoCsv:t.fixe+t.variable}}
 /* ---- calcul mensuel ---- */
 function prevuConso(y,m){let fixe=0,varb=0;const idx=y*12+m;
 for(let o=0;o<=2;o++){const i=idx-o;const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b)continue;b.ch.forEach(c=>{if(((+c.payOffset)||0)===o){if(c.fixe)fixe+=c.v;else varb+=c.v}})}
@@ -1728,6 +1729,12 @@ if(mk&&pattern){const pat=pattern.toUpperCase().trim();const rule={id:'u'+Date.n
 if(!ruleMatch(rule,u))alert('Le motif « '+pat+' » ne se retrouve pas dans ce libellé : la ligne est classée, mais la règle ne s\u2019appliquera pas aux suivantes. Motif normalisé du libellé : '+normLbl(u.l));
 DB.rules.push(rule);save()}
 impRebuild();rMore()}
+let IMP_EDIT=null,IMP_Q='',IMP_F='';
+function impReclass(k,gkey,type,sub,grp,mk,pattern,lineIdx){grp=grp||grpOf(sub)||'Divers';const g=IMP_STATE.res[k].groups.find(x=>x.key===gkey);if(!g)return;
+const lines=lineIdx==null?g.lines:[g.lines[lineIdx]];lines.forEach(x=>{IMP_STATE.unRes[k+'|'+x.l+'|'+x.v]={type,sub,grp}});
+if(mk&&pattern&&lineIdx==null){const pat=pattern.toUpperCase().trim();const rule={id:'u'+Date.now(),pattern:pat,type,sub:sub||'',grp,priority:type==='salaire'?12:type==='entree'?25:type==='interneLivret'?35:type==='interneAutre'?45:type==='invest'?55:type==='fixe'?65:75,source:'user',active:true,createdAt:new Date().toISOString().slice(0,10)};
+if(!g.lines.every(x=>ruleMatch(rule,x)))alert('Le motif « '+pat+' » ne couvre pas toutes les lignes du groupe : elles sont reclassées ici, la règle ne s\u2019appliquera qu\u2019à celles qu\u2019elle matche.');DB.rules.push(rule);save()}
+IMP_EDIT=null;impRebuild();rMore()}
 function impSetAll(k,type,sub,grp){grp=grp||grpOf(sub)||'Divers';IMP_STATE.res[k].unmatched.forEach(u=>{IMP_STATE.unRes[k+'|'+u.l+'|'+u.v]={type,sub,grp}});impRebuild();rMore()}
 function impValidate(k){const [y,m]=k.split('-').map(Number);const b=gOBM(y,m);
 const nNew=IMP_STATE.byM[k].length;
@@ -1735,7 +1742,7 @@ if(b.imp&&b.imp.done){const nOld=b.imp.n;if(nNew<nOld&&!confirm('Un import de '+
 if(nNew>=nOld&&!confirm('Remplacer l\u2019import de '+ML[m]+' ('+nOld+' lignes) par ce fichier ('+nNew+' lignes) ? Les règles et vos classements manuels sont conservés.'))return}
 if(b.cl){alert(ML[m]+' est clôturé. Rouvrez le mois dans Budget avant de ré-importer.');return}
 const force={};Object.keys(IMP_STATE.unRes).forEach(fk=>{if(fk.startsWith(k+'|'))force[fk]=IMP_STATE.unRes[fk]});b.impForce=force;
-const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)));clean.big=clean.big.slice(0,25);
+const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)));clean.big=clean.big.slice(0,25);clean.groups=(clean.groups||[]).slice(0,60).map(g=>({s:g.s,type:g.type,grp:g.grp,sub:g.sub,src:g.src,n:g.n,tot:Math.round(g.tot*100)/100}));
 b.imp=clean;b.entrees=clean.entrees;b.lvAuto=clean.livretOut;b.lrAuto=clean.livretIn;
 const n0=new Date();if((n0.getFullYear()*12+n0.getMonth()+1)-(y*12+m)>=2)b.reconst=true;save();
 delete IMP_STATE.byM[k];IMP_STATE.months=IMP_STATE.months.filter(x=>x!==k);delete IMP_STATE.res[k];
@@ -1813,9 +1820,22 @@ ${R.salaireCount!==1?'<div class="al ala" style="margin-top:8px">'+R.salaireCoun
 catSelect(id,/VIREMENT DE HICHEM|VIR INST/i.test(u.l)&&u.v<0?'Famille & transferts':'',/VIREMENT DE HICHEM|VIR INST/i.test(u.l)&&u.v<0?'Aide famille':'')+'</div>'+
 '<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><label style="font-size:11.5px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="'+id+'r" checked style="accent-color:var(--gold)">Créer une règle</label><input class="inp sm mono" id="'+id+'p" value="'+esc(sug)+'" style="flex:1;min-width:120px;font-size:11px"><button class="btn btn-gold xs" onclick="var c=catRead(\''+id+'\');impSetUnmatched(\''+k+'\','+i+',c.type,c.sub,document.getElementById(\''+id+'r\').checked,document.getElementById(\''+id+'p\').value,c.grp)">OK</button></div>'+
 '<div style="font-size:10px;color:var(--td);margin-top:5px">Type = nature comptable (fixe, variable, entrée…) · Catégorie = famille › détail.</div></div>'}).join(''):'<div class="al alg">Tout est reconnu.</div>'}</div></div>
-${R.bourso&&R.bourso.length?'<details class="card" style="padding:0"><summary class="card-h" style="cursor:pointer;list-style:none"><span class="dot" style="background:var(--cyan)"></span>Classées d\u2019après BoursoBank<span class="aux">'+R.viaBourso+'</span></summary><div class="card-b">'+
-'<div style="font-size:10.5px;color:var(--td);margin-bottom:6px">Catégorie BoursoBank traduite dans votre taxonomie. Créez une règle dans Règles pour corriger un commerçant.</div>'+R.bourso.slice(0,40).map(b=>'<div class="row rb" style="font-size:11.5px;padding:3px 0;border-bottom:1px solid rgba(36,44,66,.4)"><span style="flex:1">'+esc(b.s.slice(0,28))+' <span style="color:var(--td)">×'+b.n+'</span><div style="font-size:10px;color:var(--td)">'+TYPE_LBL[b.type]+' · '+esc(b.grp)+' › '+esc(b.sub)+'</div></span><span class="mono">'+fS(b.tot)+'</span></div>').join('')+(R.bourso.length>40?'<div class="empty">… et '+(R.bourso.length-40)+' autres</div>':'')+'</div></details>':''}
-${R.big.length?'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Variables ≥ 100 € à relire<span class="aux">'+R.big.length+'</span></div><div class="card-b">'+R.big.map(x=>'<div class="list-item" style="padding:5px 0"><span style="flex:1;font-size:12px">'+esc(x.l.slice(0,46))+'<div style="font-size:10px;color:var(--td)">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.sub)+'</div></span><span class="mono" style="font-size:12px">'+fS(x.v)+'</span></div>').join('')+'</div></div>':''}
+${(()=>{const q=IMP_Q.toUpperCase();let G=R.groups||[];const tot=G.length;
+if(IMP_F==='big')G=G.filter(g=>g.lines.some(x=>Math.abs(x.v)>=100)&&['fixe','variable'].includes(g.type));else if(IMP_F==='bourso')G=G.filter(g=>g.src==='bourso');else if(IMP_F==='manuel')G=G.filter(g=>g.src==='manuel');else if(IMP_F==='regle')G=G.filter(g=>g.src==='règle');
+if(q)G=G.filter(g=>g.s.includes(q)||g.sub.toUpperCase().includes(q)||g.grp.toUpperCase().includes(q));
+const chip=(f,l)=>'<span class="chip'+(IMP_F===f?' tag-gold':'')+'" style="cursor:pointer;font-size:10px" onclick="IMP_F=\''+f+'\';rMore()">'+l+'</span>';
+const ed=g=>{const id='ed_'+g.key.replace(/[^a-z0-9]/gi,'_').slice(0,40);return'<div style="background:var(--bg2);border:1px solid var(--gold);border-radius:10px;padding:9px;margin:6px 0">'+
+'<div class="row" style="gap:6px;flex-wrap:wrap"><select class="inp sm" id="'+id+'t" style="width:auto">'+TYPES.map(t=>'<option value="'+t+'"'+(g.type===t?' selected':'')+'>'+TYPE_LBL[t]+'</option>').join('')+'</select>'+catSelect(id,g.grp,g.sub)+'</div>'+
+'<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><label style="font-size:11px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="'+id+'r" '+(g.src==='règle'?'checked':'')+' style="accent-color:var(--gold)">Règle</label><input class="inp sm mono" id="'+id+'p" value="'+esc(g.s)+'" style="flex:1;min-width:110px;font-size:11px">'+
+'<button class="btn btn-gold xs" onclick="var c=catRead(\''+id+'\');impReclass(\''+k+'\',\''+esc(g.key)+'\',c.type,c.sub,c.grp,document.getElementById(\''+id+'r\').checked,document.getElementById(\''+id+'p\').value)">Tout le groupe</button><button class="btn btn-ghost xs" onclick="IMP_EDIT=null;rMore()">Annuler</button></div>'+
+(g.lines.length>1?'<div style="margin-top:6px;font-size:10.5px;color:var(--td)">Ou une seule ligne :</div>'+g.lines.map((x,i)=>'<div class="row rb" style="font-size:11px;padding:2px 0"><span style="flex:1">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.l.slice(0,34))+'</span><span class="mono">'+fS(x.v)+'</span><button class="btn btn-ghost xs" style="margin-left:6px" onclick="var c=catRead(\''+id+'\');impReclass(\''+k+'\',\''+esc(g.key)+'\',c.type,c.sub,c.grp,false,\'\','+i+')">↩</button></div>').join(''):'')+'</div>'};
+return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Relecture des lignes classées<span class="aux">'+tot+' groupes</span></div><div class="card-b">'+
+'<div class="row" style="gap:5px;flex-wrap:wrap;margin-bottom:8px">'+chip('','Tout')+chip('big','≥ 100 €')+chip('bourso','via BoursoBank')+chip('regle','par règle')+chip('manuel','manuel')+'</div>'+
+'<input class="inp sm" placeholder="Rechercher un commerçant, une catégorie…" value="'+esc(IMP_Q)+'" oninput="IMP_Q=this.value;rMore()" style="margin-bottom:8px">'+
+(G.length?G.slice(0,80).map(g=>'<div style="border-bottom:1px solid rgba(36,44,66,.5);padding:6px 0">'+
+'<div class="row rb"><span style="flex:1;font-size:12px"><b>'+esc(g.s.slice(0,30))+'</b> <span style="color:var(--td)">×'+g.n+'</span><div style="font-size:10.5px;color:var(--tm)">'+TYPE_LBL[g.type]+' · '+esc(g.grp)+' › '+esc(g.sub)+' <span class="chip" style="font-size:9px;padding:1px 5px">'+g.src+'</span></div></span><span class="mono" style="font-size:12px;color:'+(g.tot<0?'inherit':'var(--up)')+'">'+fS(g.tot)+'</span><button class="btn btn-ghost xs" style="margin-left:8px" onclick="IMP_EDIT=\''+esc(g.key)+'\';rMore()">✎</button></div>'+
+(IMP_EDIT===g.key?ed(g):'')+'</div>').join('')+(G.length>80?'<div class="empty">… '+(G.length-80)+' autres — affinez la recherche</div>':''):'<div class="empty">Aucune ligne pour ce filtre</div>')+
+'<div style="font-size:10px;color:var(--td);margin-top:8px">« Tout le groupe » reclasse toutes les lignes du commerçant ce mois-ci ; avec Règle coché, la correction s\u2019applique aussi aux imports suivants. ↩ reclasse une seule ligne, sans règle.</div></div></div>'})()}
 <div class="card" style="border-color:rgba(229,195,106,.4)"><div class="card-b">
 <div class="lbl" style="margin-bottom:6px">Soldes fin ${MS[m]}, après paie <span class="hint">trois comptes, depuis l\u2019app bancaire</span></div>
 ${(()=>{gOBM(y,m);return cashInputs(y,m)})()}
