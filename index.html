@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v28';const VTAG='import : rachats, classement groupé';
+const VERSION='v31';const VTAG='virements sortants à la ligne';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1539,12 +1539,16 @@ function seedRules(){const R=[];let n=0;const add=(prio,pattern,type,sub,x)=>R.p
 add(10,'ALPHA FINANCIAL MARKETS','salaire','',{amountCond:{op:'>',v:3000}});add(11,'ALPHA FINANCIAL MARKETS','entree','Remboursement frais',{amountCond:{op:'<=',v:3000}});
 add(20,'SEPA CAF','entree','CAF',{sign:'credit'});add(19,'RBT RETRAIT','entree','Remboursement frais',{sign:'credit'});add(20,'CPAM','entree','Santé');add(20,'HENNER','entree','Santé',{sign:'credit'});add(20,'DGFIP','entree','Impôts',{sign:'credit'});add(20,'AVOIR','entree','Avoir');
 add(30,'VIREMENT DEPUIS LIVRET','interneLivret');add(30,'DEPUIS LDDS','interneLivret');add(30,'LIVRET A','interneLivret');add(30,'LIVRET DEVELOPPEMENT','interneLivret');
-add(40,'VIREMENT DEPUIS BOURSOBANK','interneAutre','vers propres comptes');
+add(30,'VIREMENT DEPUIS BOURSOBANK','interneLivret','Livret A');
+add(25,'VIREMENT DE SALMA','entree','Virement conjoint reçu',{sign:'credit'});add(24,'NOTAIRES','entree','Remboursement frais',{sign:'credit'});add(26,'VIR INST','entree','Autre entrée',{sign:'credit'});
+add(70,'MAMAN','variable','Aide maman',{sign:'debit'});add(70,'MERE','variable','Aide maman',{sign:'debit'});
 add(50,'GENERALI VIE','invest','AV');add(50,'E CIE VIE','invest','AV enfants');add(50,'ORADEA','invest','PER');add(50,'PEA','invest','PEA');
 [['LOYER','Logement'],['ECH PRET','Crédit auto'],['PREST ENFANT','École'],['MICRO','Crèche'],['PAJEMPLOI','Nounou cotisations'],['ORANGE','Télécom'],['EDF','Énergie'],['SOGESSUR','Assurance auto'],['FLITTER','Assurance'],['UNICEF','Don'],['CLAUDE','Abonnement'],['ANTHROPIC','Abonnement'],['WELLPASS','Sport'],['DISNEY','Abonnement'],['GOOGLE ONE','Abonnement'],['APPLE.COM/BILL','Abonnement'],['YOUTUBE','Abonnement'],['WHOOP','Abonnement'],['FRAIS OFFRE METAL','Banque']].forEach(x=>add(60,x[0],'fixe',x[1]));
 add(60,'HENNER','fixe','Mutuelle',{sign:'debit'});
-[['AMAZON','Amazon'],['AMZN','Amazon'],['DELIVEROO','Livraison repas'],['UBER','Transport / livraison'],['CARREFOUR','Courses'],['MONOPRIX','Courses'],['FRANPRIX','Courses'],['LIDL','Courses'],['AUCHAN','Courses'],['PICARD','Courses'],['SNCF','Transport'],['RATP','Transport'],['TOTALENERGIES','Carburant'],['ESSO','Carburant'],['PHARMA','Santé'],['DOCTOLIB','Santé'],['AIR FRANCE','Voyages'],['BOOKING','Voyages'],['AIRBNB','Voyages'],['REVOLUT','Transferts'],['PAYPAL','Achats en ligne'],['FDJ','Loisirs'],['RETRAIT','Retrait espèces']].forEach(x=>add(70,x[0],'variable',x[1],{sign:'debit'}));
-add(70,'SALMA','variable','Virement conjoint',{sign:'debit'});return R}
+[['AMAZON','Amazon'],['AMZN','Amazon'],['DELIVEROO','Livraison repas'],['UBER','Transport / livraison'],['CARREFOUR','Courses'],['MONOPRIX','Courses'],['FRANPRIX','Courses'],['LIDL','Courses'],['AUCHAN','Courses'],['PICARD','Courses'],['SNCF','Transport'],['RATP','Transport'],['TOTALENERGIES','Carburant'],['ESSO','Carburant'],['PHARMA','Santé'],['DOCTOLIB','Santé'],['AIR FRANCE','Transport'],['BOOKING','Hébergement'],['AIRBNB','Hébergement'],['REVOLUT','Revolut'],['PAYPAL','Achats en ligne'],['FDJ','Loisirs'],['RETRAIT','Retrait espèces']].forEach(x=>add(70,x[0],'variable',x[1],{sign:'debit'}));
+add(70,'SALMA','variable','Virement conjoint',{sign:'debit'});
+[['LE PGDR','variable','Bien-être'],['LES BELLES AIRES','variable','Boulangerie'],['LA SURIESNE','variable','Boulangerie'],['BDM PUTEAUX','variable','Boulangerie'],['NOTAIRES','variable','Services professionnels'],['DON PEPE','variable','Restaurants'],['SC-COMPOSE','variable','Restaurants'],['SURESNES FUTSAL','variable','Club & association'],['MARCHE D','variable','Courses'],['MG MENDES','variable','Courses'],['GIE DES MAE','fixe','École'],['CHARGEMAP','variable','Carburant'],['BELIB','variable','Carburant'],['OOREDOO','variable','Sur place'],['BITAKSI','variable','Sur place'],['AVOLTA','variable','Sur place'],['MANAR FOOD','variable','Sur place'],['GLOVOAPP','variable','Sur place'],['AIRALO','variable','Sur place']].forEach(x=>add(x[1]==='fixe'?66:71,x[0],x[1],x[2],{sign:'debit'}));
+return R}
 function defCats(){return{
 'Logement':['Loyer','Charges copropriété','Énergie','Eau','Internet & télécom','Assurance habitation','Maison & entretien','Mobilier'],
 'Enfants & éducation':['École','Crèche','Nounou salaire','Nounou cotisations','Nounou net de CMG','Activités enfants','Vêtements enfants','Cadeaux enfants'],
@@ -1554,10 +1558,11 @@ function defCats(){return{
 'Loisirs & culture':['Sport','Sorties','Voyages','Livres & jouets','Jeux','Vêtements','Club & association'],
 'Abonnements & numérique':['Streaming','Cloud & logiciels','Amazon','Achats en ligne','Électronique & informatique'],
 'Assurances & banque':['Assurance','Frais bancaires','Impôts','Services professionnels'],
-'Famille & transferts':['Virement conjoint','Compte joint','Cadeaux','Transferts','Don'],
+'Famille & transferts':['Virement conjoint','Virement conjoint reçu','Aide maman','Aide famille','Compte joint','Cadeaux','Transferts','Don'],
 'Revenus':['Salaire','CAF','Remboursement impôts','Remboursement frais','Avoir','Intérêts','Autre entrée'],
 'Épargne & investissement':['PEA','AV','AV enfants','PER','PEE / PERCO','Épargne','Livret A','LDDS','Vers propres comptes'],
-'Divers':['Retrait espèces','Animaux','Divers']}}
+'Vacances':['Transport','Hébergement','Sur place'],
+'Divers':['Retrait espèces','Animaux','Revolut','Divers']}}
 function catTree(){const t=JSON.parse(JSON.stringify(DB.cats||defCats()));(DB.rules||[]).forEach(r=>{if(!r.sub)return;const g=r.grp||grpOf(r.sub)||'Divers';if(!t[g])t[g]=[];if(!t[g].includes(r.sub))t[g].push(r.sub)});
 Object.keys(t).forEach(g=>t[g].sort((a,b)=>a.localeCompare(b,'fr')));return t}
 function grpOf(sub){const t=DB.cats||defCats();for(const g of Object.keys(t))if(t[g].includes(sub))return g;return null}
@@ -1576,6 +1581,10 @@ const d=defParams();Object.keys(d).forEach(k=>{if(DB.params[k]==null)DB.params[k
 if(!Array.isArray(DB.rules)||!DB.rules.length)DB.rules=seedRules();
 const REN={'Logement':'Loyer','Télécom':'Internet & télécom','Abonnement':'Streaming','Banque':'Frais bancaires','Transport / livraison':'Taxi / VTC','Transport':'Transports en commun','Loisirs':'Sorties','vers propres comptes':'Vers propres comptes','Impôts|entree':'Remboursement impôts','Santé|entree':'Remboursement santé','Santé|variable':'Pharmacie','compte épargne':'Livret A','Sport':'Sport','Don':'Don'};
 DB.rules.forEach(r=>{if(r.source!=='seed')return;if(r.pattern==='CAF'){r.pattern='SEPA CAF';r.sign='credit'}if(r.pattern==='TOTAL')r.pattern='TOTALENERGIES';if(r.type==='variable'&&!r.sign)r.sign='debit'});
+const have=new Set(DB.rules.map(r=>r.pattern+'|'+(r.sign||'')));seedRules().forEach(r=>{if(!have.has(r.pattern+'|'+(r.sign||''))){r.id='s'+Date.now()+'_'+Math.random().toString(36).slice(2,6);DB.rules.push(r)}});
+DB.rules=DB.rules.filter(r=>!(r.source==='seed'&&r.pattern==='VIREMENT DE HICHEM DIMASSI'));
+DB.rules.forEach(r=>{if(r.source!=='seed')return;if(r.pattern==='VIREMENT DEPUIS BOURSOBANK'){r.type='interneLivret';r.sub='Livret A';r.grp='Épargne & investissement'}
+if(r.pattern==='AIR FRANCE'){r.sub='Transport';r.grp='Vacances'}if(r.pattern==='BOOKING'||r.pattern==='AIRBNB'){r.sub='Hébergement';r.grp='Vacances'}if(r.pattern==='REVOLUT'){r.sub='Revolut';r.grp='Divers'}});
 if(!DB.rules.find(r=>r.pattern==='RBT RETRAIT'))DB.rules.push({id:'s_rbt',pattern:'RBT RETRAIT',type:'entree',sub:'Remboursement frais',grp:'Revenus',priority:19,source:'seed',active:true,sign:'credit'});
 const BYP={'CLAUDE':'Cloud & logiciels','ANTHROPIC':'Cloud & logiciels','GOOGLE ONE':'Cloud & logiciels','APPLE.COM/BILL':'Cloud & logiciels','WHOOP':'Sport','DISNEY':'Streaming','YOUTUBE':'Streaming'};
 DB.rules.forEach(r=>{if(r.source==='seed'){const k2=r.sub+'|'+r.type;if(BYP[r.pattern])r.sub=BYP[r.pattern];else if(REN[k2])r.sub=REN[k2];else if(REN[r.sub])r.sub=REN[r.sub]}if(!r.grp||!grpOf(r.sub)&&r.grp==='Divers')r.grp=grpOf(r.sub)||(r.sub?'Divers':'')});
@@ -1598,7 +1607,7 @@ const BB_MAP={
 'Alimentation':['variable','Alimentation','Courses'],'Restaurants, bars, discothèques…':['variable','Alimentation','Restaurants'],
 'Livres, CD/DVD, bijoux, jouets…':['variable','Loisirs & culture','Livres & jouets'],'Transports quotidiens (métro, bus…)':['variable','Transport','Transports en commun'],
 'Parking':['variable','Transport','Péage / parking'],'Club / association (sport, hobby, art…)':['variable','Loisirs & culture','Club & association'],
-'Transports longue distance (avions, trains…)':['variable','Loisirs & culture','Voyages'],'Pharmacie et laboratoire':['variable','Santé','Pharmacie'],
+'Transports longue distance (avions, trains…)':['variable','Vacances','Transport'],'Pharmacie et laboratoire':['variable','Santé','Pharmacie'],
 'Divertissement - culture (ciné, théâtre, concerts…)':['variable','Loisirs & culture','Sorties'],'Vie Quotidienne - Autres':['variable','Divers','Divers'],'Vie quotidienne':['variable','Divers','Divers'],
 'Entretien - Réparation':['variable','Transport','Entretien auto'],'Téléphonie (fixe et mobile)':['fixe','Logement','Internet & télécom'],
 'Dépenses Jeux et paris':['variable','Loisirs & culture','Jeux'],'Electronique et informatique':['variable','Abonnements & numérique','Électronique & informatique'],
@@ -1612,9 +1621,9 @@ const BB_MAP={
 'Services professionnels (avocats, notaires…)':['variable','Assurances & banque','Services professionnels'],'Carburant':['variable','Transport','Carburant'],
 'Bien-être et soins (coiffeur, parfums…)':['variable','Santé','Bien-être'],'Mobilier, électroménager, décoration…':['variable','Logement','Mobilier'],
 'Bricolage et jardinage':['variable','Logement','Maison & entretien'],'Taxis':['variable','Transport','Taxi / VTC'],'Impôts & Taxes - Autres':['fixe','Assurances & banque','Impôts'],
-'Hébergement (hôtels, camping…)':['variable','Loisirs & culture','Voyages'],'Contraventions':['variable','Transport','Amendes'],'Optique, audition…':['variable','Santé','Optique'],
+'Hébergement (hôtels, camping…)':['variable','Vacances','Hébergement'],'Contraventions':['variable','Transport','Amendes'],'Optique, audition…':['variable','Santé','Optique'],
 'Remboursements':['entree','Revenus','Remboursement frais'],'Animaux domestiques':['variable','Divers','Animaux'],'Remboursements frais de vie quotidienne':['entree','Revenus','Remboursement frais'],
-'Loisirs - Autres':['variable','Loisirs & culture','Sorties'],'Voyages & Transports - Autres':['variable','Loisirs & culture','Voyages'],
+'Loisirs - Autres':['variable','Loisirs & culture','Sorties'],'Voyages & Transports - Autres':['variable','Vacances','Sur place'],
 'Virements reçus de comptes à comptes':['interneLivret','Épargne & investissement','Livret A'],'Virements émis de comptes à comptes':['interneLivret','Épargne & investissement','Livret A'],'Mouvements internes créditeurs':['interneLivret','Épargne & investissement','Livret A']};
 function bbClassify(tx){const m=BB_MAP[tx.cat||''];if(!m)return null;return{type:m[0],grp:m[1],sub:m[2],ruleId:'bourso',unmatched:false,via:'bourso'}}
 function classify(tx){const rules=(DB.rules||[]).slice().sort((a,b)=>a.priority-b.priority);
@@ -1707,8 +1716,10 @@ function calcPatriV2(bm,im){return(bm&&bm.cashFin!=null)?bm.cashFin+investiT(im)
 /* ---- application d'un import ---- */
 let IMP_STATE=null;
 function importCsvText(text){const r=/<OFX>|<STMTTRN>/i.test(text)?parseOfx(text):parseCsv(text);if(!r||r.error){alert(r?r.error:'Fichier vide ou format non reconnu');return}
+const seen={};let dup=0;r.tx.forEach(x=>{const k=x.d+'|'+x.l+'|'+x.v+'|'+(x.acc||'');seen[k]=(seen[k]||0)+1;if(seen[k]>1)dup++});
 const byM={};r.tx.forEach(x=>{(byM[x.d.slice(0,7)]=byM[x.d.slice(0,7)]||[]).push(x)});
-IMP_STATE={months:Object.keys(byM).sort(),byM,sel:Object.keys(byM).sort()[0],unRes:{},res:{},cols:r.cols||null,check:r.check||null,accounts:[...new Set(r.tx.map(x=>x.acc).filter(Boolean))]};impRebuild();
+const unRes={};Object.keys(byM).forEach(k=>{const [y,m]=k.split('-').map(Number);const b=gBM(y,m);if(b&&b.impForce)Object.assign(unRes,b.impForce)});
+IMP_STATE={months:Object.keys(byM).sort(),byM,sel:Object.keys(byM).sort()[0],unRes,res:{},cols:r.cols||null,check:r.check||null,dup,accounts:[...new Set(r.tx.map(x=>x.acc).filter(Boolean))]};impRebuild();
 SUB='import';PG='more';go('more');SUB='import';rMore()}
 function impRebuild(){if(!IMP_STATE)return;IMP_STATE.months.forEach(k=>{IMP_STATE.res[k]=buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)})}
 function impSetUnmatched(k,i,type,sub,mk,pattern,grp){const u=IMP_STATE.res[k].unmatched[i];if(!u)return;grp=grp||grpOf(sub)||'Divers';
@@ -1719,6 +1730,11 @@ DB.rules.push(rule);save()}
 impRebuild();rMore()}
 function impSetAll(k,type,sub,grp){grp=grp||grpOf(sub)||'Divers';IMP_STATE.res[k].unmatched.forEach(u=>{IMP_STATE.unRes[k+'|'+u.l+'|'+u.v]={type,sub,grp}});impRebuild();rMore()}
 function impValidate(k){const [y,m]=k.split('-').map(Number);const b=gOBM(y,m);
+const nNew=IMP_STATE.byM[k].length;
+if(b.imp&&b.imp.done){const nOld=b.imp.n;if(nNew<nOld&&!confirm('Un import de '+ML[m]+' existe déjà avec '+nOld+' lignes. Ce fichier n\u2019en contient que '+nNew+' pour ce mois : il le remplacerait par une version plus courte. Continuer ?'))return;
+if(nNew>=nOld&&!confirm('Remplacer l\u2019import de '+ML[m]+' ('+nOld+' lignes) par ce fichier ('+nNew+' lignes) ? Les règles et vos classements manuels sont conservés.'))return}
+if(b.cl){alert(ML[m]+' est clôturé. Rouvrez le mois dans Budget avant de ré-importer.');return}
+const force={};Object.keys(IMP_STATE.unRes).forEach(fk=>{if(fk.startsWith(k+'|'))force[fk]=IMP_STATE.unRes[fk]});b.impForce=force;
 const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)));clean.big=clean.big.slice(0,25);
 b.imp=clean;b.entrees=clean.entrees;b.lvAuto=clean.livretOut;b.lrAuto=clean.livretIn;
 const n0=new Date();if((n0.getFullYear()*12+n0.getMonth()+1)-(y*12+m)>=2)b.reconst=true;save();
@@ -1776,6 +1792,8 @@ el.innerHTML=`<button class="backlink" onclick="IMP_STATE=null;rMore()">‹ Annu
 ${IMP_STATE.months.length>1?'<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">'+IMP_STATE.months.map(x=>'<span class="chip '+(x===k?'tag-gold':'')+'" style="cursor:pointer" onclick="IMP_STATE.sel=\''+x+'\';rMore()">'+MS[+x.slice(5)]+' '+x.slice(0,4)+' · '+IMP_STATE.byM[x].length+'</span>').join('')+'</div>':''}
 ${IMP_STATE.cols?'<div class="al alb" style="margin-bottom:10px;font-size:11px">Colonnes lues — date : <b>'+esc(IMP_STATE.cols.date)+'</b> · libellé : <b>'+esc(IMP_STATE.cols.lib)+'</b> · montant : <b>'+esc(IMP_STATE.cols.montant)+'</b>'+(IMP_STATE.check?' · contrôle solde/montant : '+IMP_STATE.check.ok+'/'+IMP_STATE.check.tot+' lignes cohérentes ('+IMP_STATE.check.pct+' %)':'')+(IMP_STATE.accounts.length?' · comptes : '+IMP_STATE.accounts.map(esc).join(', '):'')+'</div>':''}
 ${IMP_STATE.check&&IMP_STATE.check.pct<80?'<div class="al alr" style="margin-bottom:10px">⚠ La colonne montant ne se réconcilie pas avec la colonne solde. Vérifiez le fichier avant de valider.</div>':''}
+${IMP_STATE.dup?'<div class="al ala" style="margin-bottom:10px">'+IMP_STATE.dup+' ligne'+(IMP_STATE.dup>1?'s':'')+' en double dans le fichier (même date, libellé, montant). Deux achats identiques le même jour sont possibles ; sinon vérifiez l\u2019export.</div>':''}
+${existing?'<div class="al alb" style="margin-bottom:10px;font-size:11px">Import existant : '+b.imp.n+' lignes le '+b.imp.at.slice(0,10)+'. Ce fichier : '+IMP_STATE.byM[k].length+' lignes pour ce mois. Valider remplace l\u2019ancien import en entier — un mois = le dernier fichier validé, jamais une addition.</div>':''}
 ${existing?'<div class="al ala" style="margin-bottom:10px">Un import existe déjà pour ce mois ; valider le remplacera.</div>':''}
 <div class="statrow">
 <div class="stat"><div class="sl">Lignes</div><div class="sv mono">${R.n}</div><div class="sf">${R.n-R.unmatched.length-R.viaBourso} par règle · ${R.viaBourso} via BoursoBank</div></div>
@@ -1792,7 +1810,7 @@ ${R.salaireCount!==1?'<div class="al ala" style="margin-top:8px">'+R.salaireCoun
 <div class="card-b">${R.unmatched.length>1?'<div style="background:var(--bg2);border:1px dashed var(--line2);border-radius:12px;padding:10px;margin-bottom:10px"><div style="font-size:11.5px;font-weight:600;margin-bottom:6px">Classer les '+R.unmatched.length+' restantes d\u2019un coup <span style="font-weight:400;color:var(--td)">(sans règle — utile pour un mois de vacances)</span></div><div class="row" style="gap:6px;flex-wrap:wrap"><select class="inp sm" id="umall_t" style="width:auto">'+TYPES.map(t=>'<option value="'+t+'"'+(t==='variable'?' selected':'')+'>'+TYPE_LBL[t]+'</option>').join('')+'</select>'+catSelect('umall','','')+'<button class="btn btn-ghost sm" onclick="var c=catRead(\'umall\');impSetAll(\''+k+'\',c.type,c.sub,c.grp)">Appliquer</button></div></div>':''}${R.unmatched.length?R.unmatched.map((u,i)=>{const sug=suggestPattern(u.l,u.s);const id='um'+i;return'<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:10px;margin-bottom:8px">'+
 '<div class="row rb"><span style="flex:1;font-size:12.5px;font-weight:500">'+esc(u.l.slice(0,60))+'</span><b class="mono" style="color:'+(u.v<0?'var(--dn)':'var(--up)')+'">'+fS(u.v)+'</b></div><div style="font-size:10px;color:var(--td)">'+u.d+'</div>'+
 '<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><select class="inp sm" id="'+id+'t" style="width:auto">'+TYPES.map(t=>'<option value="'+t+'"'+((u.v<0?'variable':'entree')===t?' selected':'')+'>'+TYPE_LBL[t]+'</option>').join('')+'</select>'+
-catSelect(id,'','')+'</div>'+
+catSelect(id,/VIREMENT DE HICHEM|VIR INST/i.test(u.l)&&u.v<0?'Famille & transferts':'',/VIREMENT DE HICHEM|VIR INST/i.test(u.l)&&u.v<0?'Aide famille':'')+'</div>'+
 '<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><label style="font-size:11.5px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="'+id+'r" checked style="accent-color:var(--gold)">Créer une règle</label><input class="inp sm mono" id="'+id+'p" value="'+esc(sug)+'" style="flex:1;min-width:120px;font-size:11px"><button class="btn btn-gold xs" onclick="var c=catRead(\''+id+'\');impSetUnmatched(\''+k+'\','+i+',c.type,c.sub,document.getElementById(\''+id+'r\').checked,document.getElementById(\''+id+'p\').value,c.grp)">OK</button></div>'+
 '<div style="font-size:10px;color:var(--td);margin-top:5px">Type = nature comptable (fixe, variable, entrée…) · Catégorie = famille › détail.</div></div>'}).join(''):'<div class="al alg">Tout est reconnu.</div>'}</div></div>
 ${R.bourso&&R.bourso.length?'<details class="card" style="padding:0"><summary class="card-h" style="cursor:pointer;list-style:none"><span class="dot" style="background:var(--cyan)"></span>Classées d\u2019après BoursoBank<span class="aux">'+R.viaBourso+'</span></summary><div class="card-b">'+
