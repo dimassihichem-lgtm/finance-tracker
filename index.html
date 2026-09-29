@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v23';const VTAG='réel v2 · régimes Pajemploi+ · euros';
+const VERSION='v24';const VTAG='parseur CSV BoursoBank FR';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1571,14 +1571,36 @@ function suggestPattern(l){const w=normLbl(l).replace(/[^A-Z0-9 .\/*-]/g,' ').sp
 function parseCsv(text){text=String(text||'').replace(/^\uFEFF/,'');const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2)return null;
 const sep=(lines[0].match(/;/g)||[]).length>=(lines[0].match(/,/g)||[]).length?';':',';
 const split=l=>{const o=[];let c='',q=false;for(const ch of l){if(ch==='"'){q=!q;continue}if(ch===sep&&!q){o.push(c);c=''}else c+=ch}o.push(c);return o};
-const H=split(lines[0]).map(h=>h.trim().toLowerCase().replace(/"/g,''));
-const iD=H.findIndex(h=>/^dateop$|^date$|date op|^date de l/.test(h)),iL=H.findIndex(h=>/^label$|libell/.test(h)),iA=H.findIndex(h=>/^amount$|^montant/.test(h));
-if(iD<0||iL<0||iA<0)return{error:'Colonnes date / libellé / montant introuvables. En-tête lu : '+H.join(' | ')};
-const tx=[];for(let i=1;i<lines.length;i++){const c=split(lines[i]);if(c.length<=Math.max(iD,iL,iA))continue;
+const norm=h=>h.trim().toLowerCase().replace(/"/g,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const H=split(lines[0]).map(norm);
+const iD=H.findIndex(h=>/^dateop$|^date$|^date op|^date de l|^date operation/.test(h));
+const iL=H.findIndex(h=>/^label$|^libelle$/.test(h));const iL2=iL>=0?iL:H.findIndex(h=>/label|libell/.test(h));
+const iAcc=H.findIndex(h=>/accountlabel|libelle compte/.test(h));
+let iA=H.findIndex(h=>/^amount$|^montant/.test(h));
+const soldes=H.map((h,i)=>/^solde|^accountbalance$|^balance$/.test(h)?i:-1).filter(i=>i>=0);
+let iBal=-1;
+if(iA<0&&soldes.length>=2){iA=soldes[0];iBal=soldes[soldes.length-1]}
+else if(iA>=0&&soldes.length)iBal=soldes[soldes.length-1];
+if(iD<0||iL2<0||iA<0)return{error:'Colonnes date / libellé / montant introuvables. En-tête lu : '+H.join(' | ')};
+const num=v=>{const x=parseFloat(String(v||'').replace(/[\s\u00a0]/g,'').replace(',','.'));return isNaN(x)?null:x};
+const rows=[];for(let i=1;i<lines.length;i++){const c=split(lines[i]);if(c.length<=Math.max(iD,iL2,iA))continue;
 const d=c[iD].trim();const m=d.match(/(\d{4})-(\d{2})-(\d{2})/)||d.match(/(\d{2})\/(\d{2})\/(\d{4})/);if(!m)continue;
 const key=m[0].includes('-')?m[1]+'-'+m[2]+'-'+m[3]:m[3]+'-'+m[2]+'-'+m[1];
-const v=parseFloat(c[iA].replace(/[\s\u00a0]/g,'').replace(',','.'));if(isNaN(v))continue;
-tx.push({d:key,l:c[iL].trim(),v})}return{tx}}
+const v=num(c[iA]);if(v==null)continue;
+rows.push({d:key,l:c[iL2].trim(),v,acc:iAcc>=0?String(c[iAcc]||'').trim():'',bal:iBal>=0?num(c[iBal]):null})}
+// Contrôle : si deux colonnes numériques ont pu être confondues, vérifier que solde(n) − solde(n+1) = montant(n) sur un même compte (export du plus récent au plus ancien)
+let check=null;
+if(iBal>=0&&rows.length>2){let ok=0,tot=0;for(let i=0;i<rows.length-1;i++){const a=rows[i],b=rows[i+1];if(a.acc!==b.acc||a.bal==null||b.bal==null)continue;tot++;
+if(Math.abs((a.bal-b.bal)-a.v)<0.02||Math.abs((b.bal-a.bal)-b.v)<0.02)ok++}
+check=tot?{ok,tot,pct:Math.round(ok/tot*100)}:null;
+if(check&&check.pct<50&&iA!==iBal&&soldes.length>=2){ // colonnes inversées : réessayer en échangeant
+const iA2=iBal,iBal2=iA;let ok2=0,tot2=0;const r2=[];
+for(let i=1;i<lines.length;i++){const c=split(lines[i]);if(c.length<=Math.max(iD,iL2,iA2))continue;const d=c[iD].trim();const m=d.match(/(\d{4})-(\d{2})-(\d{2})/)||d.match(/(\d{2})\/(\d{2})\/(\d{4})/);if(!m)continue;
+const key=m[0].includes('-')?m[1]+'-'+m[2]+'-'+m[3]:m[3]+'-'+m[2]+'-'+m[1];const v=num(c[iA2]);if(v==null)continue;r2.push({d:key,l:c[iL2].trim(),v,acc:iAcc>=0?String(c[iAcc]||'').trim():'',bal:num(c[iBal2])})}
+for(let i=0;i<r2.length-1;i++){const a=r2[i],b=r2[i+1];if(a.acc!==b.acc||a.bal==null||b.bal==null)continue;tot2++;if(Math.abs((a.bal-b.bal)-a.v)<0.02||Math.abs((b.bal-a.bal)-b.v)<0.02)ok2++}
+if(tot2&&ok2/tot2>ok/Math.max(tot,1)){return{tx:r2.map(x=>({d:x.d,l:x.l,v:x.v,acc:x.acc})),cols:{date:H[iD],lib:H[iL2],montant:H[iA2]+' (col. '+(iA2+1)+')',solde:H[iBal2]},check:{ok:ok2,tot:tot2,pct:Math.round(ok2/tot2*100)}}}}}
+return{tx:rows.map(x=>({d:x.d,l:x.l,v:x.v,acc:x.acc})),cols:{date:H[iD],lib:H[iL2],montant:H[iA]+' (col. '+(iA+1)+')',solde:iBal>=0?H[iBal]:'—'},check}}
+
 function parseOfx(text){const out=[];const re=/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi;let m;
 while((m=re.exec(text))){const b=m[1];const g=t=>{const r=b.match(new RegExp('<'+t+'>([^<\r\n]+)','i'));return r?r[1].trim():''};
 const dt=g('DTPOSTED').slice(0,8);const amt=parseFloat(g('TRNAMT').replace(',','.'));const l=(g('NAME')+' '+g('MEMO')).trim();
@@ -1587,10 +1609,10 @@ return out.length?{tx:out}:null}
 function buildImport(txs,force){force=force||{};const t={salaire:0,entree:0,interneLivret:0,interneAutre:0,invest:0,fixe:0,variable:0};
 const bySub={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[];let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0;
 const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
-txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):classify(x);const a=Math.abs(x.v);if(x.v<0)debits+=a;
+txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'compte épargne',ruleId:'acc',unmatched:false}:classify(x));const a=Math.abs(x.v);if(x.v<0)debits+=a;
 if(c.type==='salaire'){t.salaire+=x.v;salaireCount++;entrees.push({l:x.l,v:x.v,cat:'salaire'})}
 else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v)}}
-else if(c.type==='interneLivret'){t.interneLivret+=x.v;if(x.v>0)livretIn+=a;else livretOut+=a}
+else if(c.type==='interneLivret'){t.interneLivret+=x.v;if(!/livret|ldds/i.test(x.acc||'')){if(x.v>0)livretIn+=a;else livretOut+=a}}
 else if(c.type==='interneAutre'){t.interneAutre+=x.v;if(x.v<0)internesOut+=a;else internesIn+=a}
 else if(c.type==='invest'){if(x.v<0){t.invest+=a;add(bySub.invest,c.sub,a)}}
 else if(c.type==='fixe'){if(x.v<0){t.fixe+=a;add(bySub.fixe,c.sub,a)}}
@@ -1624,7 +1646,7 @@ function calcPatriV2(bm,im){return(bm&&bm.cashFin!=null)?bm.cashFin+investiT(im)
 let IMP_STATE=null;
 function importCsvText(text){const r=/<OFX>|<STMTTRN>/i.test(text)?parseOfx(text):parseCsv(text);if(!r||r.error){alert(r?r.error:'Fichier vide ou format non reconnu');return}
 const byM={};r.tx.forEach(x=>{(byM[x.d.slice(0,7)]=byM[x.d.slice(0,7)]||[]).push(x)});
-IMP_STATE={months:Object.keys(byM).sort(),byM,sel:Object.keys(byM).sort()[0],unRes:{},res:{}};impRebuild();
+IMP_STATE={months:Object.keys(byM).sort(),byM,sel:Object.keys(byM).sort()[0],unRes:{},res:{},cols:r.cols||null,check:r.check||null,accounts:[...new Set(r.tx.map(x=>x.acc).filter(Boolean))]};impRebuild();
 SUB='import';PG='more';go('more');SUB='import';rMore()}
 function impRebuild(){if(!IMP_STATE)return;IMP_STATE.months.forEach(k=>{IMP_STATE.res[k]=buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)})}
 function impSetUnmatched(k,i,type,sub,mk,pattern){const u=IMP_STATE.res[k].unmatched[i];if(!u)return;
@@ -1687,6 +1709,8 @@ ${sBM().filter(d=>isV2(d.y,d.m)).slice(-8).reverse().map(d=>{const mr=monthReal(
 const k=IMP_STATE.sel;const [y,m]=k.split('-').map(Number);const R=IMP_STATE.res[k];const b=gBM(y,m);const existing=b&&b.imp&&b.imp.done;
 el.innerHTML=`<button class="backlink" onclick="IMP_STATE=null;rMore()">‹ Annuler l\u2019import</button><div class="pagetitle">Import · ${ML[m]} ${y}</div>
 ${IMP_STATE.months.length>1?'<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">'+IMP_STATE.months.map(x=>'<span class="chip '+(x===k?'tag-gold':'')+'" style="cursor:pointer" onclick="IMP_STATE.sel=\''+x+'\';rMore()">'+MS[+x.slice(5)]+' '+x.slice(0,4)+' · '+IMP_STATE.byM[x].length+'</span>').join('')+'</div>':''}
+${IMP_STATE.cols?'<div class="al alb" style="margin-bottom:10px;font-size:11px">Colonnes lues — date : <b>'+esc(IMP_STATE.cols.date)+'</b> · libellé : <b>'+esc(IMP_STATE.cols.lib)+'</b> · montant : <b>'+esc(IMP_STATE.cols.montant)+'</b>'+(IMP_STATE.check?' · contrôle solde/montant : '+IMP_STATE.check.ok+'/'+IMP_STATE.check.tot+' lignes cohérentes ('+IMP_STATE.check.pct+' %)':'')+(IMP_STATE.accounts.length?' · comptes : '+IMP_STATE.accounts.map(esc).join(', '):'')+'</div>':''}
+${IMP_STATE.check&&IMP_STATE.check.pct<80?'<div class="al alr" style="margin-bottom:10px">⚠ La colonne montant ne se réconcilie pas avec la colonne solde. Vérifiez le fichier avant de valider.</div>':''}
 ${existing?'<div class="al ala" style="margin-bottom:10px">Un import existe déjà pour ce mois ; valider le remplacera.</div>':''}
 <div class="statrow">
 <div class="stat"><div class="sl">Lignes</div><div class="sv mono">${R.n}</div><div class="sf">${R.salaireCount} salaire${R.salaireCount>1?'s':''}</div></div>
