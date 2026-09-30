@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v36';const VTAG='recalé sur la déclaration réelle';
+const VERSION='v37';const VTAG='suivi nounou · retour wizard';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -465,7 +465,7 @@ function rHome(){
 const el=document.getElementById('pg-home');
 const B=sBM().filter(d=>d.sav>0||d.sap>0||d.cashFin!=null);const last=B.length?B[B.length-1]:null;const prev=B.length>1?B[B.length-2]:null;
 const lastI=last?gIM(last.y,last.m):null;const prevI=prev?gIM(prev.y,prev.m):null;
-const patri=calcPatriV2(last,lastI);const patriP=calcPatriV2(prev,prevI);const patriOld=calcPatri(last,lastI);const showRecon=last&&last.cashFin!=null&&last.sav>0;
+const patri=calcPatriV2(last,lastI);const patriP=calcPatriV2(prev,prevI);const patriOld=last&&last.sap>0?kE(last.sap)+amundiT(lastI):calcPatri(last,lastI);const showRecon=last&&last.cashFin!=null&&last.sap>0;
 const gain=patriP>0?patri-patriP:0;const dC=(last&&prev)?(last.sav-prev.sav):0;
 const sal=last&&last.sap>0&&last.sav>0?(last.sap-last.sav)*1000:0;
 const revs=last?(last.rev||[]).reduce((a,c)=>a+c.v,0):0;const totRev=sal+revs;
@@ -489,7 +489,7 @@ el.innerHTML=`
   <div class="hsub">
     <span class="chip ${gain>=0?'tag-up':'tag-dn'}">${gain>=0?'▲':'▼'} ${f$(Math.abs(Math.round(gain)))} € vs ${prev?MS[prev.m]:'M-1'}</span>
     <span style="color:var(--td)">${last?MS[last.m]+' '+last.y:''} · ${last&&last.cashFin!=null?'Cash + investi':'Compte + PEE + PER Amundi'}</span>
-    ${showRecon?'<span class="chip '+(Math.abs(patri-patriOld)>50?'tag-dn':'tag-up')+'" title="ancienne formule vs nouvelle">ancien '+fk(patriOld)+' · écart '+(patri-patriOld>=0?'+':'')+f$(Math.round(patri-patriOld))+' €</span>':''}
+    ${showRecon?'<span class="chip '+(Math.abs(patri-patriOld)>500?'tag-dn':'tag-up')+'" title="vérification : solde après salaire + Amundi (ancienne formule) vs cash + investi">vérif. ancienne formule '+fE(patriOld)+' · '+(Math.abs(patri-patriOld)>500?'écart '+(patri-patriOld>=0?'+':'−')+fE(Math.abs(patri-patriOld))+' — enveloppe manquante ou doublon ?':'cohérent ✓')+'</span>':''}
   </div>
   <div class="spark"><canvas id="ch-spark"></canvas></div>
 </div>
@@ -502,7 +502,7 @@ el.innerHTML=`
 
 ${declBanner()}${(()=>{const n0=new Date();const pv=pM(n0.getFullYear(),n0.getMonth()+1);const pb=gBM(pv.y,pv.m);return(pb&&isV2(pv.y,pv.m)&&!pb.cl)?completeBanner(pv.y,pv.m):''})()}
 ${(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
-return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?mr.regime.label:'')+'</span></div><div class="card-b">'+
+return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?'régime : '+mr.regime.label:'')+'</span></div><div class="card-b">'+
 '<div class="row rb" style="margin-bottom:8px"><span style="font-size:13px">Variables réelles</span><b class="mono" style="font-size:18px;color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+fS(mr.variables)+'</b></div>'+
 '<div class="row rb" style="font-size:11.5px;color:var(--tm)"><span>'+(m3?'moy. 3 mois '+fS(m3.v):'moy. 3 mois —')+'</span><span>cible '+f$(P.cibleVariables)+' € · <b style="color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+(mr.variables>P.cibleVariables?'+':'')+Math.round((mr.variables/P.cibleVariables-1)*100)+' %</b></span></div>'+
 '<div class="hr"></div><div class="row rb"><span style="font-size:13px">Épargne réelle</span><b class="mono" style="font-size:18px;color:'+(mr.epargne>=0?'var(--up)':'var(--dn)')+'">'+fS(mr.epargne)+'</b></div>'+
@@ -597,7 +597,7 @@ if(st.t==='soldes'&&isV2(WZ.y,WZ.m)){const mr=monthReal(WZ.y,WZ.m);
 body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Import + solde</div>
 <div class="wiz-q">Relevé et solde de fin de mois</div>
 <div class="wiz-where">📍 BoursoBank → export CSV, puis total CC + Livret A + LDDS</div>
-${mr&&mr.imp?'<div class="al alg">Import validé le '+mr.imp.at.slice(0,10)+' · '+mr.imp.n+' lignes · fixes '+fS(mr.imp.t.fixe)+' · variables '+fS(mr.imp.t.variable)+'</div>':'<label class="btn btn-gold wide" style="display:block;text-align:center;cursor:pointer;margin-bottom:14px">Importer le CSV de '+MS[WZ.m]+'<input type="file" accept=".csv,text/csv" style="display:none" onchange="wizClose();readCsvFile(this)"></label>'}
+${mr&&mr.imp?'<div class="al alg">Import validé le '+mr.imp.at.slice(0,10)+' · '+mr.imp.n+' lignes · fixes '+fS(mr.imp.t.fixe)+' · variables '+fS(mr.imp.t.variable)+'</div>':'<label class="btn btn-gold wide" style="display:block;text-align:center;cursor:pointer;margin-bottom:14px">Importer le CSV de '+MS[WZ.m]+'<input type="file" accept=".csv,text/csv" style="display:none" onchange="IMP_RETURN={y:WZ.y,m:WZ.m};wizClose();readCsvFile(this)"></label>'}
 <div class="lbl" style="margin-top:14px">Soldes fin ${MS[WZ.m]}, après paie <span class="hint">CC + Livret A + LDDS — pas le total Boursorama</span></div>
 ${cashInputs(WZ.y,WZ.m,'')}
 <div class="wiz-ref">Fin ${MS[pv.m]} : <b>${pvB&&pvB.cashFin!=null?fS(pvB.cashFin):'—'}</b>${mr&&mr.missing.length?' · manque : '+mr.missing.join(', '):''}</div>`}
@@ -768,7 +768,7 @@ ${(cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;fon
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Charges<span class="aux mono" style="color:var(--dn)">${f$(tCh)} €</span></div>
 <div class="card-b">
-${cm.ch.map((c,i)=>{const flags='<span class="chip'+(c.fixe?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="fixe / variable" onclick="var d=gOBM(bY,bM).ch['+i+'];d.fixe=!d.fixe;save();rBudget()">'+(c.fixe?'F':'V')+'</span>'+(c.auto?'':'<span class="chip'+(c.payOffset?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="mois de sortie du compte" onclick="var d=gOBM(bY,bM).ch['+i+'];d.payOffset=((d.payOffset||0)+1)%3;save();rBudget()">M+'+(c.payOffset||0)+'</span>');
+${cm.ch.map((c,i)=>{const flags='<span class="chip'+(c.fixe?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="fixe / variable" onclick="var d=gOBM(bY,bM).ch['+i+'];d.fixe=!d.fixe;save();rBudget()">'+(c.fixe?'F':'V')+'</span>'+(c.auto?'<span class="chip" style="font-size:9px;padding:2px 6px" title="placée par le module Garde dans ce mois">ce mois</span>'+(c.auto==='garde'?(()=>{const st=gardeTrack(bY,bM);return st.paid?'<span class="chip tag-up" style="font-size:9px;padding:2px 6px">✓ payé'+(st.paidSrc==='relevé'?' (relevé)':'')+'</span>':'<span class="chip" style="font-size:9px;padding:2px 6px;color:var(--td)">à payer</span>'})():''):'<span class="chip'+(c.payOffset?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="mois de sortie du compte" onclick="var d=gOBM(bY,bM).ch['+i+'];d.payOffset=((d.payOffset||0)+1)%3;save();rBudget()">M+'+(c.payOffset||0)+'</span>');
 return c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto ›</span></span>'+flags+'<span class="mono" style="font-weight:600;width:80px;text-align:right">'+f$(c.v)+' €</span><span style="width:20px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1;min-width:0" value="'+esc(c.l)+'" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()">'+flags+'<input class="inp sm mono" type="number" inputmode="decimal" style="width:80px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>'}).join('')}
 <div style="font-size:10px;color:var(--td);margin-top:6px">F = fixe · V = variable · M+n = sort du compte n mois plus tard (base cash)</div>
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nc-l" placeholder="Nouvelle charge"><input class="inp sm mono" id="nc-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nc-l').value.trim();if(!l)return;gOBM(bY,bM).ch.push({l,v:+document.getElementById('nc-v').value||0});save();rBudget()">+</button></div>
@@ -1137,6 +1137,15 @@ function cashSet(y,m,k,v){const b=gOBM(y,m);if(!b.cash)b.cash={cc:null,la:null,l
 const c=b.cash;b.cashFin=(c.cc!=null||c.la!=null||c.ldds!=null)?Math.round((c.cc||0)+(c.la||0)+(c.ldds||0)):null;save()}
 function cashInputs(y,m,cls){const b=gBM(y,m)||{};const c=b.cash||{};const f=(k,l)=>'<div><div class="lbl">'+l+'</div><input class="inp '+(cls||'sm')+' mono" type="number" step="1" inputmode="numeric" style="text-align:right" value="'+(c[k]!=null?c[k]:'')+'" placeholder="€" onchange="cashSet('+y+','+m+',\''+k+'\',this.value);'+(PG==='budget'?'rBudget()':'')+'"></div>';
 return'<div class="grid2" style="grid-template-columns:1fr 1fr 1fr;gap:8px">'+f('cc','Compte courant')+f('la','Livret A')+f('ldds','LDDS')+'</div><div class="row rb" style="margin-top:7px;font-size:12px;color:var(--tm)"><span>Cash fin de mois</span><b class="mono" style="color:var(--gold)">'+(b.cashFin!=null?fE(b.cashFin):'—')+'</b></div>'}
+function gardeTrack(y,m){const g=DB.garde;const k=ym(y,m);const t=(g.track&&g.track[k])||{};const r=gardeCost(y,m);if(r.before||r.after)return{paid:false};
+// salaire : dans l'import du mois de paiement (M+lag), une ligne fixe « nounou » d'un montant ≈ net (+ transport)
+const pay=(()=>{let i=y*12+m+(g.lag||0);const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b||!b.imp||!b.imp.done)return null;
+const gs=(b.imp.groups||[]).filter(x=>x.type==='fixe'&&/nounou|ourhou|saadia/i.test(x.s+' '+x.sub));const tgt=[r.net,r.net+(r.nav.amt||0),r.toPay];
+for(const x of gs){const a=Math.abs(x.tot);if(tgt.some(v=>Math.abs(a-v)<1.5))return{amt:a}}const f=b.imp.bySub.fixe||{};const kk=Object.keys(f).find(x=>/nounou/i.test(x));return kk?{amt:f[kk],approx:true}:null})();
+// CAF nette : entrée CAF ≈ cmgRem − cotRest dans l'import de M+cmgLag
+const caf=(()=>{const net=r.cmgRem-r.cotRest;if(net<=0)return null;let i=y*12+m+(g.cmgLag||1);const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b||!b.entrees)return null;return b.entrees.find(e=>/caf/i.test(e.cat)&&Math.abs(e.v-net)<1.5)||null})();
+return{paid:!!t.paid||!!(pay&&!pay.approx),paidSrc:pay&&!pay.approx?'relevé':(t.paid?'manuel':null),paidAmt:pay?pay.amt:null,paidApprox:!!(pay&&pay.approx),decl:!!t.decl||!!(g.cmgReal&&g.cmgReal[k]),declSrc:(g.cmgReal&&g.cmgReal[k])?'montants réels saisis':(t.decl?'manuel':null),caf:!!t.caf||!!caf,cafSrc:caf?'relevé':(t.caf?'manuel':null),fiche:!!t.fiche}}
+function gardeTrackSet(y,m,f,v){const g=DB.garde;if(!g.track)g.track={};const k=ym(y,m);g.track[k]=g.track[k]||{};g.track[k][f]=v;save();rGarde()}
 function isPP(y,m){const f=DB.garde.ppFrom||'';return !!f&&ym(y,m)>=f}
 function gardeRealDebit(y,m){const s=nM(y,m);const b=gBM(s.y,s.m);if(!b||!b.imp||!b.imp.done)return null;const f=b.imp.bySub.fixe||{};
 const k=Object.keys(f).find(x=>/pajemploi|nounou/i.test(x));return k!=null?f[k]:null}
@@ -1222,6 +1231,13 @@ ${panel}
 <button class="btn btn-gold wide" style="margin-bottom:14px" onclick="openFiche(${gY},${gM})">📄 Fiche mensuelle · ${ML[gM]} ${gY}</button>
 ${isPP(gY,gM)?(()=>{const real=gardeRealDebit(gY,gM);const calc=r.cash;if(real==null)return'<div class="al alb" style="margin-bottom:10px">Régime Pajemploi+ · prélèvement attendu '+fE(calc)+' le mois de la déclaration'+(g.avanceImmediate?' (avance CI : '+fE(calc-r.ci)+')':'')+'.</div>';
 const d=real-calc;return'<div class="al '+(Math.abs(d)>10?'alr':'alg')+'" style="margin-bottom:10px">Pajemploi+ · prélevé '+fE(real)+' vs calculé '+fE(calc)+' — écart '+(d>=0?'+':'')+fE(d)+(Math.abs(d)>10?'. Saisir les montants réels CMG / cotisations ci-dessous.':' ✓')+'</div>'})():''}
+${(()=>{const st=gardeTrack(gY,gM);if(st.paid===undefined)return'';const row=(l,ok,src,f,note)=>'<div class="row rb" style="padding:6px 0;border-bottom:1px solid var(--line2)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" '+(ok?'checked':'')+' '+(src==='relevé'||src==='montants réels saisis'?'disabled':'')+' style="accent-color:var(--gold);width:16px;height:16px" onchange="gardeTrackSet('+gY+','+gM+',\''+f+'\',this.checked)">'+l+'</label><span style="font-size:10.5px;color:'+(ok?'var(--up)':'var(--td)')+'">'+(ok?'✓ '+(src||''):note||'en attente')+'</span></div>';
+return'<div class="card"><div class="card-h"><span class="dot" style="background:'+(st.paid&&st.decl&&st.fiche?'var(--up)':'var(--gold)')+'"></span>Suivi · '+ML[gM]+'</div><div class="card-b" style="padding-top:4px">'+
+row('Salaire versé'+(st.paidAmt?' <span class="mono" style="font-size:11px;color:var(--td)">'+fE(st.paidAmt)+'</span>':''),st.paid,st.paidSrc,'paid',st.paidApprox?'ligne nounou trouvée mais montant différent':'non trouvé dans le relevé du mois de paiement')+
+row('Déclaration Pajemploi faite',st.decl,st.declSrc,'decl','saisissez les montants réels ci-dessous ou cochez')+
+row('CMG net reçu de la CAF',st.caf,st.cafSrc,'caf','attendu dans le relevé du mois suivant')+
+row('Fiche de paie envoyée',st.fiche,st.fiche?'manuel':null,'fiche','bouton Fiche mensuelle en haut')+
+'<div style="font-size:10px;color:var(--td);margin-top:7px">Coché automatiquement quand la ligne est reconnue dans un relevé importé ; sinon à cocher à la main. Le mois est soldé quand les quatre sont verts.</div></div></div>'})()}
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
 ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" style="margin:0 0 10px">📌 ${r.partialIn?'Mois d\u2019embauche':'Mois de fin de contrat'} : salaire calculé sur les heures réelles du ${r.from?kDate(r.from).toLocaleDateString('fr-FR'):'1'+'/'+String(gM).padStart(2,'0')} au ${r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(gM).padStart(2,'0')}, pas sur la mensualisation.</div></div>
@@ -1716,12 +1732,14 @@ if(imp&&imp.salaireCount!==1)warn.push(imp.salaireCount+' salaire'+(imp.salaireC
 if(recon!=null&&reelConso&&Math.abs(recon)/Math.abs(reelConso)>0.02)warn.push('écart de réconciliation CSV / soldes : '+f$(Math.round(recon))+' €');
 if(imp&&imp.internesOut>0)warn.push(f$(Math.round(imp.internesOut))+' € vers vos autres comptes — à retrouver en entrée ailleurs, sinon dépense');
 if(imp&&imp.livretIn>0)warn.push('retrait livret ce mois : '+f$(Math.round(imp.livretIn))+' €');
+const cc=b.cash||{};const miss0=[cc.la==null?'Livret A':null,cc.ldds==null?'LDDS':null].filter(Boolean);if(cashFin!=null&&miss0.length)warn.push(miss0.join(' et ')+' non renseigné'+(miss0.length>1?'s':'')+' fin '+MS[m]+' — compté 0, la consommation est faussée d\u2019autant');
+const pc=(pb&&pb.cash)||{};const miss1=[pc.la==null?'Livret A':null,pc.ldds==null?'LDDS':null].filter(Boolean);if(cashDeb!=null&&miss1.length)warn.push(miss1.join(' et ')+' non renseigné'+(miss1.length>1?'s':'')+' fin '+MS[pv.m]);
 return{cashDeb,cashFin,imp,salaire,autres,invest,investSrc:imp?'import':'prévisionnel',reelConso,fixes,fixesSrc:imp?'import':'prévisionnel',variables,prevu,ecart:reelConso!=null?reelConso-prevu.total:null,epargne,recon,missing,warn,complete:missing.length===0,regime:regimeFor(y,m)}}
 function variablesMoy3(y,m){let s=0,n=0;let yy=y,mm=m;for(let i=0;i<6&&n<3;i++){const r=pM(yy,mm);yy=r.y;mm=r.m;const b=gBM(yy,mm);if(b&&b.cl){const mr=monthReal(yy,mm);if(mr&&mr.variables!=null){s+=mr.variables;n++}}}return n?{v:s/n,n}:null}
 function investiT(im){return im?im.supports.filter(s=>(s.owner||'moi')==='moi').reduce((a,s)=>a+s.v,0):0}
 function calcPatriV2(bm,im){return(bm&&bm.cashFin!=null)?bm.cashFin+investiT(im):calcPatri(bm,im)}
 /* ---- application d'un import ---- */
-let IMP_STATE=null;
+let IMP_STATE=null,IMP_RETURN=null;
 function importCsvText(text){const r=/<OFX>|<STMTTRN>/i.test(text)?parseOfx(text):parseCsv(text);if(!r||r.error){alert(r?r.error:'Fichier vide ou format non reconnu');return}
 const seen={};let dup=0;r.tx.forEach(x=>{const k=x.d+'|'+x.l+'|'+x.v+'|'+(x.acc||'');seen[k]=(seen[k]||0)+1;if(seen[k]>1)dup++});
 const byM={};r.tx.forEach(x=>{(byM[x.d.slice(0,7)]=byM[x.d.slice(0,7)]||[]).push(x)});
@@ -1752,7 +1770,7 @@ const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unR
 b.imp=clean;b.entrees=clean.entrees;b.lvAuto=clean.livretOut;b.lrAuto=clean.livretIn;
 const n0=new Date();if((n0.getFullYear()*12+n0.getMonth()+1)-(y*12+m)>=2)b.reconst=true;save();
 delete IMP_STATE.byM[k];IMP_STATE.months=IMP_STATE.months.filter(x=>x!==k);delete IMP_STATE.res[k];
-if(!IMP_STATE.months.length){IMP_STATE=null;bY=y;bM=m;go('budget')}else{IMP_STATE.sel=IMP_STATE.months[0];rMore()}}
+if(!IMP_STATE.months.length){IMP_STATE=null;if(IMP_RETURN&&IMP_RETURN.y===y&&IMP_RETURN.m===m){IMP_RETURN=null;go('home');wizStartFor(y,m);WZ.step=Math.min(1,WZ.steps.length-1);wizRender()}else{bY=y;bM=m;go('budget')}}else{IMP_STATE.sel=IMP_STATE.months[0];rMore()}}
 function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>importCsvText(e.target.result);r.readAsText(f,'UTF-8')}
 /* ---- clôture v2 ---- */
 function canClose(y,m){if(!isV2(y,m))return{ok:true,missing:[]};const mr=monthReal(y,m);if(!mr)return{ok:false,missing:['mois inexistant']};return{ok:mr.complete,missing:mr.missing}}
@@ -1766,13 +1784,13 @@ function declBanner(){const n=new Date();const d=n.getDate();if(d<25&&d>5)return
 const r=gardeCost(wm.y,wm.m);if(r.before||r.after)return'';
 return'<div class="al alb" style="margin-bottom:10px">📋 Déclaration Pajemploi de <b>'+ML[wm.m]+'</b> avant le 5 — trois champs séparés : <b>heures '+fh(r.paidH)+' h</b> · <b>salaire net '+fE(r.net)+'</b>'+(r.nav.amt?' · <b>indemnité de transport '+fE(r.nav.amt)+'</b> (champ dédié, exonéré)':'')+(isPP(wm.y,wm.m)?' · prélèvement Pajemploi+ attendu '+fE(r.cash):'')+'</div>'}
 function completeBanner(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);
-if(b.cl)return'';
+if(b.cl)return mr.warn.length?'<div class="al" style="margin-bottom:10px;background:var(--bg2);border-color:var(--line2);color:var(--tm)">Mois clos · ⚠ '+mr.warn.join(' · ')+'<br><span style="font-size:10.5px;color:var(--td)">Rouvrir le mois pour corriger ; le solde saisi ici se répercute sur le mois suivant.</span></div>':'';
 if(mr.complete)return'<div class="al alg" style="margin-bottom:10px">✓ '+ML[m]+' est complet — prêt à clôturer.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+'</div>';
 return'<div class="al ala" style="margin-bottom:10px"><b>'+ML[m]+' '+y+' — manque :</b> '+mr.missing.join(' · ')+'.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+' <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="PG=\'more\';SUB=\'import\';go(\'more\');SUB=\'import\';rMore()">Importer →</span></div>'}
 function reelCard(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);const P=DB.params;
 const row=(l,p,r,e,cls)=>'<tr class="'+(cls||'')+'"><td>'+l+'</td><td class="mono" style="text-align:right;color:var(--td)">'+(p==null?'—':fS(p))+'</td><td class="mono" style="text-align:right">'+(r==null?'—':fS(r))+'</td><td class="mono" style="text-align:right;color:'+(e==null?'var(--td)':e>0?'var(--dn)':'var(--up)')+'">'+(e==null?'—':(e>0?'+':'')+fS(e))+'</td></tr>';
 const varPrev=mr.prevu.variable,varReel=mr.variables;const cible=P.cibleVariables;const m3=variablesMoy3(y,m);
-return`<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel vs prévu · ${MS[m]}<span class="aux" style="font-size:10.5px;color:var(--td)">${mr.regime?mr.regime.label:''}${b.reconst?' · reconstitué':''}</span></div>
+return`<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel vs prévu · ${MS[m]}<span class="aux" style="font-size:10.5px;color:var(--td)">${mr.regime?'régime : '+mr.regime.label:''}${b.reconst?' · reconstitué':''}</span></div>
 <div class="card-b">
 ${mr.cashDeb==null?(()=>{const pv=pM(y,m);gOBM(pv.y,pv.m);return'<div style="background:var(--goldDim);border:1px solid rgba(229,195,106,.4);border-radius:12px;padding:10px;margin-bottom:12px"><div class="lbl" style="margin-bottom:6px;color:var(--gold)">Point de départ : soldes fin '+MS[pv.m]+' '+pv.y+' <span class="hint">nécessaire pour calculer '+MS[m]+' — à saisir une seule fois</span></div>'+cashInputs(pv.y,pv.m)+'</div>'})():''}
 <div class="lbl" style="margin-bottom:6px">Soldes fin ${MS[m]}, après paie <span class="hint">pas le total Boursorama — PEA, AV, PER sont dans Invest</span></div>
