@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v46';const VTAG='carte nounou : mois soldé';
+const VERSION='v47';const VTAG='bandeau déclaration lié au suivi';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1792,7 +1792,7 @@ d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.par
 /* ---- UI Réel v2 ---- */
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
 function declBanner(){const n=new Date();const d=n.getDate();if(d<25&&d>5)return'';const pv=pM(n.getFullYear(),n.getMonth()+1);const wm=d>=25?{y:n.getFullYear(),m:n.getMonth()+1}:pv;
-const r=gardeCost(wm.y,wm.m);if(r.before||r.after)return'';
+const r=gardeCost(wm.y,wm.m);if(r.before||r.after)return'';if(gardeTrack(wm.y,wm.m).decl)return'';
 return'<div class="al alb" style="margin-bottom:10px">📋 Déclaration Pajemploi de <b>'+ML[wm.m]+'</b> avant le 5 — trois champs séparés : <b>heures '+fh(r.paidH)+' h</b> · <b>salaire net '+fE(r.net)+'</b>'+(r.nav.amt?' · <b>indemnité de transport '+fE(r.nav.amt)+'</b> (champ dédié, exonéré)':'')+(isPP(wm.y,wm.m)?' · prélèvement Pajemploi+ attendu '+fE(r.cash):'')+'</div>'}
 function completeBanner(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);
 if(b.cl)return mr.warn.length?'<div class="al" style="margin-bottom:10px;background:var(--bg2);border-color:var(--line2);color:var(--tm)">Mois clos · ⚠ '+mr.warn.join(' · ')+'<br><span style="font-size:10.5px;color:var(--td)">Rouvrir le mois pour corriger ; le solde saisi ici se répercute sur le mois suivant.</span></div>':'';
