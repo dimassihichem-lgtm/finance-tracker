@@ -123,6 +123,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 .gauge-track{height:9px;border-radius:99px;background:var(--bg2);overflow:hidden;border:1px solid var(--line)}
 .gauge-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .5s cubic-bezier(.2,.8,.2,1)}
 .gauge-fill.ok{background:linear-gradient(90deg,#6FE0AE,var(--up))}
+.gauge-fill.bad{background:linear-gradient(90deg,#FFA8A6,var(--dn))}
 
 /* ===== MONTH NAV ===== */
 .mnav{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin-bottom:12px}
@@ -348,7 +349,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v48';const VTAG='compteur d\'heures · fiche solo/partagé · PDF';
+const VERSION='v49';const VTAG='projection annuelle théorique vs réel';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -379,7 +380,7 @@ else{el.textContent='…';el.style.color='var(--td)'}}
 /* ===== STORAGE (clé hft7 conservée) ===== */
 let DB,svT=null;
 function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
-if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2()}
+if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj()}
 function load(){
 try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}
 ensure();
@@ -511,6 +512,7 @@ return'<div class="card"><div class="card-h"><span class="dot" style="background
 '<div style="font-size:10.5px;color:var(--td);margin-top:4px">Δ cash + investi · consommation réelle '+fS(mr.reelConso)+(mr.prevu.total?' vs prévu '+fS(mr.prevu.total):'')+'</div>'+
 (mr.imp&&mr.imp.livretIn>0?'<div class="al alr" style="margin-top:8px">Retrait Livret ce mois : '+fS(mr.imp.livretIn)+'. Virement automatique trop élevé ou dépense excessive.</div>':'')+
 '</div></div>'})()}
+${rProjHome()}
 <div class="card">
   <div class="card-b" style="cursor:pointer" onclick="wizStart()">
     <div class="row rb">
@@ -1967,6 +1969,64 @@ ${(P.regimes||[]).slice().sort((a,b)=>a.from<b.from?-1:1).map(r=>'<div class="li
 ${(P.journal||[]).slice().reverse().map(j=>'<div class="list-item" style="align-items:flex-start"><span style="flex:1;font-size:12px"><b>'+esc(j.champ)+'</b> : '+esc(j.old==null?'—':String(j.old))+' → '+esc(String(j.new))+'<div style="font-size:10.5px;color:var(--td)">'+j.date+' · '+esc(j.motif)+'</div></span></div>').join('')||'<div class="empty">Aucune modification</div>'}
 <div style="font-size:10.5px;color:var(--td);margin-top:7px">Non effaçable.</div></div></div>`}
 
+/* ================= PROJECTION ANNUELLE : théorique vs réel ================= */
+function defProj(){return{anneeDebut:9,salaire:6200,autresMensuels:90,
+aides:[{l:'Allocations familiales',v:150.44,from:'2026-01'},{l:'CMG micro-crèche',v:715,from:'2026-10'},{l:'CMG garde à domicile (net)',v:20,from:'2026-10'}],
+ponctuels:[{l:'Flux employeur PEE / PERECOI',v:13000,mois:8},{l:'Crédit d\u2019impôt (garde + emploi à domicile)',v:1750,mois:7},{l:'Bonus',v:0,mois:3}]}}
+function ensureProj(){if(!DB.params)return;if(!DB.params.proj)DB.params.proj=defProj();const d=defProj();Object.keys(d).forEach(k=>{if(DB.params.proj[k]==null)DB.params.proj[k]=d[k]})}
+function fyOf(y,m){const s=DB.params.proj.anneeDebut||9;const fy=m>=s?y:y-1;return{fy,fm:s,ty:s===1?fy:fy+1,tm:s===1?12:s-1,label:s===1?String(fy):fy+'-'+String(fy+1).slice(2)}}
+function fyMonths(fy){const s=DB.params.proj.anneeDebut||9;const out=[];for(let i=0;i<12;i++){const idx=fy*12+s+i;const yy=Math.floor((idx-1)/12),mm=idx-yy*12;out.push({y:yy,m:mm})}return out}
+// dépenses théoriques : lignes Budget du mois (avec décalages) ; à défaut, gabarit du dernier mois saisi
+function projDep(y,m){const b=gBM(y,m);if(b&&(b.ch.length||b.ex.length))return prevuConso(y,m).total;
+const all=sBM().filter(d=>d.ch.length);const t=all.length?all[all.length-1]:null;if(!t)return 0;
+return t.ch.reduce((a,c)=>a+(c.v||0),0)}
+function projRev(y,m){const P=DB.params.proj;const k=ym(y,m);let r=P.salaire+(P.autresMensuels||0);
+(P.aides||[]).forEach(a=>{if(!a.from||a.from<=k)r+=(+a.v||0)});(P.ponctuels||[]).forEach(p=>{if(+p.mois===m)r+=(+p.v||0)});return r}
+function projMonth(y,m){const rev=projRev(y,m),dep=projDep(y,m);return{rev,dep,ep:rev-dep}}
+// réel : salaire + entrées importées + flux employeur (versements Invest libellés Alpha / participation / abondement)
+function employerFlow(y,m){const im=gIM(y,m);if(!im)return 0;return im.contribs.filter(c=>/particip|abond|int[ée]ress|employeur|alpha|pee|perco/i.test(c.l)).reduce((a,c)=>a+(+c.v||0),0)}
+function realMonth(y,m){if(!isV2(y,m))return{known:false};const mr=monthReal(y,m);if(!mr||mr.reelConso==null)return{known:false};
+const emp=employerFlow(y,m);const rev=mr.salaire+mr.autres+emp;return{known:true,rev,dep:mr.reelConso,ep:mr.epargne+emp,sal:mr.salaire,ent:mr.autres,emp,closed:!!gBM(y,m).cl}}
+function yearKpi(y,m){const F=fyOf(y,m);const months=fyMonths(F.fy);let tRev=0,tDep=0,tEp=0,rRev=0,rDep=0,rEp=0,n=0,full={rev:0,dep:0,ep:0};const rows=[];
+months.forEach(mm=>{const p=projMonth(mm.y,mm.m);const r=realMonth(mm.y,mm.m);full.rev+=p.rev;full.dep+=p.dep;full.ep+=p.ep;
+if(r.known){n++;tRev+=p.rev;tDep+=p.dep;tEp+=p.ep;rRev+=r.rev;rDep+=r.dep;rEp+=r.ep}rows.push({y:mm.y,m:mm.m,p,r})});
+return{fy:F,rows,n,cum:{tRev,tDep,tEp,rRev,rDep,rEp},full,pctEp:tEp>0?rEp/tEp:null,pctRev:tRev>0?rRev/tRev:null,pctDep:tDep>0?rDep/tDep:null}}
+function thermo(label,real,theo,pct,good){const p=pct==null?0:Math.max(0,Math.min(1.5,pct));const ok=pct!=null&&(good==='high'?pct>=1:pct<=1);
+return'<div class="card"><div class="card-b"><div class="row rb"><div class="eyebrow">'+label+'</div><span class="chip '+(pct==null?'':ok?'tag-up':'tag-dn')+'" style="font-size:12px">'+(pct==null?'—':Math.round(pct*100)+' %')+'</span></div>'+
+'<div class="row rb" style="margin-top:6px"><span style="font-size:12px;color:var(--tm)">réel <b class="mono" style="color:var(--t)">'+fE(real)+'</b></span><span style="font-size:12px;color:var(--tm)">théorique <b class="mono" style="color:var(--t)">'+fE(theo)+'</b></span></div>'+
+'<div class="gauge-track" style="margin-top:8px;position:relative"><div class="gauge-fill '+(pct==null?'':ok?'ok':'bad')+'" style="width:'+Math.round(p/1.5*100)+'%"></div><div style="position:absolute;left:'+Math.round(1/1.5*100)+'%;top:-2px;width:2px;height:calc(100% + 4px);background:var(--gold)"></div></div>'+
+'<div class="row rb" style="font-size:10px;color:var(--td);margin-top:4px"><span>0</span><span>100 % = théorique</span><span>150 %</span></div></div></div>'}
+function rProjHome(){const n=new Date();const K=yearKpi(n.getFullYear(),n.getMonth()+1);if(!K.n)return'';
+const F=K.fy;const ecartEp=K.cum.rEp-K.cum.tEp;
+return'<div class="eyebrow" style="margin:14px 0 8px">Année '+F.label+' · '+K.n+' mois réalisé'+(K.n>1?'s':'')+' sur 12</div>'+
+thermo('Épargne cumulée',K.cum.rEp,K.cum.tEp,K.pctEp,'high')+thermo('Revenus cumulés',K.cum.rRev,K.cum.tRev,K.pctRev,'high')+
+'<div class="card"><div class="card-b" style="font-size:12px;line-height:1.55"><div class="row rb"><span>Dépenses cumulées</span><span class="mono">'+fE(K.cum.rDep)+' <span style="color:var(--td)">vs '+fE(K.cum.tDep)+'</span> <b style="color:'+(K.cum.rDep<=K.cum.tDep?'var(--up)':'var(--dn)')+'">'+(K.cum.rDep-K.cum.tDep>0?'+':'')+fE(K.cum.rDep-K.cum.tDep)+'</b></span></div>'+
+'<div class="row rb" style="margin-top:4px"><span>Retard / avance d\u2019épargne</span><b class="mono" style="color:'+(ecartEp>=0?'var(--up)':'var(--dn)')+'">'+(ecartEp>=0?'+':'')+fE(ecartEp)+'</b></div>'+
+(ecartEp<0&&12-K.n>0?'<div style="font-size:10.5px;color:var(--td);margin-top:5px">Pour finir l\u2019année sur la projection : '+fE(-ecartEp/(12-K.n))+' de dépenses en moins par mois sur les '+(12-K.n)+' mois restants.</div>':'')+
+'<div style="font-size:10.5px;color:var(--td);margin-top:5px">Projection fin d\u2019année : épargne théorique '+fE(K.full.ep)+' · détail dans Plus → Projection.</div></div></div>'}
+/* ---- page Projection ---- */
+function pjSet(path,val){const motif=(document.getElementById('pj-motif')||{}).value||'';if(!motif.trim()){alert('Motif obligatoire (ces hypothèses alimentent l\u2019IPS).');rMore();return}
+const P=DB.params.proj;let old;const seg=path.split('.');if(seg.length===1){old=P[seg[0]];P[seg[0]]=val}else{old=P[seg[0]][+seg[1]][seg[2]];P[seg[0]][+seg[1]][seg[2]]=val}
+jrnl('proj.'+path,old==null?null:String(old),String(val),motif);rMore()}
+function rProj(el){ensureProj();const P=DB.params.proj;const n=new Date();const K=yearKpi(n.getFullYear(),n.getMonth()+1);
+el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Projection · ${K.fy.label}</div>
+<div class="card"><div class="card-b" style="font-size:12.5px;line-height:1.55"><b>Principe.</b> Chaque mois, théorique = revenus projetés − budget saisi (fixes et variables, avec leurs décalages). Réel = ce que le relevé et les soldes mesurent. Les deux se cumulent de ${MS[P.anneeDebut]} à ${MS[P.anneeDebut===1?12:P.anneeDebut-1]}. Les mois futurs sans budget reprennent le dernier mois saisi. Le flux employeur réel se lit dans Invest : une ligne de versement libellée « Participation Alpha », « Abondement »… le mois où il arrive.</div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Mois par mois</div><div class="card-b" style="padding:0 6px 10px"><table><thead><tr><th>Mois</th><th style="text-align:right">Rev. théo.</th><th style="text-align:right">Rev. réel</th><th style="text-align:right">Dép. théo.</th><th style="text-align:right">Dép. réel</th><th style="text-align:right">Ép. théo.</th><th style="text-align:right">Ép. réel</th></tr></thead><tbody>
+${K.rows.map(r=>'<tr style="opacity:'+(r.r.known?1:.55)+'"><td>'+MS[r.m]+' '+String(r.y).slice(2)+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.rev)+'</td><td class="mono" style="text-align:right">'+(r.r.known?fE(r.r.rev):'—')+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.dep)+'</td><td class="mono" style="text-align:right;color:'+(r.r.known?(r.r.dep<=r.p.dep?'var(--up)':'var(--dn)'):'inherit')+'">'+(r.r.known?fE(r.r.dep):'—')+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.ep)+'</td><td class="mono" style="text-align:right;color:'+(r.r.known?(r.r.ep>=r.p.ep?'var(--up)':'var(--dn)'):'inherit')+'">'+(r.r.known?fE(r.r.ep):'—')+'</td></tr>').join('')}
+<tr style="border-top:2px solid var(--line2);font-weight:700"><td>Cumul réalisé</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tRev)}</td><td class="mono" style="text-align:right">${fE(K.cum.rRev)}</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tDep)}</td><td class="mono" style="text-align:right">${fE(K.cum.rDep)}</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tEp)}</td><td class="mono" style="text-align:right">${fE(K.cum.rEp)}</td></tr>
+<tr style="font-weight:700"><td>Année complète</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.full.rev)}</td><td></td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.full.dep)}</td><td></td><td class="mono" style="text-align:right;color:var(--gold)">${fE(K.full.ep)}</td><td></td></tr></tbody></table></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Hypothèses de revenus<span class="aux" style="font-size:10px;color:var(--td)">journalisées</span></div><div class="card-b">
+<input class="inp sm" id="pj-motif" placeholder="Motif obligatoire pour modifier" style="margin-bottom:10px">
+<div class="prm"><label>Début de l\u2019année de suivi<small>mois</small></label><select class="inp sm" onchange="pjSet('anneeDebut',+this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(i=>'<option value="'+i+'"'+(P.anneeDebut===i?' selected':'')+'>'+ML[i]+'</option>').join('')}</select></div>
+<div class="prm"><label>Salaire net mensuel<small>€</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.salaire}" onchange="pjSet('salaire',+this.value||0)"></div>
+<div class="prm"><label>Autres entrées mensuelles<small>€ · remboursements de frais, divers</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.autresMensuels}" onchange="pjSet('autresMensuels',+this.value||0)"></div>
+<div class="eyebrow" style="margin:10px 0 4px">Aides mensuelles</div>
+${(P.aides||[]).map((a,i)=>'<div class="prm"><label>'+esc(a.l)+'<small>à partir de '+(a.from||'—')+'</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="'+a.v+'" onchange="pjSet(\'aides.'+i+'.v\',+this.value||0)"><input class="inp sm mono" style="width:80px" value="'+esc(a.from||'')+'" placeholder="AAAA-MM" onchange="pjSet(\'aides.'+i+'.from\',this.value)"></div></div>').join('')}
+<div class="eyebrow" style="margin:10px 0 4px">Entrées ponctuelles annuelles</div>
+${(P.ponctuels||[]).map((p,i)=>'<div class="prm"><label>'+esc(p.l)+'<small>versé en '+ML[p.mois]+'</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" inputmode="decimal" value="'+p.v+'" onchange="pjSet(\'ponctuels.'+i+'.v\',+this.value||0)"><select class="inp sm" style="width:auto" onchange="pjSet(\'ponctuels.'+i+'.mois\',+this.value)">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(k=>'<option value="'+k+'"'+(+p.mois===k?' selected':'')+'>'+MS[k]+'</option>').join('')+'</select></div></div>').join('')}
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">Les dépenses théoriques ne se règlent pas ici : ce sont tes lignes Budget, mois par mois. Modifie-les là où tu les vois.</div>
+</div></div>`}
+
 /* ================= PLUS (hub) ================= */
 function rMore(){
 const el=document.getElementById('pg-more');
@@ -1977,6 +2037,7 @@ el.innerHTML=`
 <div class="hub-item" onclick="SUB='fiscal';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">◎</div><div class="ht"><b>Fiscal & PER</b><span>Objectif PER, actions${ftd?' · '+ftd+' à faire':''}, déductibles</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='import';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">⤒</div><div class="ht"><b>Import bancaire</b><span>CSV BoursoBank → réel du mois</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='rules';rMore()"><div class="hi" style="background:rgba(79,209,224,.13);color:var(--cyan)">≡</div><div class="ht"><b>Règles de correspondance</b><span>${(DB.rules||[]).length} règles · ${(DB.rules||[]).filter(r=>r.source==='user').length} créées</span></div><span style="color:var(--td)">›</span></div>
+<div class="hub-item" onclick="SUB='proj';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">◔</div><div class="ht"><b>Projection annuelle</b><span>Théorique vs réel, revenus et épargne</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='gouv';rMore()"><div class="hi" style="background:rgba(167,139,250,.13);color:var(--violet)">⚖</div><div class="ht"><b>Gouvernance</b><span>Cibles, trajectoire, régimes · v${(DB.params||{}).version||1}</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='analyses';rMore()"><div class="hi" style="background:rgba(110,168,254,.13);color:var(--blue)">◫</div><div class="ht"><b>Analyses</b><span>Versements, Δ compte, Amundi, tableau</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='notes';rMore()"><div class="hi" style="background:var(--upDim);color:var(--up)">✎</div><div class="ht"><b>Notes</b><span>Mémo global (enfants, clés, répartitions…)</span></div><span style="color:var(--td)">›</span></div>
@@ -1990,6 +2051,7 @@ if(SUB==='fiscal'){rFiscal(el);return}
 if(SUB==='import'){rImport(el);return}
 if(SUB==='rules'){rRules(el);return}
 if(SUB==='gouv'){rGouv(el);return}
+if(SUB==='proj'){rProj(el);return}
 if(SUB==='analyses'){rAnalyses(el);return}
 if(SUB==='notes'){
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button>
