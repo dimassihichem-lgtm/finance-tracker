@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v33';const VTAG='amorce du réel';
+const VERSION='v36';const VTAG='recalé sur la déclaration réelle';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1158,10 +1158,10 @@ if(syncLine(bm,'ch','gardePP',g.budgetLine&&active&&pp1&&in1,()=>{const c=gardeC
 return{l:'Prélèvement Pajemploi+ · '+MS[s1.m]+(g.avanceImmediate?' (avance CI)':''),v}}))ch=true;
 if(syncLine(bm,'ch','garde',g.budgetLine&&active&&!pp1&&in1,()=>{const c=gardeCost(s1.y,s1.m);
 return{l:'Nounou · '+(allIn?'décaissé':'net')+' '+MS[s1.m],v:Math.round(c.budget)}}))ch=true;
-if(syncLine(bm,'ch','gardeCot',g.cotLine&&active&&!allIn&&!pp2&&in2,()=>{const c=gardeCost(s2.y,s2.m);
-return{l:'Cotisations Pajemploi · '+MS[s2.m],v:Math.round(c.cotRest)}}))ch=true;
-if(syncLine(bm,'rev','gardeCmg',g.cmgLine&&active&&!allIn&&!pp3&&in3,()=>{const c=gardeCost(s3.y,s3.m);
-return{l:'CMG garde à domicile · '+MS[s3.m],v:Math.round(c.cmgRem)}}))ch=true;
+const c3=(!pp3&&in3)?gardeCost(s3.y,s3.m):null;const netCaf=c3?c3.cmgRem-c3.cotRest:0;
+if(syncLine(bm,'ch','gardeCot',false,()=>({l:'',v:0})))ch=true;
+if(syncLine(bm,'rev','gardeCmg',g.cmgLine&&active&&!allIn&&!pp3&&in3&&netCaf>=0,()=>({l:'CMG net des cotisations · '+MS[s3.m],v:Math.round(netCaf*100)/100})))ch=true;
+if(syncLine(bm,'ch','gardeCotNet',g.cmgLine&&active&&!allIn&&!pp3&&in3&&netCaf<0,()=>({l:'Cotisations nettes du CMG · '+MS[s3.m],v:Math.round(-netCaf*100)/100})))ch=true;
 if(ch)save()}
 
 /* ---- page Garde ---- */
@@ -1300,8 +1300,9 @@ ${GCOST?`<div class="card-b">
 <div class="cost-line"><span>Cotisations totales<small>${f$(Math.round(r.cotSal))} salariales + ${f$(Math.round(r.cotPat))} patronales</small></span><b style="color:var(--tm)">${f$(Math.round(r.cotBrut))} €</b></div>
 <div class="cost-line"><span>Déductions & exonérations<small>${f$(p.abatH)} €/h × ${fh(r.paid)} h</small></span><b style="color:var(--up)">− ${f$(Math.round(r.abat))} €</b></div>
 <div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} % des cotisations totales, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgCot))} €</b></div>
-<div class="cost-line"><span>Cotisations prélevées par Pajemploi ${r.ovCot?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>~2 mois après la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
+<div class="cost-line"><span>Cotisations restant à charge ${r.ovCot?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>compensées avec le CMG lors de la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
 <div class="cost-line"><span>CMG rémunération (CAF) ${r.ovRem?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>${r.ovRem?'montant saisi':Math.round((1-r.fact)*100)+' % du net retenu · revenus '+f$(revUsed)+' €/mois'}</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
+${!isPP(gY,gM)?'<div class="cost-line" style="background:var(--goldDim);border-radius:8px;padding:6px 8px"><span>Flux réel Pajemploi<small>cotisations restantes compensées par le CMG : '+(r.cmgRem-r.cotRest>=0?'la CAF vous verse la différence, aucun prélèvement':'Pajemploi prélève la différence')+'</small></span><b style="color:'+(r.cmgRem-r.cotRest>=0?'var(--up)':'var(--dn)')+'">'+(r.cmgRem-r.cotRest>=0?'+ ':'− ')+f$(Math.round(Math.abs(r.cmgRem-r.cotRest)*100)/100)+' €</b></div>':''}
 <div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:11px;margin:12px 0">
 <div class="eyebrow" style="margin-bottom:7px">Montants réellement constatés · ${MS[gM]} ${gY}</div>
 <div class="prm"><label>Cotisations prélevées par Pajemploi<small>estimation : ${f$(Math.round(r.cotRestEst))} €${r.ovCot?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cotRestEst)}" value="${r.ovCot?r.cotRest:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','cot',this.value)"></div>
@@ -1593,7 +1594,12 @@ DB.im.forEach(m=>m.supports.forEach(s=>{if(!s.owner)s.owner=/livret|ldds/i.test(
 if(!DB.params.v2mig){DB.params.v2mig=true;
 const FIX=/loyer|cr[ée]dit|[ée]cole|cr[eè]che|nounou|cotisations|navigo|[ée]lectric|edf|internet|t[ée]l[ée]|orange|assurance|abonnement|natation|foot|conservatoire|mutuelle/i;
 DB.bm.forEach(b=>b.ch.forEach(c=>{if(FIX.test(c.l))c.fixe=true;if(/cr[eè]che/i.test(c.l)&&!c.auto)c.payOffset=1}));
-}}
+}
+if(DB.garde&&!DB.params.sept26Real){if(!DB.garde.cmgReal)DB.garde.cmgReal={};if(!DB.garde.cmgReal['2026-09'])DB.garde.cmgReal['2026-09']={rem:95.49,cot:78.53};DB.params.sept26Real=true;
+DB.params.journal.push({date:'2026-09-30',champ:'cmgReal.2026-09',old:null,new:'CMG 95,49 · cotisations restantes 78,53',motif:'déclaration Pajemploi de septembre 2026 (première déclaration)'})}
+if(DB.garde&&DB.garde.p&&!DB.params.recal26){const P=DB.garde.p;const old={txPat:P.txPat,abatH:P.abatH,rev:P.rev};P.txPat=43.059;P.abatH=1.80;P.rev=6823.9;DB.params.recal26=true;
+DB.params.journal.push({date:'2026-09-30',champ:'garde.p (txPat, rev)',old:JSON.stringify(old),new:'txPat 43,059 · rev 6 823,90 · abatH maintenu 1,80',motif:'recalage sur la déclaration Pajemploi réelle de septembre 2026 (290 € / 23 h) : cotisations 241,07, déduction 42,00, CMG 95,49'})}
+if(DB.params.recal26&&!DB.params.recal26b&&DB.garde&&DB.garde.p){DB.garde.p.abatH=1.80;DB.params.recal26b=true}}
 function jrnl(champ,oldV,newV,motif){const n=new Date();const inWin=(DB.params.fenetre.mois.includes(n.getMonth()+1))&&n.getDate()>=DB.params.fenetre.jours[0]&&n.getDate()<=DB.params.fenetre.jours[1];
 DB.params.journal.push({date:n.toISOString().slice(0,10),champ,old:oldV,new:newV,motif:motif+(inWin?'':' [hors fenêtre]')});DB.params.version=(DB.params.version||1)+1;save()}
 function regimeFor(y,m){const k=ym(y,m);const rs=(DB.params.regimes||[]).filter(r=>r.from<=k).sort((a,b)=>a.from<b.from?1:-1);return rs.length?rs[0]:null}
@@ -1758,7 +1764,7 @@ d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.par
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
 function declBanner(){const n=new Date();const d=n.getDate();if(d<25&&d>5)return'';const pv=pM(n.getFullYear(),n.getMonth()+1);const wm=d>=25?{y:n.getFullYear(),m:n.getMonth()+1}:pv;
 const r=gardeCost(wm.y,wm.m);if(r.before||r.after)return'';
-return'<div class="al alb" style="margin-bottom:10px">📋 Déclarer les heures de <b>'+ML[wm.m]+'</b> sur Pajemploi avant le 5 : '+fh(r.paidH)+' h · '+fE(r.net)+' net'+(r.nav.amt?' · transport '+fE(r.nav.amt):'')+(isPP(wm.y,wm.m)?' · prélèvement Pajemploi+ attendu '+fE(r.cash):'')+'</div>'}
+return'<div class="al alb" style="margin-bottom:10px">📋 Déclaration Pajemploi de <b>'+ML[wm.m]+'</b> avant le 5 — trois champs séparés : <b>heures '+fh(r.paidH)+' h</b> · <b>salaire net '+fE(r.net)+'</b>'+(r.nav.amt?' · <b>indemnité de transport '+fE(r.nav.amt)+'</b> (champ dédié, exonéré)':'')+(isPP(wm.y,wm.m)?' · prélèvement Pajemploi+ attendu '+fE(r.cash):'')+'</div>'}
 function completeBanner(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);
 if(b.cl)return'';
 if(mr.complete)return'<div class="al alg" style="margin-bottom:10px">✓ '+ML[m]+' est complet — prêt à clôturer.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+'</div>';
