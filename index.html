@@ -221,6 +221,7 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .cal-cell.absd{background:var(--dnDim);border-color:rgba(240,113,111,.45)}
 .cal-cell.sickd{background:rgba(167,139,250,.14);border-color:rgba(167,139,250,.45)}
 .cal-cell.zerod{border-color:var(--dn);border-style:dashed}
+.cal-cell.recd{background:var(--goldDim);border-color:rgba(229,195,106,.45);border-style:dashed}
 .cal-cell.hol .dn::after{content:'✦';font-size:7px;color:var(--blue);margin-left:2px;vertical-align:top}
 .cal-cell.cp .dn{color:var(--tx)}
 /* ===== MODE CONFIDENTIALITÉ ===== */
@@ -347,7 +348,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v47';const VTAG='bandeau déclaration lié au suivi';
+const VERSION='v48';const VTAG='compteur d\'heures · fiche solo/partagé · PDF';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -924,7 +925,7 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 /* ================= GARDE À DOMICILE (nounou) ================= */
 // Sources : cotisations Pajemploi 01/01/2026 ; CMG barème 01/04/2026 ; crédit d'impôt 2026 ; CCN IDCC 3239 (HS > 40 h : +25 %/+50 % ; 1er mai +100 % ; férié ordinaire travaillé +10 % ; CP 2,5 j ouvrables/mois ; mensualisation 52/12).
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
-function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},sick:{},endReason:'licenciement',preavisPaid:false,
+function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},sick:{},recup:{},unused:{},endReason:'licenciement',preavisPaid:false,
 plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
 contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'auto',share:50,manual:0,ref:{},requireJustif:true,label:'Navigo Mois'},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',cotLine:true,cotLag:2,cmgLine:true,cmgLag:1,crecheMigrated:false,
 cpDays:30,cpWeek:6,cpAcq:2.5,cpHours:2.5,cpStartM:6,ppFrom:'',avanceImmediate:false,cpMode:'ouvres',holOffPaid:true,cmgReal:{},
@@ -962,19 +963,19 @@ function holName(k){const y=+k.slice(0,4);if(!HOL[y]){const e=easter(y);const ad
 function planFor(k){const ps=(DB.garde.plans||[]).filter(p=>p.from<=k).sort((a,b)=>a.from<b.from?1:-1);return ps.length?ps[0]:null}
 function planDay(k){const p=planFor(k);if(!p)return{s:0,p:0};const d=p.d[dowOf(k)]||{};return{s:+d.s||0,p:+d.p||0}}
 function planWeekly(pl){let s=0,p=0;for(let i=1;i<=7;i++){const d=pl.d[i]||{};s+=+d.s||0;p+=+d.p||0}return{s,p}}
-function realDay(k){const v=DB.garde.hours[k];if(v==null)return null;if(typeof v==='number')return{s:v,p:0};return{s:+v.s||0,p:+v.p||0}}
+function realDay(k){const v=DB.garde.hours[k];if(v==null)return null;if(typeof v==='number')return{s:v,p:0,r:0};return{s:+v.s||0,p:+v.p||0,r:+v.r||0}}
 function dayInfo(k){const g=DB.garde;const hol=holName(k);const mai1=k.slice(5)==='05-01';
 const Z={s:0,p:0};
 if(g.contractFrom&&k<g.contractFrom)return{prev:Z,real:null,hol,mai1,cp:false,abs:false,sick:false,eff:Z,status:'before',planned:false};
 if(g.contractTo&&k>g.contractTo)return{prev:Z,real:null,hol,mai1,cp:false,abs:false,sick:false,eff:Z,status:'after',planned:false};
 const prev=planDay(k);const real=realDay(k);const planned=(prev.s+prev.p)>0;
-const cp=!!g.leave[k]&&planned,abs=!!g.abs[k]&&planned,sick=!!(g.sick&&g.sick[k])&&planned;
+const cp=!!g.leave[k]&&planned,abs=!!g.abs[k]&&planned,sick=!!(g.sick&&g.sick[k])&&planned,recup=!!(g.recup&&g.recup[k])&&planned,unused=!!(g.unused&&g.unused[k])&&planned;
 let eff=Z,status='off';
 if(hol&&planned&&!real)status='holoff';
-else if(cp)status='cp';else if(sick)status='sick';else if(abs)status='abs';
+else if(cp)status='cp';else if(sick)status='sick';else if(abs)status='abs';else if(recup)status='recup';else if(unused)status='unused';
 else if(real){eff=real;status=(eff.s+eff.p)>0?'work':(planned?'zero':'off')}
 else{eff=prev;status=planned?'plan':'off'}
-return{prev,real,hol,mai1,cp,abs,sick,eff,status,planned}}
+return{prev,real,hol,mai1,cp,abs,sick,recup,unused,eff,status,planned}}
 
 const payOf=(e,g)=>e.s*g.rate+e.p*g.rateShared;
 // Calcul du mois
@@ -988,11 +989,11 @@ const after=!!ct&&(y*12+m)>(ctY*12+ctM);
 const partialIn=!!cf&&y===cfY&&m===cfM&&cfD>1;
 const partialOut=!!ct&&y===ctY&&m===ctM&&ctD<nd;
 const partial=partialIn||partialOut;
-const Z0={base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,sick:0,sickH:0,sickEur:0,zeroDays:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null,planChanged:false};
+const Z0={base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,sick:0,sickH:0,sickEur:0,zeroDays:0,owedH:0,owedDays:0,recupH:0,unusedH:0,recupAbsH:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null,planChanged:false};
 if(before||after)return Z0;
 const plEnd=planFor(gKey(y,m,nd));const wk=plEnd?planWeekly(plEnd):{s:0,p:0};
 let baseHs=0,baseHp=0,planChanged=false,firstPlan=null;
-let planH=0,hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,sick=0,sickH=0,sickEur=0,zeroDays=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0;
+let planH=0,hS=0,hP=0,days=0,cp=0,abs=0,absH=0,absEur=0,sick=0,sickH=0,sickEur=0,zeroDays=0,extraH=0,extraEur=0,reclassEur=0,holMaj=0,holWorked=0,holOff=0,holOffEur=0,holOffH=0,payReal=0,owedH=0,owedDays=0,recupH=0,unusedH=0,recupAbsH=0;
 for(let d=1;d<=nd;d++){const k=gKey(y,m,d);const i=dayInfo(k);
 if(i.status==='before'||i.status==='after')continue;
 const pw=planFor(k);if(pw){if(firstPlan&&firstPlan!==pw)planChanged=true;firstPlan=firstPlan||pw;const w=planWeekly(pw);baseHs+=w.s*52/12/nd;baseHp+=w.p*52/12/nd}
@@ -1001,12 +1002,15 @@ if(i.status==='holoff'){holOff++;holOffH+=i.prev.s+i.prev.p;holOffEur+=payOf(i.p
 if(i.cp){cp++;continue}
 if(i.sick){sick++;sickH+=i.prev.s+i.prev.p;sickEur+=payOf(i.prev,g);continue}
 if(i.abs){abs++;absH+=i.prev.s+i.prev.p;absEur+=payOf(i.prev,g);continue}
+if(i.status==='recup'){owedDays++;owedH+=i.prev.s+i.prev.p;recupAbsH+=i.prev.s+i.prev.p;continue}
+if(i.status==='unused'){owedDays++;owedH+=i.prev.s+i.prev.p;unusedH+=i.prev.s+i.prev.p;continue}
 if(i.status==='zero')zeroDays++;
 const t=i.eff.s+i.eff.p;if(t>0){days++;hS+=i.eff.s;hP+=i.eff.p;payReal+=payOf(i.eff,g)}
 if(i.real){const pT=i.prev.s+i.prev.p,rT=i.real.s+i.real.p;
 const pP=payOf(i.prev,g),rP=payOf(i.real,g);
-const dH=Math.max(0,rT-pT),dP=Math.max(0,rP-pP);
-const rt=rT>0?rP/rT:0;const hE=Math.min(dP,dH*rt);
+let dH=Math.max(0,rT-pT),dP=Math.max(0,rP-pP);
+const rt=rT>0?rP/rT:0;const rc=Math.min(i.real.r||0,dH);recupH+=rc;dH-=rc;dP=Math.max(0,dP-rc*rt);
+const hE=Math.min(dP,dH*rt);
 extraH+=dH;extraEur+=hE;reclassEur+=dP-hE}
 if(i.hol&&t>0){holWorked++;holMaj+=payOf(i.eff,g)*(i.mai1?g.fer.majMai:g.fer.majOrd)/100}}
 const base=baseHs*g.rate+baseHp*g.rateShared;
@@ -1024,7 +1028,7 @@ let net,paidH;
 if(partial){net=payReal+holMaj+hsEur+compEur;paidH=hS+hP;extraH=0;extraEur=0;reclassEur=0}
 else if(g.mode==='mensualise'){net=base+extraEur+reclassEur+holMaj+hsEur+compEur-absEur;paidH=baseHs+baseHp-absH+extraH}
 else{net=hS*g.rate+hP*g.rateShared+cp*g.cpHours*g.rate+(g.holOffPaid===false?0:holOffEur)+holMaj+hsEur+compEur;paidH=hS+hP+cp*g.cpHours+(g.holOffPaid===false?0:holOffH)}
-return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,sick,sickH,sickEur,zeroDays,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,planChanged,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,sick,sickH,sickEur,zeroDays,owedH,owedDays,recupH,unusedH,recupAbsH,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,planChanged,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
 
 function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
 function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padStart(2,'0');
@@ -1152,6 +1156,9 @@ const caf=(()=>{const net=r.cmgRem-r.cotRest;if(net<=0)return null;let i=y*12+m+
 return{paid:!!t.paid||!!(pay&&!pay.approx),paidSrc:pay&&!pay.approx?'relevé':(t.paid?'manuel':null),paidAmt:pay?pay.amt:null,paidApprox:!!(pay&&pay.approx),decl:!!t.decl,declSrc:t.decl?'manuel':null,caf:!!t.caf||!!caf,cafSrc:caf?'relevé':(t.caf?'manuel':null),fiche:!!t.fiche}}
 function gardeTrackSet(y,m,f,v){const g=DB.garde;if(!g.track)g.track={};const k=ym(y,m);g.track[k]=g.track[k]||{};g.track[k][f]=v;save();rGarde()}
 function isPP(y,m){const f=DB.garde.ppFrom||'';return !!f&&ym(y,m)>=f}
+function hoursLedger(y,m){const g=DB.garde;const cf=g.contractFrom||'2026-09-01';const lo=+cf.slice(0,4)*12+ +cf.slice(5,7);const cur=y*12+m;let bal=0;
+for(let i=lo;i<cur;i++){const yy=Math.floor((i-1)/12),mm=i-yy*12;const r=gardeMonth(yy,mm);bal+=r.owedH-r.recupH}
+const r=gardeMonth(y,m);return{start:Math.round(bal*100)/100,owed:r.owedH,unused:r.unusedH,recupAbs:r.recupAbsH,done:r.recupH,end:Math.round((bal+r.owedH-r.recupH)*100)/100}}
 function gardeRealDebit(y,m){const s=nM(y,m);const b=gBM(s.y,s.m);if(!b||!b.imp||!b.imp.done)return null;const f=b.imp.bySub.fixe||{};
 const k=Object.keys(f).find(x=>/pajemploi|nounou/i.test(x));return k!=null?f[k]:null}
 function gardeSrc(y,m){let r={y,m};for(let i=0;i<(DB.garde.lag||0);i++)r=pM(r.y,r.m);return r}
@@ -1181,7 +1188,7 @@ if(ch)save()}
 /* ---- page Garde ---- */
 let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false,GPLAN=false,GPI=-1;
 const fh=h=>(Math.round(h*100)/100).toLocaleString('fr-FR');
-function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';if(i.status==='sick')return'<span class="hb" style="color:var(--violet)">MAL</span>';if(i.status==='zero')return'<span class="hb" style="color:var(--dn)">0h ?</span>';
+function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';if(i.status==='sick')return'<span class="hb" style="color:var(--violet)">MAL</span>';if(i.status==='recup')return'<span class="hb" style="color:var(--gold)">RÉC</span>';if(i.status==='unused')return'<span class="hb" style="color:var(--gold)">N.U.</span>';if(i.status==='zero')return'<span class="hb" style="color:var(--dn)">0h ?</span>';
 if(i.status==='holoff')return'<span class="hb" style="color:var(--blue)">férié</span>';const e=i.eff;if(e.s+e.p<=0)return'';
 const txt=(e.s?fh(e.s):'')+(e.s&&e.p?'+':'')+(e.p?fh(e.p)+'p':'');return'<span class="hb"'+(i.status==='plan'?' style="color:var(--td);font-weight:500"':'')+'>'+txt+'</span>'}
 function rGarde(){
@@ -1192,17 +1199,18 @@ const first=new Date(gY,gM-1,1);const off=(first.getDay()+6)%7;const nd=new Date
 const tk=todayKey();const nx=nM(gY,gM);const mens=g.mode==='mensualise';
 let cells='';for(let i=0;i<off;i++)cells+='<div class="cal-cell blank"></div>';
 for(let d=1;d<=nd;d++){const k=gKey(gY,gM,d);const i=dayInfo(k);const dow=(off+d-1)%7;
-cells+='<div class="cal-cell'+(i.status==='work'?' has':'')+(i.status==='cp'?' cp':'')+(i.status==='abs'?' absd':'')+(i.status==='sick'?' sickd':'')+(i.status==='zero'?' zerod':'')+(i.hol?' hol':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(k>tk?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+cellBadge(i)+'</div>'}
+cells+='<div class="cal-cell'+(i.status==='work'?' has':'')+(i.status==='cp'?' cp':'')+(i.status==='abs'?' absd':'')+(i.status==='sick'?' sickd':'')+(i.status==='zero'?' zerod':'')+(i.status==='recup'||i.status==='unused'?' recd':'')+(i.hol?' hol':'')+(k===tk?' today':'')+(GSEL===k?' sel':'')+(dow>=5?' we':'')+(k>tk?' future':'')+'" onclick="gSel(\''+k+'\')"><span class="dn">'+d+'</span>'+cellBadge(i)+'</div>'}
 let panel='';
 if(GSEL){const i=dayInfo(GSEL);const dt=kDate(GSEL);const cur=i.real||i.prev;
 panel=`<div class="cal-panel">
 <div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
-<div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.sick?'<span class="chip" style="color:var(--violet)">Absence salariée</span>':''}${!i.planned?'<span class="chip">Jour non travaillé au planning</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
+<div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.sick?'<span class="chip" style="color:var(--violet)">Absence salariée</span>':''}${i.recup?'<span class="chip tag-gold">À récupérer par elle · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${i.unused?'<span class="chip tag-gold">Non utilisé par nous · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${!i.planned?'<span class="chip">Jour non travaillé au planning</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
 <div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(g.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
 <div><div class="lbl">Partagé (h) · ${f$(g.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
-<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value)">Enregistrer</button>
-${i.planned?`<button class="btn btn-ghost sm" onclick="gMark('leave')">${i.cp?'Retirer le CP':'Congé payé'}</button><button class="btn btn-ghost sm" onclick="gMark('abs')">${i.abs?'Retirer l\u2019absence':'Absence'}</button><button class="btn btn-ghost sm" onclick="gMark('sick')">${i.sick?'Retirer l\u2019absence':'Absence salariée'}</button>`:''}
-${(i.real||i.cp||i.abs||i.sick)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
+<div style="margin-top:8px"><div class="lbl">dont récupération (h) <span class="hint">heures du compteur, non payées en complémentaires</span></div><input class="inp sm mono" id="g-r" type="number" step="0.5" inputmode="decimal" value="${cur.r||''}" placeholder="0" style="text-align:center"></div>
+<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value,+document.getElementById('g-r').value)">Enregistrer</button>
+${i.planned?`<select class="inp sm" style="width:auto" onchange="gMarkSel(this.value)"><option value="">Jour non travaillé…</option><option value="leave"${i.cp?' selected':''}>Congé payé</option><option value="abs"${i.abs?' selected':''}>Absence non rémunérée</option><option value="recup"${i.recup?' selected':''}>Absence à récupérer (elle)</option><option value="unused"${i.unused?' selected':''}>Non utilisé (nous) — à récupérer</option><option value="sick"${i.sick?' selected':''}>Absence salariée (maladie)</option></select>`:''}
+${(i.real||i.cp||i.abs||i.sick||i.recup||i.unused)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
 ${i.status==='zero'?'<div class="al ala" style="margin-top:10px">0 h saisie sur un jour prévu au planning. En mensualisé, elle reste payée. S\u2019il s\u2019agit d\u2019un congé, d\u2019une absence ou d\u2019un arrêt, utilisez les boutons ci-dessus.</div>':''}
 </div>`}
 const budgetSrc=[];sBM().forEach(b=>{const s=gardeSrc(b.y,b.m);if(s.y===gY&&s.m===gM&&g.budgetLine&&(b.y*12+b.m)>=g.startY*12+g.startM)budgetSrc.push(MS[b.m]+' '+b.y)});
@@ -1243,6 +1251,13 @@ row('Déclaration Pajemploi validée',st.decl,st.declSrc,'decl','à cocher aprè
 row('CMG net reçu de la CAF',st.caf,st.cafSrc,'caf','attendu dans le relevé du mois suivant')+
 row('Fiche de paie envoyée',st.fiche,st.fiche?'manuel':null,'fiche','bouton Fiche mensuelle en haut')+
 '<div style="font-size:10px;color:var(--td);margin-top:7px">Coché automatiquement quand la ligne est reconnue dans un relevé importé ; sinon à cocher à la main. Le mois est soldé quand salaire, déclaration et fiche sont verts — la CAF arrive le mois suivant, c\u2019est un suivi, pas une condition.</div></div></div>'})()}
+${(()=>{const L=hoursLedger(gY,gM);if(!L.start&&!L.owed&&!L.done)return'';return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Compteur d\u2019heures · '+ML[gM]+'<span class="aux mono" style="color:'+(L.end>0?'var(--gold)':L.end<0?'var(--dn)':'var(--up)')+'">'+(L.end>0?'+':'')+fh(L.end)+' h</span></div><div class="card-b">'+
+'<div class="cost-line"><span>Solde reporté</span><b class="mono">'+(L.start>0?'+':'')+fh(L.start)+' h</b></div>'+
+(L.unused?'<div class="cost-line"><span>Non utilisées par nous<small>payées, à replacer d\u2019un commun accord</small></span><b class="mono">+ '+fh(L.unused)+' h</b></div>':'')+
+(L.recupAbs?'<div class="cost-line"><span>Absences à récupérer par elle<small>payées, à rattraper sous deux mois, sinon absence non rémunérée</small></span><b class="mono">+ '+fh(L.recupAbs)+' h</b></div>':'')+
+(L.done?'<div class="cost-line"><span>Récupérées ce mois<small>heures au-delà du planning, non payées en complémentaires</small></span><b class="mono" style="color:var(--up)">− '+fh(L.done)+' h</b></div>':'')+
+'<div class="cost-line tot"><span>Solde<small>'+(L.end>0?'heures payées non travaillées, à replacer':L.end<0?'heures travaillées non payées — à régulariser en complémentaires':'à jour')+'</small></span><b class="mono" style="color:'+(L.end>0?'var(--gold)':L.end<0?'var(--dn)':'var(--up)')+'">'+(L.end>0?'+':'')+fh(L.end)+' h</b></div>'+
+'<div style="font-size:10.5px;color:var(--td);margin-top:8px">Quand c\u2019est vous qui n\u2019utilisez pas ses heures, la mensualisation les lui garantit : la récupération est un arrangement à sa main, jamais une dette. Quand c\u2019est elle qui s\u2019absente : congé payé, absence non rémunérée, ou récupération dans un délai court.</div></div></div>'})()}
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
 ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" style="margin:0 0 10px">📌 ${r.partialIn?'Mois d\u2019embauche':'Mois de fin de contrat'} : salaire calculé sur les heures réelles du ${r.from?kDate(r.from).toLocaleDateString('fr-FR'):'1'+'/'+String(gM).padStart(2,'0')} au ${r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(gM).padStart(2,'0')}, pas sur la mensualisation.</div></div>
@@ -1410,10 +1425,11 @@ if(Object.keys(o).length)DB.garde.cmgReal[k]=o;else delete DB.garde.cmgReal[k];
 if(DB.params&&DB.params.journal)DB.params.journal.push({date:new Date().toISOString().slice(0,10),champ:'cmgReal.'+k+'.'+f,old:old==null?null:old,new:v===''?null:+v,motif:'montant réel constaté (Pajemploi / CAF)'});gSave()}
 function navRef(k,v){if(!DB.garde.nav.ref)DB.garde.nav.ref={};if(v)DB.garde.nav.ref[k]=1;else delete DB.garde.nav.ref[k];gSave()}
 function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
-function gSet(s,p){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;DB.garde.hours[GSEL]={s,p};delete DB.garde.leave[GSEL];delete DB.garde.abs[GSEL];if(DB.garde.sick)delete DB.garde.sick[GSEL];save();gResync();GSEL=null;rGarde()}
-function gMark(t){if(!GSEL)return;const g=DB.garde;if(!g.sick)g.sick={};const maps={leave:g.leave,abs:g.abs,sick:g.sick};const o=maps[t];
+function gSet(s,p,r){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;r=Math.round((+r||0)*100)/100;DB.garde.hours[GSEL]={s,p};if(r)DB.garde.hours[GSEL].r=r;['leave','abs','sick','recup','unused'].forEach(x=>{if(DB.garde[x])delete DB.garde[x][GSEL]});save();gResync();GSEL=null;rGarde()}
+function gMark(t){if(!GSEL)return;const g=DB.garde;['sick','recup','unused'].forEach(x=>{if(!g[x])g[x]={}});const maps={leave:g.leave,abs:g.abs,sick:g.sick,recup:g.recup,unused:g.unused};const o=maps[t];
 if(o[GSEL])delete o[GSEL];else{Object.values(maps).forEach(x=>{delete x[GSEL]});o[GSEL]=1;delete g.hours[GSEL]}save();gResync();GSEL=null;rGarde()}
-function gClear(){if(!GSEL)return;const g=DB.garde;delete g.hours[GSEL];delete g.leave[GSEL];delete g.abs[GSEL];if(g.sick)delete g.sick[GSEL];save();gResync();GSEL=null;rGarde()}
+function gMarkSel(t){if(!GSEL)return;const g=DB.garde;['sick','recup','unused'].forEach(x=>{if(!g[x])g[x]={}});['leave','abs','sick','recup','unused'].forEach(x=>{delete g[x][GSEL]});if(t){g[t][GSEL]=1;delete g.hours[GSEL]}save();gResync();GSEL=null;rGarde()}
+function gClear(){if(!GSEL)return;const g=DB.garde;delete g.hours[GSEL];['leave','abs','sick','recup','unused'].forEach(x=>{if(g[x])delete g[x][GSEL]});save();gResync();GSEL=null;rGarde()}
 function gPlanNew(i){const src=DB.garde.plans[i];const from=prompt('Date d\u2019effet du nouveau planning (AAAA-MM-JJ) :',todayKey());if(!from||!/^\d{4}-\d{2}-\d{2}$/.test(from))return;
 DB.garde.plans.push({from,d:JSON.parse(JSON.stringify(src.d))});GPI=-1;gSave()}
 function gSave(){save();gResync();rGarde()}
@@ -1442,7 +1458,7 @@ B.push({t:'Ce que vous percevez ce mois',rows:pay});
 const calc=[];let intro='';
 if(r.partial&&r.partialIn){
  intro='Votre contrat a débuté le '+kDate(r.from).toLocaleDateString('fr-FR')+'. Ce premier mois est payé sur les heures réellement travaillées. Dès le mois suivant, vous percevrez chaque mois le même salaire de '+fEur(baseFull)+' ('+fh(hebdo)+' h par semaine lissées sur l\u2019année), congés et jours fériés compris.';
- calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
+ calc.push({l:fH(r.hS)+' en solo \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
  if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
 }else if(r.partial){
  intro='Votre contrat se termine le '+kDate(r.to).toLocaleDateString('fr-FR')+'. Ce dernier mois est payé sur les heures réellement travaillées.';
@@ -1450,7 +1466,7 @@ if(r.partial&&r.partialIn){
  if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
 }else if(mens){
  intro='Votre salaire est identique chaque mois : '+fh(hebdo)+' h par semaine lissées sur l\u2019année, congés payés et jours fériés compris.';
- calc.push({l:'Salaire mensuel convenu',v:fEur(r.base)});
+ calc.push({l:'Salaire mensuel convenu',v:fEur(r.base),note:fh(wk.s)+' h en solo × '+fEur(g.rate)+(wk.p?' + '+fh(wk.p)+' h en garde partagée × '+fEur(g.rateShared):'')+' = '+fEur(wk.s*g.rate+wk.p*g.rateShared)+' par semaine × 52 ÷ 12'});
  if(r.extraEur>0)calc.push({l:'Heures en plus : '+fH(r.extraH),v:'+ '+fEur(r.extraEur)});
  if(r.reclassEur>0)calc.push({l:'Heures prévues en garde partagée effectuées seule',v:'+ '+fEur(r.reclassEur),note:'payées '+fEur(g.rate)+' au lieu de '+fEur(g.rateShared)});
  if(r.absEur>0)calc.push({l:'Absences non rémunérées : '+fH(r.absH),v:'\u2212 '+fEur(r.absEur)});
@@ -1473,6 +1489,7 @@ if(r.extraH>0||(r.partial&&r.compH>0))hr.push({l:'dont heures en plus du plannin
 if(r.cp>0||r.holOff>0)hr.push({l:'Jours payés non travaillés',v:(r.cp+r.holOff)+' j',note:(r.cp?r.cp+' congé'+(r.cp>1?'s':''):'')+(r.cp&&r.holOff?' + ':'')+(r.holOff?r.holOff+' férié'+(r.holOff>1?'s':''):'')});
 if(r.absH>0)hr.push({l:'Absences non rémunérées',v:fH(r.absH)});
 if(r.sickH>0)hr.push({l:'Absence salariée',v:fH(r.sickH)});
+const HL=hoursLedger(y,m);if(HL.start||HL.owed||HL.done){hr.push({l:'Compteur d\u2019heures à récupérer',v:(HL.end>0?'+':'')+fH(HL.end),strong:true,note:'reporté '+(HL.start>0?'+':'')+fh(HL.start)+' h'+(HL.unused?' · non utilisées par l\u2019employeur +'+fh(HL.unused)+' h':'')+(HL.recupAbs?' · absences à récupérer +'+fh(HL.recupAbs)+' h':'')+(HL.done?' · récupérées −'+fh(HL.done)+' h':'')+' · heures déjà payées dans le salaire mensuel, à replacer d\u2019un commun accord'})}
 B.push({t:'Vos heures',rows:hr,
  foot:'Les heures effectuées en plus vous sont payées au taux horaire normal. La majoration de '+g.hs.maj1+' % ne s\u2019applique qu\u2019au-delà de '+g.hs.seuil+' heures par semaine (convention collective des particuliers employeurs, IDCC 3239).'});
 
@@ -1510,41 +1527,43 @@ else alert(t);}
 function downloadPdf(){
 const J=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
 if(!J){alert('Le module PDF n\u2019a pas pu être chargé. Vérifiez votre connexion.');return}
-const d=ficheData(FY,FM);const doc=new J({unit:'mm',format:'a4'});
-const M=18,W=210,RW=W-2*M;let y=22;
+const d=ficheData(FY,FM);let doc=buildPdf(J,d,1);if(doc.internal.getNumberOfPages()>1){const d2=buildPdf(J,d,0.86);if(d2.internal.getNumberOfPages()<doc.internal.getNumberOfPages())doc=d2}
+doc.save('fiche-'+String(FM).padStart(2,'0')+'-'+FY+'.pdf')}
+function buildPdf(J,d,K){const doc=new J({unit:'mm',format:'a4'});
+const M=16,W=210,RW=W-2*M;let y=24;
 const line=(txt,size,style,color,gap)=>{doc.setFont('helvetica',style||'normal');doc.setFontSize(size);
  doc.setTextColor(color||'#14171F');const ls=doc.splitTextToSize(txt,RW);ls.forEach(l=>{doc.text(l,M,y);y+=size*0.42});y+=(gap||0)};
-doc.setFont('helvetica','bold');doc.setFontSize(17);doc.setTextColor('#14171F');
-doc.text('Fiche de paie simplifiée',M,y);y+=7;
-doc.setFont('helvetica','normal');doc.setFontSize(12);doc.text(d.month,M,y);y+=6;
-if(d.sal||d.empl){doc.setFontSize(9);doc.setTextColor('#5A6478');
- doc.text((d.sal?'Salariée : '+d.sal:'')+(d.empl?'     Employeur : '+d.empl:''),M,y);y+=5}
-doc.setDrawColor('#14171F');doc.setLineWidth(.5);doc.line(M,y,W-M,y);y+=8;
+doc.setFont('helvetica','bold');doc.setFontSize(21*K);doc.setTextColor('#14171F');
+doc.text('Fiche de paie simplifiée',M,y);y+=9*K;
+doc.setFont('helvetica','normal');doc.setFontSize(14*K);doc.text(d.month,M,y);y+=7*K;
+if(d.sal||d.empl){doc.setFontSize(10.5*K);doc.setTextColor('#5A6478');
+ doc.text((d.sal?'Salariée : '+d.sal:'')+(d.empl?'     Employeur : '+d.empl:''),M,y);y+=6*K}
+doc.setDrawColor('#14171F');doc.setLineWidth(.6);doc.line(M,y,W-M,y);y+=10*K;
 d.blocks.forEach(b=>{
  if(y>252){doc.addPage();y=22}
- doc.setFillColor('#14171F');doc.rect(M,y-4.6,RW,6.6,'F');
- doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor('#FFFFFF');
- doc.text(b.t.toUpperCase(),M+2.5,y);y+=8;
- if(b.intro){doc.setFont('helvetica','italic');doc.setFontSize(8.3);doc.setTextColor('#41485C');
-  doc.splitTextToSize(b.intro,RW).forEach(l=>{doc.text(l,M,y);y+=3.9});y+=2.5}
+ doc.setFillColor('#14171F');doc.rect(M,y-5.4*K,RW,7.8*K,'F');
+ doc.setFont('helvetica','bold');doc.setFontSize(10.5*K);doc.setTextColor('#FFFFFF');
+ doc.text(b.t.toUpperCase(),M+3,y);y+=10*K;
+ if(b.intro){doc.setFont('helvetica','italic');doc.setFontSize(10*K);doc.setTextColor('#41485C');
+  doc.splitTextToSize(b.intro,RW-2).forEach(l=>{doc.text(l,M,y);y+=4.8*K});y+=3*K}
  b.rows.forEach(r=>{
   if(y>276){doc.addPage();y=22}
-  if(r.strong){doc.setFillColor('#F4EFE0');doc.rect(M,y-4,RW,6.2,'F')}
-  doc.setFont('helvetica',r.strong?'bold':'normal');doc.setFontSize(r.strong?10:9.3);
-  doc.setTextColor('#14171F');doc.text(r.l,M+1.5,y);
-  doc.text(r.v,W-M-1.5,y,{align:'right'});y+=5.2;
-  if(r.note){doc.setFont('helvetica','italic');doc.setFontSize(7.6);doc.setTextColor('#6B7488');
-   doc.splitTextToSize(r.note,RW-4).forEach(l=>{doc.text(l,M+1.5,y);y+=3.4});y+=.8}
-  doc.setDrawColor('#E4E7EE');doc.setLineWidth(.2);doc.line(M,y-3.4,W-M,y-3.4)});
- if(b.foot){y+=1.5;doc.setFont('helvetica','italic');doc.setFontSize(7.8);doc.setTextColor('#6B7488');
-  doc.splitTextToSize(b.foot,RW).forEach(l=>{doc.text(l,M,y);y+=3.5})}
- y+=7});
-if(y>250){doc.addPage();y=22}
-y+=6;doc.setDrawColor('#9AA2B4');doc.setLineWidth(.3);
-doc.line(M,y,M+70,y);doc.line(W-M-70,y,W-M,y);y+=4.5;
-doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor('#14171F');
-doc.text('Signature de l\u2019employeur',M,y);doc.text('Signature de la salariée',W-M-70,y);
-doc.save('fiche-'+String(FM).padStart(2,'0')+'-'+FY+'.pdf');}
+  doc.setFont('helvetica',r.strong?'bold':'normal');doc.setFontSize((r.strong?12.5:11.5)*K);doc.setTextColor('#14171F');
+  const vw=doc.getTextWidth(String(r.v));const ls=doc.splitTextToSize(String(r.l).replace(/<[^>]+>/g,''),RW-vw-8);
+  if(r.strong){doc.setFillColor('#F4EFE0');doc.rect(M,y-5*K,RW,ls.length*5.6*K+2.2*K,'F')}
+  ls.forEach((l,i)=>{doc.text(l,M+2,y+i*5.6*K)});doc.text(String(r.v),W-M-2,y,{align:'right'});y+=ls.length*5.6*K+1.2*K;
+  if(r.note){doc.setFont('helvetica','italic');doc.setFontSize(9*K);doc.setTextColor('#6B7488');
+   doc.splitTextToSize(String(r.note),RW-6).forEach(l=>{doc.text(l,M+2,y);y+=4.1*K});y+=1*K}
+  doc.setDrawColor('#E4E7EE');doc.setLineWidth(.25);doc.line(M,y-3.2*K,W-M,y-3.2*K)});
+ if(b.foot){y+=2*K;doc.setFont('helvetica','italic');doc.setFontSize(9.2*K);doc.setTextColor('#6B7488');
+  doc.splitTextToSize(b.foot,RW-2).forEach(l=>{doc.text(l,M,y);y+=4.2*K})}
+ y+=9*K});
+if(y>262){doc.addPage();y=24}
+y=Math.max(y+8,268);doc.setDrawColor('#9AA2B4');doc.setLineWidth(.3);
+doc.line(M,y,M+72,y);doc.line(W-M-72,y,W-M,y);y+=5;
+doc.setFont('helvetica','normal');doc.setFontSize(10*K);doc.setTextColor('#14171F');
+doc.text('Signature de l\u2019employeur',M,y);doc.text('Signature de la salariée',W-M-72,y);
+return doc;}
 
 /* ================= RÉEL v2 : périmètre cash, import CSV, règles, gouvernance ================= */
 const p2=n=>String(n).padStart(2,'0');const ym=(y,m)=>y+'-'+p2(m);
