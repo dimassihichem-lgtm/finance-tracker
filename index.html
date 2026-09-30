@@ -15,6 +15,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <style>
 :root{
   --bg:#0B0E15; --bg2:#0E1220; --card:#131826; --card2:#1A2032; --line:#242C42; --line2:#2E3852;
@@ -270,6 +271,13 @@ body.privacy .hdr .brand::after{content:' · privé';font-size:11px;color:var(--
 </head>
 <body>
 
+<div id="login" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
+  <div class="mark">H · Finances</div>
+  <h1 style="font-family:var(--serif);font-size:26px;margin:14px 0 8px">Connexion</h1>
+  <div style="font-size:13px;color:var(--tm);max-width:320px;line-height:1.55;margin-bottom:22px">Les données sont protégées par votre compte Google. Une seule connexion par appareil, puis le code PIN suffit.</div>
+  <button class="btn btn-gold" style="padding:13px 24px;font-size:15px" onclick="authLogin()">Se connecter avec Google</button>
+  <div id="login-msg" style="font-size:12px;color:var(--dn);margin-top:14px;min-height:18px"></div>
+</div>
 <div id="lock">
   <div class="mark">H · Finances</div>
   <h1>Bienvenue</h1>
@@ -349,7 +357,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v50';const VTAG='projection : hypothèses éditables';
+const VERSION='v55';const VTAG='connexion Google · sauvegardes cloud';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -369,7 +377,13 @@ gn:'Notes globales…',garde:defGarde()}}
 
 /* ===== FIREBASE (identique v7 : mêmes données, zéro migration) ===== */
 let fdb=null;
-try{if(typeof firebase!=='undefined'){firebase.initializeApp({apiKey:"AIzaSyD1aR69XxeZ_uqJ0Pg7T1nmYcnRqPFVm5o",authDomain:"finance-tracker-6d899.firebaseapp.com",projectId:"finance-tracker-6d899",storageBucket:"finance-tracker-6d899.firebasestorage.app",messagingSenderId:"268046324399",appId:"1:268046324399:web:fc13816f4c3c2b32ba3a5a"});fdb=firebase.firestore()}}catch(e){}
+let fauth=null,FUSER=null;
+try{if(typeof firebase!=='undefined'){firebase.initializeApp({apiKey:"AIzaSyD1aR69XxeZ_uqJ0Pg7T1nmYcnRqPFVm5o",authDomain:"finance-tracker-6d899.firebaseapp.com",projectId:"finance-tracker-6d899",storageBucket:"finance-tracker-6d899.firebasestorage.app",messagingSenderId:"268046324399",appId:"1:268046324399:web:fc13816f4c3c2b32ba3a5a"});fdb=firebase.firestore();fauth=firebase.auth()}}catch(e){}
+function authLogin(){if(!fauth)return;const p=new firebase.auth.GoogleAuthProvider();const msg=document.getElementById('login-msg');msg.textContent='';
+fauth.signInWithPopup(p).catch(e=>{if(/popup|cancelled|blocked/i.test(e.code||''))return fauth.signInWithRedirect(p);msg.textContent='Connexion refusée : '+(e.message||e.code)})}
+function authLogout(){if(!confirm('Se déconnecter ? Les données locales de cet appareil seront effacées ; elles restent dans le cloud.'))return;try{localStorage.removeItem('hft7')}catch(e){}if(fauth)fauth.signOut().then(()=>location.reload());else location.reload()}
+function authGate(next){const lg=document.getElementById('login');if(!fauth){next();return}
+fauth.onAuthStateChanged(u=>{FUSER=u;if(u){lg.style.display='none';next()}else{lg.style.display='flex'}})}
 const DID='hichem_finance';
 function sss(s){const el=document.getElementById('ss');if(!el)return;
 if(s==='ok'){el.textContent='☁ sync';el.style.color='var(--up)'}
@@ -387,7 +401,7 @@ ensure();
 if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
   if(doc.exists&&doc.data().db){const c=doc.data().db;if((c._ts||0)>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB))}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
-  postLoad();sss('ok')}).catch(e=>{postLoad();sss('error')})}else postLoad()}
+  postLoad();sss('ok')}).catch(e=>{postLoad();sss('error');if(/permission|insufficient/i.test(String(e.message||e.code)))setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
 function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
 function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
 function s2c(){if(!fdb)return;sss('saving');const c=JSON.parse(JSON.stringify(DB));
@@ -396,6 +410,19 @@ fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).the
 function listenSync(){if(!fdb)return;fdb.collection('data').doc(DID).onSnapshot(doc=>{
 if(!doc.exists||!doc.data().db)return;const c=doc.data().db;
 if(c._ts&&c._ts>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));migrateGarde();sss('ok');if(typeof RA==='function')RA()}},e=>{})}
+const BK_KEEP=6;
+function backupNow(reason,cb){if(!fdb){if(cb)cb('local');return}const c=JSON.parse(JSON.stringify(DB));
+if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
+const id=DID+'_bk_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23)+'_'+Math.random().toString(36).slice(2,6);
+fdb.collection('data').doc(id).set({db:c,at:new Date().toISOString(),reason:reason||'manuel',parent:DID}).then(()=>{sss('ok');backupPrune();if(cb)cb('ok')}).catch(e=>{if(cb)cb('error')})}
+function backupList(cb){if(!fdb){cb([]);return}fdb.collection('data').where('parent','==',DID).get().then(q=>{const L=[];q.forEach(d=>{const x=d.data();L.push({id:d.id,at:x.at,reason:x.reason,months:(x.db&&x.db.bm||[]).filter(b=>b.cl).length})});L.sort((a,b)=>a.at<b.at?1:-1);cb(L)}).catch(()=>cb(null))}
+function backupPrune(){backupList(L=>{if(!L)return;L.slice(BK_KEEP).forEach(b=>fdb.collection('data').doc(b.id).delete().catch(()=>{}))})}
+function backupRestore(id,at){if(!confirm('Restaurer la sauvegarde du '+at.slice(0,16).replace('T',' ')+' ? La base actuelle sera remplacée (une sauvegarde de sécurité de l\u2019état actuel est prise avant).'))return;
+backupNow('avant restauration',()=>{fdb.collection('data').doc(id).get().then(d=>{if(!d.exists||!d.data().db){alert('Sauvegarde introuvable');return}DB=d.data().db;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c();setTimeout(()=>location.reload(),800)}).catch(()=>alert('Restauration impossible (accès refusé ?)'))})}
+function rBackups(){const el=document.getElementById('bk-list');if(!el)return;el.innerHTML='<div class="empty">Chargement…</div>';
+backupList(L=>{if(L===null){el.innerHTML='<div class="al alr">Impossible de lire les sauvegardes (hors ligne ou accès refusé).</div>';return}
+if(!L.length){el.innerHTML='<div class="empty">Aucune sauvegarde cloud pour l\u2019instant — la première sera prise à la prochaine clôture.</div>';return}
+el.innerHTML=L.map(b=>'<div class="list-item"><span style="flex:1;font-size:12.5px"><b>'+b.at.slice(0,10)+' '+b.at.slice(11,16)+'</b><div style="font-size:10.5px;color:var(--td)">'+esc(b.reason||'')+' · '+b.months+' mois clos</div></span><button class="btn btn-ghost xs" onclick="backupRestore(\''+b.id+'\',\''+b.at+'\')">Restaurer</button></div>').join('')})}
 function xport(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{DB=JSON.parse(ev.target.result);ensure();save();location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
 
@@ -410,7 +437,7 @@ function gIM(y,m){return DB.im.find(x=>x.y===y&&x.m===m)}
 function gOIM(y,m){let d=gIM(y,m);if(!d){d=defIM(y,m);
 const prev=[...DB.im].filter(x=>(x.y*12+x.m)<(y*12+m)).sort((a,b)=>(b.y*12+b.m)-(a.y*12+a.m));
 if(prev.length){if(prev[0].contribs&&prev[0].contribs.length)d.contribs=JSON.parse(JSON.stringify(prev[0].contribs));
-if(prev[0].supports&&prev[0].supports.length)d.supports=prev[0].supports.map(s=>({n:s.n,v:0,det:(s.det||[]).map(dd=>({l:dd.l,v:0,cible:dd.cible||0,img:null}))}))}
+if(prev[0].supports&&prev[0].supports.length)d.supports=prev[0].supports.map(s=>({n:s.n,v:0,owner:s.owner||'moi',det:(s.det||[]).map(dd=>({l:dd.l,v:0,cible:dd.cible||0,img:null}))}))}
 DB.im.push(d);save()}return d}
 function sBM(){return[...DB.bm].sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m))}
 function sIM(){return[...DB.im].sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m))}
@@ -427,7 +454,7 @@ function perAutoSum(){const fp=DB.fp;return DB.im.filter(m=>(m.y*12+m.m)>=(fp.pe
 
 /* ===== PIN ===== */
 let pe='';
-function initPin(){load();const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
+function initPin(){authGate(()=>{load();});const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
 const p=document.getElementById('ppad');[1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(k=>{
 if(k===''){p.innerHTML+='<div></div>';return}
 p.innerHTML+='<button class="pkey'+(k==='⌫'?' fn':'')+'" onclick="pp(\''+k+'\')">'+k+'</button>'})}
@@ -437,7 +464,7 @@ else{document.querySelectorAll('.pdot').forEach(d=>d.classList.add('e'));setTime
 function ud(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('f',i<pe.length)}
 
 /* ===== ROUTER / INIT ===== */
-let PG='home',SUB='hub',bY,bM,iY,iM,CHS={};
+let PG='home',SUB='hub',bY,bM,iY,iM,CHS={},BTAB='reel';
 let dF={fy:2025,fm:12,ty:2026,tm:12},iCf={fy:2025,fm:12,ty:2026,tm:12},bCf={fy:2025,fm:12,ty:2026,tm:12};
 let PRIV=false;
 function applyPriv(){document.body.classList.toggle('privacy',PRIV);const b=document.getElementById('privbtn');if(b){b.textContent=PRIV?'🙈':'👁';b.classList.toggle('on',PRIV)}}
@@ -465,7 +492,7 @@ const NOLEG={plugins:{legend:{display:false}},responsive:true,maintainAspectRati
 /* ================= ACCUEIL ================= */
 function rHome(){
 const el=document.getElementById('pg-home');
-const B=sBM().filter(d=>d.sav>0||d.sap>0||d.cashFin!=null);const last=B.length?B[B.length-1]:null;const prev=B.length>1?B[B.length-2]:null;
+const B=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const last=B.length?B[B.length-1]:null;const prev=B.length>1?B[B.length-2]:null;
 const lastI=last?gIM(last.y,last.m):null;const prevI=prev?gIM(prev.y,prev.m):null;
 const patri=calcPatriV2(last,lastI);const patriP=calcPatriV2(prev,prevI);const patriOld=last&&last.sap>0?kE(last.sap)+amundiT(lastI):calcPatri(last,lastI);const showRecon=last&&last.cashFin!=null&&last.sap>0;
 const gain=patriP>0?patri-patriP:0;const dC=(last&&prev)?(last.sav-prev.sav):0;
@@ -498,21 +525,21 @@ return'<span class="chip '+(d>=0?'tag-up':'tag-dn')+'" title="patrimoine aujourd
 </div>
 
 <div class="statrow">
-  <div class="stat"><div class="sl">Gain du mois</div><div class="sv mono" style="color:${gain>=0?'var(--up)':'var(--dn)'}">${gain>=0?'+':''}${fk(gain)}</div><div class="sf">Patri M − M-1</div></div>
+  <div class="stat"><div class="sl">Variation patrimoine</div><div class="sv mono" style="color:${gain>=0?'var(--up)':'var(--dn)'}">${gain>=0?'+':''}${fk(gain)}</div><div class="sf">vs mois précédent, marché inclus</div></div>
   <div class="stat"><div class="sl">Δ Compte</div><div class="sv mono" style="color:${dC>=0?'var(--up)':'var(--dn)'}">${dC>=0?'+':''}${fE(kE(dC))}</div><div class="sf">Avant sal.</div></div>
   <div class="stat"><div class="sl">Épargné</div><div class="sv mono" style="color:var(--blue)">${totRev>0?txE+'%':'—'}</div><div class="sf">${totRev>0?f$(Math.round(ep))+' € / '+f$(Math.round(totRev))+' €'+(revs?' (dont aides)':''):'Salaire manquant'}</div></div>
 </div>
 
-${declBanner()}${(()=>{const n0=new Date();const pv=pM(n0.getFullYear(),n0.getMonth()+1);const pb=gBM(pv.y,pv.m);return(pb&&isV2(pv.y,pv.m)&&!pb.cl)?completeBanner(pv.y,pv.m):''})()}
+${rTodo()}
+${rProjHome()}
 ${(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
 return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?'régime : '+mr.regime.label:'')+'</span></div><div class="card-b">'+
 '<div class="row rb" style="margin-bottom:8px"><span style="font-size:13px">Variables réelles</span><b class="mono" style="font-size:18px;color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+fS(mr.variables)+'</b></div>'+
-'<div class="row rb" style="font-size:11.5px;color:var(--tm)"><span>'+(m3?'moy. 3 mois '+fS(m3.v):'moy. 3 mois —')+'</span><span>cible '+f$(P.cibleVariables)+' € · <b style="color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+(mr.variables>P.cibleVariables?'+':'')+Math.round((mr.variables/P.cibleVariables-1)*100)+' %</b></span></div>'+
+'<div class="row rb" style="font-size:11.5px;color:var(--tm)"><span>fixes '+fS(mr.fixes)+' · variables '+fS(mr.variables)+'</span><span>cible '+f$(P.cibleVariables)+' € · <b style="color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+(mr.variables>P.cibleVariables?'+':'')+Math.round((mr.variables/P.cibleVariables-1)*100)+' %</b></span></div>'+
 '<div class="hr"></div><div class="row rb"><span style="font-size:13px">Épargne réelle</span><b class="mono" style="font-size:18px;color:'+(mr.epargne>=0?'var(--up)':'var(--dn)')+'">'+fS(mr.epargne)+'</b></div>'+
 '<div style="font-size:10.5px;color:var(--td);margin-top:4px">Δ cash + investi · consommation réelle '+fS(mr.reelConso)+(mr.prevu.total?' vs prévu '+fS(mr.prevu.total):'')+'</div>'+
 (mr.imp&&mr.imp.livretIn>0?'<div class="al alr" style="margin-top:8px">Retrait Livret ce mois : '+fS(mr.imp.livretIn)+'. Virement automatique trop élevé ou dépense excessive.</div>':'')+
 '</div></div>'})()}
-${rProjHome()}
 <div class="card">
   <div class="card-b" style="cursor:pointer" onclick="wizStart()">
     <div class="row rb">
@@ -559,7 +586,7 @@ return'<div class="card"><div class="card-b" style="cursor:pointer" onclick="GSE
   <div class="card-b"><div class="chartbox s"><canvas id="ch-hgain"></canvas></div><div class="formula">= Patrimoine(M) − Patrimoine(M-1)</div></div></div>`;
 
 setTimeout(()=>{
-const pts=B.map(d=>({l:mLbl(d.y,d.m),v:Math.round(calcPatriV2(d,gIM(d.y,d.m)))}));
+const pts=B.filter(d=>isV2(d.y,d.m)&&d.cashFin!=null).map(d=>({l:mLbl(d.y,d.m),v:Math.round(calcPatriV2(d,gIM(d.y,d.m)))}));
 const last12=pts.slice(-14);
 mkC('ch-spark',{type:'line',data:{labels:last12.map(p=>p.l),datasets:[{data:last12.map(p=>p.v),borderColor:'#E5C36A',borderWidth:2,pointRadius:0,tension:.4,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,60);g.addColorStop(0,'rgba(229,195,106,.22)');g.addColorStop(1,'rgba(229,195,106,0)');return g}}]},
 options:{...NOLEG,scales:{x:{display:false},y:{display:false}},elements:{line:{capBezierPoints:true}},plugins:{legend:{display:false},tooltip:{enabled:false}}}});
@@ -577,12 +604,14 @@ function wizStart(){const n=new Date();let y=n.getFullYear(),m=n.getMonth()+1;
 // les 5 premiers jours du mois, on clôture d'abord le mois précédent s'il ne l'est pas
 if(n.getDate()<=5){const pv=pM(y,m);const b=gBM(pv.y,pv.m);if(!b||!b.cl){y=pv.y;m=pv.m}}
 wizStartFor(y,m)}
+function wizEmployeur(v){const im=gOIM(WZ.y,WZ.m);let c=im.contribs.find(x=>/particip|abond|int[ée]ress|employeur|alpha|pee|perco/i.test(x.l));if(!c&&v>0){c={l:'Participation + abondement Alpha',v:0};im.contribs.push(c)}if(c){c.v=v;if(!v)im.contribs=im.contribs.filter(x=>x!==c)}save()}
 function wizShift(d){const r=d>0?nM(WZ.y,WZ.m):pM(WZ.y,WZ.m);wizStartFor(r.y,r.m)}
 function wizStartFor(y,m){
 WZ.y=y;WZ.m=m;WZ.step=0;
 gOBM(y,m);const im=gOIM(y,m);syncMonth(gBM(y,m));
 WZ.steps=[{t:'soldes'}];
-im.supports.forEach((s,i)=>WZ.steps.push({t:'sup',i}));
+im.supports.forEach((s,i)=>{if((s.owner||'moi')!=='cash')WZ.steps.push({t:'sup',i})});
+if(DB.params&&DB.params.proj&&(DB.params.proj.ponctuels||[]).some(p=>/employeur|pee|perco|particip|abond/i.test(p.l)&&+p.mois===m))WZ.steps.push({t:'employeur'});
 WZ.steps.push({t:'contribs'},{t:'revenus'},{t:'charges'},{t:'excep'},{t:'recap'});
 WZ.on=true;document.getElementById('wiz').classList.add('on');
 document.getElementById('wiz-month').textContent=ML[m]+' '+y;
@@ -621,6 +650,13 @@ body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Soldes</div>
 <input class="wiz-input" type="number" step="0.1" inputmode="decimal" value="${cm.sap||''}" onchange="gOBM(WZ.y,WZ.m).sap=+this.value||0;save()">
 <div class="wiz-ref">Mois dernier : <b>${pvB&&pvB.sap?fE(kE(pvB.sap)):'—'}</b></div>`}
 
+else if(st.t==='employeur'){const P=DB.params.proj;const pj=(P.ponctuels||[]).find(p=>/employeur|pee|perco|particip|abond/i.test(p.l)&&+p.mois===WZ.m);const cur=im.contribs.find(c=>/particip|abond|int[ée]ress|employeur|alpha|pee|perco/i.test(c.l));
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Flux employeur</div>
+<div class="wiz-q">Participation et abondement Alpha reçus ce mois ?</div>
+<div class="wiz-where">📍 Relevé Amundi (PEE / PERECOI) · montant total versé par l\u2019employeur en ${ML[WZ.m]}</div>
+<div class="al alb" style="margin-bottom:12px">Cet argent arrive chez Amundi sans passer par BoursoBank : l\u2019import ne le voit pas. Il compte dans ton épargne réelle et dans le thermomètre Revenus.</div>
+<input class="wiz-input" type="number" inputmode="numeric" value="${cur?cur.v:(pj?pj.v:'')}" onchange="wizEmployeur(+this.value||0)">
+<div class="wiz-ref">Hypothèse de la projection : <b>${pj?fE(pj.v):'—'}</b> · 0 si rien n\u2019est arrivé ce mois</div>`}
 else if(st.t==='sup'){
 const s=im.supports[st.i];if(!s){wizNav(1);return}
 const pvS=pvI?pvI.supports.find(x=>x.n===s.n):null;
@@ -737,8 +773,10 @@ el.innerHTML=`
 <button class="arrbtn" onclick="navB(1)" ${hasNext?'':'disabled'}>▶</button>
 </div>
 ${monthTools('b',bY,bM,"var y=+document.getElementById('bAY').value,m=+document.getElementById('bAM').value;gOBM(y,m);bY=y;bM=m;rBudget()","delBM()","bulkDelBM()")}
+${exists&&isV2(bY,bM)?'<div class="pillselect" style="margin-bottom:12px"><button class="'+(BTAB==='reel'?'on':'')+'" onclick="BTAB=\'reel\';rBudget()">Réel</button><button class="'+(BTAB==='prev'?'on':'')+'" onclick="BTAB=\'prev\';rBudget()">Prévisionnel</button></div>':''}
 ${exists?completeBanner(bY,bM):''}
-${exists?reelCard(bY,bM):''}
+${exists&&(BTAB==='reel'||!isV2(bY,bM))?reelCard(bY,bM):''}
+<div style="${exists&&isV2(bY,bM)&&BTAB==='reel'?'display:none':''}">
 
 <div class="statrow">
 <div class="stat"><div class="sl">Δ hors sal.</div><div class="sv mono" style="color:${deltaHS>=0?'var(--up)':'var(--dn)'}">${deltaHS>=0?'+':''}${fE(kE(deltaHS))}</div><div class="sf">FinAvSal − DébAvSal</div></div>
@@ -774,7 +812,7 @@ ${(cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;fon
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nr-l" placeholder="Aide, allocation…"><input class="inp sm mono" id="nr-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nr-l').value.trim();if(!l)return;var d=gOBM(bY,bM);if(!d.rev)d.rev=[];d.rev.push({l,v:+document.getElementById('nr-v').value||0});save();rBudget()">+</button></div>
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Charges<span class="aux mono" style="color:var(--dn)">${f$(tCh)} €</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Budget prévisionnel · charges<span class="aux mono" style="color:var(--dn)">${f$(tCh)} €</span></div>
 <div class="card-b">
 ${cm.ch.map((c,i)=>{const flags='<span class="chip'+(c.fixe?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="fixe / variable" onclick="var d=gOBM(bY,bM).ch['+i+'];d.fixe=!d.fixe;save();rBudget()">'+(c.fixe?'F':'V')+'</span>'+(c.auto?'<span class="chip" style="font-size:9px;padding:2px 6px" title="placée par le module Garde dans ce mois">ce mois</span>'+(c.auto==='garde'?(()=>{const st=gardeTrack(bY,bM);return st.paid?'<span class="chip tag-up" style="font-size:9px;padding:2px 6px">✓ payé'+(st.paidSrc==='relevé'?' (relevé)':'')+'</span>':'<span class="chip" style="font-size:9px;padding:2px 6px;color:var(--td)">à payer</span>'})():''):'<span class="chip'+(c.payOffset?' tag-gold':'')+'" style="font-size:9px;cursor:pointer;padding:2px 6px" title="mois de sortie du compte" onclick="var d=gOBM(bY,bM).ch['+i+'];d.payOffset=((d.payOffset||0)+1)%3;save();rBudget()">M+'+(c.payOffset||0)+'</span>');
 return c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+' <span class="chip tag-gold" style="font-size:9px;cursor:pointer" onclick="go(\'garde\')">auto ›</span></span>'+flags+'<span class="mono" style="font-weight:600;width:80px;text-align:right">'+f$(c.v)+' €</span><span style="width:20px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1;min-width:0" value="'+esc(c.l)+'" onchange="gOBM(bY,bM).ch['+i+'].l=this.value;save()">'+flags+'<input class="inp sm mono" type="number" inputmode="decimal" style="width:80px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(bY,bM).ch['+i+'].v=+this.value||0;save();rBudget()"><span class="xdel" onclick="gOBM(bY,bM).ch.splice('+i+',1);save();rBudget()">×</span></div>'}).join('')}
@@ -805,6 +843,7 @@ ${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px"
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Notes du mois</div>
 <div class="card-b"><textarea class="note-ta" style="min-height:70px" onchange="gOBM(bY,bM).nt=this.value;save()">${esc(cm.nt||'')}</textarea></div></div>
 
+</div>
 <button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="closeMonth(bY,bM);rBudget()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[bM]}</button>
 ${cm.cl&&isV2(bY,bM)?'<div style="font-size:10.5px;color:var(--td);margin:-8px 0 14px;text-align:center">clos le '+(cm.closedAt||'—')+' · paramètres v'+(cm.paramsVersion||1)+(cm.regime?' · '+esc(cm.regime):'')+(cm.reconst?' · reconstitué':'')+'</div>':''}
 
@@ -860,7 +899,7 @@ ${monthTools('i',iY,iM,"var y=+document.getElementById('iAY').value,m=+document.
 <div class="stat"><div class="sl">Versé</div><div class="sv mono" style="color:var(--violet)">${f$(cT2)}€</div><div class="sf">→ Budget</div></div>
 </div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Supports<span class="aux" style="font-size:10.5px;color:var(--td)">valeur au 1er, avant versement</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Supports<span class="aux" style="font-size:10.5px;color:var(--td)">valeur au dernier jour du mois</span></div>
 <div class="card-b">
 ${cm.supports.map((s,si)=>{
 const open=ACC_OPEN[si]||(s.det&&s.det.length&&ACC_OPEN[si]!==false);
@@ -1188,7 +1227,7 @@ if(syncLine(bm,'ch','gardeCotNet',g.cmgLine&&active&&!allIn&&!pp3&&in3&&netCaf<0
 if(ch)save()}
 
 /* ---- page Garde ---- */
-let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false,GPLAN=false,GPI=-1;
+let gY=0,gM=0,GSEL=null,GPRM=false,GCOST=false,GPLAN=false,GPI=-1,GVIEW='mois';
 const fh=h=>(Math.round(h*100)/100).toLocaleString('fr-FR');
 function cellBadge(i){if(i.status==='cp')return'<span class="hb" style="color:var(--up)">CP</span>';if(i.status==='abs')return'<span class="hb" style="color:var(--dn)">ABS</span>';if(i.status==='sick')return'<span class="hb" style="color:var(--violet)">MAL</span>';if(i.status==='recup')return'<span class="hb" style="color:var(--gold)">RÉC</span>';if(i.status==='unused')return'<span class="hb" style="color:var(--gold)">N.U.</span>';if(i.status==='zero')return'<span class="hb" style="color:var(--dn)">0h ?</span>';
 if(i.status==='holoff')return'<span class="hb" style="color:var(--blue)">férié</span>';const e=i.eff;if(e.s+e.p<=0)return'';
@@ -1223,7 +1262,9 @@ const baseNet=(wk.s*g.rate+wk.p*g.rateShared)*52/12;
 
 el.innerHTML=`
 <div class="pagetitle">Garde à domicile</div>
-${declBanner()}
+<div class="pillselect" style="margin-bottom:12px"><button class="${GVIEW==='mois'?'on':''}" onclick="GVIEW='mois';rGarde()">Le mois</button><button class="${GVIEW==='contrat'?'on':''}" onclick="GVIEW='contrat';rGarde()">Contrat & paramètres</button></div>
+${GVIEW==='contrat'?'':declBanner()}
+${GVIEW==='mois'?`
 <div class="mnav">
 <button class="arrbtn" onclick="var r=pM(gY,gM);gY=r.y;gM=r.m;GSEL=null;rGarde()">◀</button>
 <div class="mt"><b>${ML[gM]} ${gY}</b><div>${r.days} jour${r.days>1?'s':''} travaillé${r.days>1?'s':''}${r.cp?' · '+r.cp+' CP':''}${r.holOff?' · '+r.holOff+' férié'+(r.holOff>1?'s':''):''}</div></div>
@@ -1317,9 +1358,10 @@ return `<div class="card" style="border-color:rgba(229,195,106,.4)"><div class="
 <div class="cost-line"><span>Indemnité de licenciement<small>${st.indemLic>0?'¼ de mois brut par année (brut moyen '+f$(Math.round(st.avgBrut))+' €) · exonérée de cotisations':st.moWorked<8&&['licenciement','deces','rupture_conv'].includes(st.reason)?'non due avant 8 mois d\u2019ancienneté':'non due pour ce motif'}</small></span><b style="color:${st.indemLic?'var(--gold)':'var(--td)'}">${st.indemLic?f$(Math.round(st.indemLic*100)/100)+' €':'—'}</b></div>
 <div class="cost-line tot"><span>Total du solde de tout compte</span><b style="color:var(--gold);font-size:19px">${f$(Math.round(st.total*100)/100)} €</b></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:9px">Barème CCN 3239 (socle salarié du particulier employeur) : préavis licenciement 1 sem. / 1 mois / 2 mois selon ancienneté &lt; 6 mois / &lt; 2 ans / ≥ 2 ans ; démission 1 sem. / 2 sem. / 1 mois ; indemnité de licenciement dès 8 mois. La régularisation mensualisation ↔ heures réelles n'est pas calculée. Le simulateur officiel findecontrat-pajemploi.urssaf.fr produit les documents définitifs.</div>
-</div></div>`})()}
-<div class="card"><div class="card-h" style="cursor:pointer" onclick="GPLAN=!GPLAN;rGarde()"><span class="dot" style="background:var(--violet)"></span>Planning type<span class="aux" style="color:var(--td)">${fh(wk.s)} h solo · ${fh(wk.p)} h partagé / sem. · ${GPLAN?'▾':'▸'}</span></div>
-${GPLAN?`<div class="card-b">
+</div></div>`})()}`:''}
+${GVIEW==='contrat'?`
+<div class="card"><div class="card-h" ><span class="dot" style="background:var(--violet)"></span>Planning type<span class="aux" style="color:var(--td)">${fh(wk.s)} h solo · ${fh(wk.p)} h partagé / sem. · </span></div>
+${true?`<div class="card-b">
 <div class="row" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"><select class="inp sm" style="width:auto" onchange="GPI=+this.value;rGarde()">${plans.map((x,i)=>'<option value="'+i+'"'+(i===GPI?' selected':'')+'>Depuis le '+kDate(x.from).toLocaleDateString('fr-FR')+'</option>').join('')}</select>
 <input class="inp sm" type="date" value="${pl.from}" style="width:auto" onchange="DB.garde.plans[${plIdx}].from=this.value;gSave()">
 <button class="btn btn-ghost xs" onclick="gPlanNew(${plIdx})">+ Nouveau à partir du…</button>${plans.length>1?'<button class="btn btn-danger xs" onclick="if(confirm(\'Supprimer ce planning ?\')){DB.garde.plans.splice('+plIdx+',1);GPI=-1;gSave()}">Suppr.</button>':''}</div>
@@ -1331,31 +1373,8 @@ ${[1,2,3,4,5,6,7].map(i=>{const d=pl.d[i]||{s:0,p:0};return'<div class="dline"><
 </div>`:''}
 </div>
 
-<div class="card"><div class="card-h" style="cursor:pointer" onclick="GCOST=!GCOST;rGarde()"><span class="dot" style="background:var(--pink)"></span>Coût réel après aides<span class="aux" style="color:var(--td)">${f$(Math.round(r.real))} € · ${GCOST?'▾':'▸'}</span></div>
-${GCOST?`<div class="card-b">
-<div class="cost-line"><span>Salaire net</span><b>${f$(Math.round(r.net))} €</b></div>
-<div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(r.brut))} €</b></div>
-<div class="cost-line"><span>Cotisations totales<small>${f$(Math.round(r.cotSal))} salariales + ${f$(Math.round(r.cotPat))} patronales</small></span><b style="color:var(--tm)">${f$(Math.round(r.cotBrut))} €</b></div>
-<div class="cost-line"><span>Déductions & exonérations<small>${f$(p.abatH)} €/h × ${fh(r.paid)} h</small></span><b style="color:var(--up)">− ${f$(Math.round(r.abat))} €</b></div>
-<div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} % des cotisations totales, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgCot))} €</b></div>
-<div class="cost-line"><span>Cotisations restant à charge ${r.ovCot?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>compensées avec le CMG lors de la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
-<div class="cost-line"><span>CMG rémunération (CAF) ${r.ovRem?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>${r.ovRem?'montant saisi':Math.round((1-r.fact)*100)+' % du net retenu · revenus '+f$(revUsed)+' €/mois'}</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
-${!isPP(gY,gM)?'<div class="cost-line" style="background:var(--goldDim);border-radius:8px;padding:6px 8px"><span>Flux réel Pajemploi<small>cotisations restantes compensées par le CMG : '+(r.cmgRem-r.cotRest>=0?'la CAF vous verse la différence, aucun prélèvement':'Pajemploi prélève la différence')+'</small></span><b style="color:'+(r.cmgRem-r.cotRest>=0?'var(--up)':'var(--dn)')+'">'+(r.cmgRem-r.cotRest>=0?'+ ':'− ')+f$(Math.round(Math.abs(r.cmgRem-r.cotRest)*100)/100)+' €</b></div>':''}
-<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:11px;margin:12px 0">
-<div class="eyebrow" style="margin-bottom:7px">Montants réellement constatés · ${MS[gM]} ${gY}</div>
-<div class="prm"><label>Cotisations prélevées par Pajemploi<small>estimation : ${f$(Math.round(r.cotRestEst))} €${r.ovCot?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cotRestEst)}" value="${r.ovCot?r.cotRest:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','cot',this.value)"></div>
-<div class="prm" style="border:none"><label>CMG rémunération reçu de la CAF<small>estimation : ${f$(Math.round(r.cmgRemEst))} €${r.ovRem?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cmgRemEst)}" value="${r.ovRem?r.cmgRem:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','rem',this.value)"></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:7px">Laissez vide pour garder l'estimation. Une valeur saisie remplace le calcul pour ce mois — utile dès le premier relevé Pajemploi et le premier versement CAF.</div>
-</div>
-<div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(r.cash))} €</b></div>
-<div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(r.ci))} €</b></div>
-<div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(r.real))} €</b></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:8px">${budgetSrc.length?'Ce mois alimente la ligne « Nounou » ('+(g.budgetMode==='cash'?'décaissé estimé':'net versé')+') du budget de '+budgetSrc.join(', ')+'.':'Aucun mois budget ne se source encore sur '+ML[gM]+'.'}</div>
-</div>`:''}
-</div>
-
-<div class="card"><div class="card-h" style="cursor:pointer" onclick="GPRM=!GPRM;rGarde()"><span class="dot" style="background:var(--cyan)"></span>Paramètres<span class="aux" style="color:var(--td)">${GPRM?'▾':'▸'}</span></div>
-${GPRM?`<div class="card-b">
+<div class="card"><div class="card-h" ><span class="dot" style="background:var(--cyan)"></span>Paramètres<span class="aux" style="color:var(--td)"></span></div>
+${true?`<div class="card-b">
 <div class="eyebrow" style="margin:0 0 4px">Identité (fiche mensuelle)</div>
 <div class="prm"><label>Salariée</label><input class="inp sm" value="${g.id.sal||''}" placeholder="Mme …" onchange="DB.garde.id.sal=this.value;gSave()"></div>
 <div class="prm"><label>Employeur</label><input class="inp sm" value="${g.id.empl||''}" placeholder="M. …" onchange="DB.garde.id.empl=this.value;gSave()"></div>
@@ -1415,11 +1434,35 @@ ${p.cmgMode==='fix'?`<div class="prm"><label>Montant mensuel du CMG<small>€ ·
 </div>`:''}
 </div>
 
+`:`
+<div class="card"><div class="card-h" style="cursor:pointer" onclick="GCOST=!GCOST;rGarde()"><span class="dot" style="background:var(--pink)"></span>Coût réel après aides<span class="aux" style="color:var(--td)">${f$(Math.round(r.real))} € · ${GCOST?'▾':'▸'}</span></div>
+${GCOST?`<div class="card-b">
+<div class="cost-line"><span>Salaire net</span><b>${f$(Math.round(r.net))} €</b></div>
+<div class="cost-line"><span>Salaire brut<small>net ÷ (1 − ${p.txSal} %)</small></span><b style="color:var(--tm)">${f$(Math.round(r.brut))} €</b></div>
+<div class="cost-line"><span>Cotisations totales<small>${f$(Math.round(r.cotSal))} salariales + ${f$(Math.round(r.cotPat))} patronales</small></span><b style="color:var(--tm)">${f$(Math.round(r.cotBrut))} €</b></div>
+<div class="cost-line"><span>Déductions & exonérations<small>${f$(p.abatH)} €/h × ${fh(r.paid)} h</small></span><b style="color:var(--up)">− ${f$(Math.round(r.abat))} €</b></div>
+<div class="cost-line"><span>CMG cotisations (CAF)<small>${p.cmgCotPct} % des cotisations totales, plafond ${f$(p.cmgCotCap)} €</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgCot))} €</b></div>
+<div class="cost-line"><span>Cotisations restant à charge ${r.ovCot?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>compensées avec le CMG lors de la déclaration</small></span><b>${f$(Math.round(r.cotRest))} €</b></div>
+<div class="cost-line"><span>CMG rémunération (CAF) ${r.ovRem?'<span class="chip tag-gold" style="font-size:9px">réel</span>':''}<small>${r.ovRem?'montant saisi':Math.round((1-r.fact)*100)+' % du net retenu · revenus '+f$(revUsed)+' €/mois'}</small></span><b style="color:var(--up)">− ${f$(Math.round(r.cmgRem))} €</b></div>
+${!isPP(gY,gM)?'<div class="cost-line" style="background:var(--goldDim);border-radius:8px;padding:6px 8px"><span>Flux réel Pajemploi<small>cotisations restantes compensées par le CMG : '+(r.cmgRem-r.cotRest>=0?'la CAF vous verse la différence, aucun prélèvement':'Pajemploi prélève la différence')+'</small></span><b style="color:'+(r.cmgRem-r.cotRest>=0?'var(--up)':'var(--dn)')+'">'+(r.cmgRem-r.cotRest>=0?'+ ':'− ')+f$(Math.round(Math.abs(r.cmgRem-r.cotRest)*100)/100)+' €</b></div>':''}
+<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:11px;margin:12px 0">
+<div class="eyebrow" style="margin-bottom:7px">Montants réellement constatés · ${MS[gM]} ${gY}</div>
+<div class="prm"><label>Cotisations prélevées par Pajemploi<small>estimation : ${f$(Math.round(r.cotRestEst))} €${r.ovCot?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cotRestEst)}" value="${r.ovCot?r.cotRest:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','cot',this.value)"></div>
+<div class="prm" style="border:none"><label>CMG rémunération reçu de la CAF<small>estimation : ${f$(Math.round(r.cmgRemEst))} €${r.ovRem?' · <b style="color:var(--gold)">réel saisi</b>':''}</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" placeholder="${Math.round(r.cmgRemEst)}" value="${r.ovRem?r.cmgRem:''}" onchange="cmgSet('${gY}-${String(gM).padStart(2,'0')}','rem',this.value)"></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:7px">Laissez vide pour garder l'estimation. Une valeur saisie remplace le calcul pour ce mois — utile dès le premier relevé Pajemploi et le premier versement CAF.</div>
+</div>
+<div class="cost-line tot"><span>Décaissé net par mois<small>net + cotisations − CMG (régime de croisière)</small></span><b style="color:var(--gold)">${f$(Math.round(r.cash))} €</b></div>
+<div class="cost-line"><span>Crédit d'impôt (N+1)<small>${p.ciPct} %, plafond ${f$(p.ciCap)} €/an (${f$(Math.round(p.ciCap/12))} €/mois lissé)</small></span><b style="color:var(--up)">− ${f$(Math.round(r.ci))} €</b></div>
+<div class="cost-line tot"><span>Coût réel</span><b style="color:var(--blue)">${f$(Math.round(r.real))} €</b></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">${budgetSrc.length?'Ce mois alimente la ligne « Nounou » ('+(g.budgetMode==='cash'?'décaissé estimé':'net versé')+') du budget de '+budgetSrc.join(', ')+'.':'Aucun mois budget ne se source encore sur '+ML[gM]+'.'}</div>
+</div>`:''}
+</div>
+
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Historique</div>
 <div class="card-b" style="overflow-x:auto"><table><thead><tr><th>Mois</th><th>Heures</th><th>Salaire</th><th>Transp.</th><th>Versé</th></tr></thead><tbody>
 ${(()=>{const ms=new Set();[g.hours,g.leave,g.abs].forEach(o=>Object.keys(o||{}).forEach(k=>{if(o[k])ms.add(k.slice(0,7))}));const cur=gY+'-'+String(gM).padStart(2,'0');ms.add(cur);const arr=[...ms].sort().reverse().slice(0,8);
 return arr.map(k=>{const [yy,mm]=k.split('-').map(Number);const cc=gardeCost(yy,mm);return'<tr><td style="font-weight:600">'+MS[mm]+' '+yy+'</td><td class="mono">'+fh(cc.h)+' h</td><td class="mono">'+f$(Math.round(cc.net))+' €</td><td class="mono" style="color:'+(cc.nav.justif?'var(--cyan)':'var(--td)')+'">'+(cc.nav.amt?f$(cc.nav.amt)+' €':'—')+'</td><td class="mono" style="color:var(--gold)">'+f$(Math.round(cc.toPay))+' €</td></tr>'}).join('')})()}
-</tbody></table></div></div>`;
+</tbody></table></div></div>`}`;
 const gi=document.getElementById('g-s');if(gi)setTimeout(()=>gi.focus(),80)}
 function cmgSet(k,f,v){if(!DB.garde.cmgReal)DB.garde.cmgReal={};const o=DB.garde.cmgReal[k]||{};const old=o[f];
 if(v===''||v==null)delete o[f];else o[f]=+v;
@@ -1808,7 +1851,7 @@ function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new File
 function canClose(y,m){if(!isV2(y,m))return{ok:true,missing:[]};const mr=monthReal(y,m);if(!mr)return{ok:false,missing:['mois inexistant']};return{ok:mr.complete,missing:mr.missing}}
 function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){d.cl=false;save();return true}
 if(!c.ok){alert('Impossible de clôturer '+ML[m]+' : '+c.missing.join(', '));return false}
-d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;save();return true}
+d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;save();backupNow('clôture '+ML[m]+' '+y);return true}
 
 /* ---- UI Réel v2 ---- */
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
@@ -1842,7 +1885,7 @@ ${mr.recon!=null?'<details style="margin-top:6px"><summary style="font-size:11.5
 (mr.imp.ccEnd!=null?'<div class="row rb" style="margin-top:8px;padding:6px 8px;border-radius:8px;background:'+(b.cash&&b.cash.cc!=null&&Math.abs(b.cash.cc-mr.imp.ccEnd)>2?'var(--dnDim)':'var(--upDim)')+'"><span>Compte courant : saisi vs relevé au '+mr.imp.ccEndDate.slice(8)+'/'+mr.imp.ccEndDate.slice(5,7)+'</span><b class="mono">'+(b.cash&&b.cash.cc!=null?fS(b.cash.cc):'—')+' / '+fS(mr.imp.ccEnd)+(b.cash&&b.cash.cc!=null&&Math.abs(b.cash.cc-mr.imp.ccEnd)>2?' <span style="color:var(--dn)">('+(b.cash.cc-mr.imp.ccEnd>0?'+':'')+fS(b.cash.cc-mr.imp.ccEnd)+')</span>':' ✓')+'</b></div>':'')+
 (mr.imp.internes&&mr.imp.internes.length?'<div class="eyebrow" style="margin:9px 0 4px">Lignes hors consommation ce mois — à vérifier une par une</div>'+mr.imp.internes.map(x=>'<div class="row rb" style="font-size:11px;padding:2px 0"><span style="flex:1">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.l)+' <span class="chip" style="font-size:9px;padding:1px 5px">'+TYPE_LBL[x.t]+'</span></span><span class="mono">'+fS(x.v)+'</span></div>').join('')+'<div style="font-size:10px;color:var(--td);margin-top:5px">Chaque ligne ici est supposée rester dans ton périmètre cash (livrets) ou aller vers un investissement suivi dans Invest. Si l\u2019une est partie ailleurs, reclassez-la en dépense dans la Relecture.</div>':'')+
 '</div></details>':''}
-${varReel!=null?'<div class="row rb" style="margin-top:9px;font-size:12px"><span>Variables vs cible <b class="mono">'+f$(cible)+' €</b></span><span class="mono" style="color:'+(varReel<=cible?'var(--up)':'var(--dn)')+'">'+(varReel>cible?'+':'')+Math.round((varReel/cible-1)*100)+' %'+(m3?' · moy. 3 mois '+fS(m3.v):'')+'</span></div>':''}
+${varReel!=null?'<div class="row rb" style="margin-top:9px;font-size:12px"><span>Variables vs cible <b class="mono">'+f$(cible)+' €</b></span><span class="mono" style="color:'+(varReel<=cible?'var(--up)':'var(--dn)')+'">'+(varReel>cible?'+':'')+Math.round((varReel/cible-1)*100)+' %</span></div>':''}
 ${mr.imp&&mr.imp.big.length?'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Variables ≥ 100 € ('+mr.imp.big.length+')</summary>'+mr.imp.big.map(x=>'<div class="list-item" style="padding:5px 0"><span style="flex:1;font-size:12px">'+esc(x.l.slice(0,44))+'<div style="font-size:10px;color:var(--td)">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.sub)+'</div></span><span class="mono" style="font-size:12px">'+fS(x.v)+'</span></div>').join('')+'</details>':''}
 ${mr.imp?'<details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Dépenses par famille</summary>'+['fixe','variable'].map(t=>{const o=(mr.imp.byGrp||{})[t]||{};const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);const tot=ks.reduce((a,k)=>a+o[k],0);return ks.length?'<div class="eyebrow" style="margin:7px 0 3px">'+TYPE_LBL[t]+' · '+fS(tot)+'</div>'+ks.map(k=>'<div class="row rb" style="font-size:12px;padding:2px 0"><span>'+esc(k)+'</span><span class="mono">'+fS(o[k])+' <span style="color:var(--td);font-size:10px">'+Math.round(o[k]/tot*100)+' %</span></span></div>').join(''):''}).join('')+'</details><details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Détail fin</summary>'+['fixe','variable','invest','entree'].map(t=>{const o=mr.imp.bySub[t]||{};const ks=Object.keys(o).sort((a,b)=>o[b]-o[a]);return ks.length?'<div class="eyebrow" style="margin:7px 0 3px">'+TYPE_LBL[t]+'</div>'+ks.map(k=>'<div class="row rb" style="font-size:12px;padding:2px 0"><span>'+esc(grpOf(k)?grpOf(k)+' › ':'')+esc(k)+'</span><span class="mono">'+fS(o[k])+'</span></div>').join(''):''}).join('')+'</details>':''}
 </div></div>`}
@@ -1970,7 +2013,7 @@ ${(P.journal||[]).slice().reverse().map(j=>'<div class="list-item" style="align-
 <div style="font-size:10.5px;color:var(--td);margin-top:7px">Non effaçable.</div></div></div>`}
 
 /* ================= PROJECTION ANNUELLE : théorique vs réel ================= */
-function defProj(){return{anneeDebut:9,salaire:6200,autresMensuels:90,
+function defProj(){return{anneeDebut:9,salaire:6200,salaireEvo:[],autresMensuels:90,
 aides:[{l:'Allocations familiales',v:150.44,from:'2026-01'},{l:'CMG micro-crèche',v:715,from:'2026-10'},{l:'CMG garde à domicile (net)',v:20,from:'2026-10'}],
 ponctuels:[{l:'Flux employeur PEE / PERECOI',v:13000,mois:8},{l:'Crédit d\u2019impôt (garde + emploi à domicile)',v:1750,mois:7},{l:'Bonus',v:0,mois:3}]}}
 function ensureProj(){if(!DB.params)return;if(!DB.params.proj)DB.params.proj=defProj();const d=defProj();Object.keys(d).forEach(k=>{if(DB.params.proj[k]==null)DB.params.proj[k]=d[k]})}
@@ -1980,13 +2023,16 @@ function fyMonths(fy){const s=DB.params.proj.anneeDebut||9;const out=[];for(let 
 function projDep(y,m){const b=gBM(y,m);if(b&&(b.ch.length||b.ex.length))return prevuConso(y,m).total;
 const all=sBM().filter(d=>d.ch.length);const t=all.length?all[all.length-1]:null;if(!t)return 0;
 return t.ch.reduce((a,c)=>a+(c.v||0),0)}
-function projRev(y,m){const P=DB.params.proj;const k=ym(y,m);let r=P.salaire+(P.autresMensuels||0);
-(P.aides||[]).forEach(a=>{if(!a.from||a.from<=k)r+=(+a.v||0)});(P.ponctuels||[]).forEach(p=>{if(+p.mois===m)r+=(+p.v||0)});return r}
-function projMonth(y,m){const rev=projRev(y,m),dep=projDep(y,m);return{rev,dep,ep:rev-dep}}
+function salaireAt(k){const P=DB.params.proj;let v=P.salaire;(P.salaireEvo||[]).filter(e=>e.from&&e.from<=k).sort((a,b)=>a.from<b.from?-1:1).forEach(e=>{v=+e.v||v});return v}
+function projRev(y,m){const P=DB.params.proj;const k=ym(y,m);let r=salaireAt(k)+(P.autresMensuels||0);
+(P.aides||[]).forEach(a=>{if((!a.from||a.from<=k)&&(!a.to||a.to>=k))r+=(+a.v||0)});(P.ponctuels||[]).forEach(p=>{if(+p.mois===m)r+=(+p.v||0)});return r}
+function projMonth(y,m){const P=DB.params.proj;const k=ym(y,m);const rev=projRev(y,m),dep=projDep(y,m);const sal=salaireAt(k);const aides=(P.aides||[]).filter(a=>(!a.from||a.from<=k)&&(!a.to||a.to>=k)).reduce((a,x)=>a+(+x.v||0),0);const ponct=(P.ponctuels||[]).filter(x=>+x.mois===m);const emp=ponct.filter(x=>/employeur|pee|perco|particip|abond/i.test(x.l)).reduce((a,x)=>a+(+x.v||0),0);const autresP=ponct.reduce((a,x)=>a+(+x.v||0),0)-emp;
+return{rev,dep,ep:rev-dep,sal,aides,emp,autres:(P.autresMensuels||0)+autresP,fixe:(()=>{const b=gBM(y,m);return b&&(b.ch.length||b.ex.length)?prevuConso(y,m).fixe:null})()}}
 // réel : salaire + entrées importées + flux employeur (versements Invest libellés Alpha / participation / abondement)
 function employerFlow(y,m){const im=gIM(y,m);if(!im)return 0;return im.contribs.filter(c=>/particip|abond|int[ée]ress|employeur|alpha|pee|perco/i.test(c.l)).reduce((a,c)=>a+(+c.v||0),0)}
 function realMonth(y,m){if(!isV2(y,m))return{known:false};const mr=monthReal(y,m);if(!mr||mr.reelConso==null)return{known:false};
-const emp=employerFlow(y,m);const rev=mr.salaire+mr.autres+emp;return{known:true,rev,dep:mr.reelConso,ep:mr.epargne+emp,sal:mr.salaire,ent:mr.autres,emp,closed:!!gBM(y,m).cl}}
+const emp=employerFlow(y,m);const rev=mr.salaire+mr.autres+emp;const ent=(gBM(y,m).entrees||[]);const caf=ent.filter(e=>/caf/i.test(e.cat)).reduce((a,e)=>a+e.v,0);const imp=ent.filter(e=>/imp[oô]t/i.test(e.cat)).reduce((a,e)=>a+e.v,0);
+return{known:true,rev,dep:mr.reelConso,ep:mr.epargne+emp,sal:mr.salaire,ent:mr.autres,caf,impots:imp,autres:mr.autres-caf-imp,emp,fixes:mr.fixes,variables:mr.variables,closed:!!gBM(y,m).cl}}
 function yearKpi(y,m){const F=fyOf(y,m);const months=fyMonths(F.fy);let tRev=0,tDep=0,tEp=0,rRev=0,rDep=0,rEp=0,n=0,full={rev:0,dep:0,ep:0};const rows=[];
 months.forEach(mm=>{const p=projMonth(mm.y,mm.m);const r=realMonth(mm.y,mm.m);full.rev+=p.rev;full.dep+=p.dep;full.ep+=p.ep;
 if(r.known){n++;tRev+=p.rev;tDep+=p.dep;tEp+=p.ep;rRev+=r.rev;rDep+=r.dep;rEp+=r.ep}rows.push({y:mm.y,m:mm.m,p,r})});
@@ -1996,6 +2042,31 @@ return'<div class="card"><div class="card-b"><div class="row rb"><div class="eye
 '<div class="row rb" style="margin-top:6px"><span style="font-size:12px;color:var(--tm)">réel <b class="mono" style="color:var(--t)">'+fE(real)+'</b></span><span style="font-size:12px;color:var(--tm)">théorique <b class="mono" style="color:var(--t)">'+fE(theo)+'</b></span></div>'+
 '<div class="gauge-track" style="margin-top:8px;position:relative"><div class="gauge-fill '+(pct==null?'':ok?'ok':'bad')+'" style="width:'+Math.round(p/1.5*100)+'%"></div><div style="position:absolute;left:'+Math.round(1/1.5*100)+'%;top:-2px;width:2px;height:calc(100% + 4px);background:var(--gold)"></div></div>'+
 '<div class="row rb" style="font-size:10px;color:var(--td);margin-top:4px"><span>0</span><span>100 % = théorique</span><span>150 %</span></div></div></div>'}
+function todoList(){const n=new Date();const cy=n.getFullYear(),cm=n.getMonth()+1;const items=[];
+const pv=pM(cy,cm);const pb=gBM(pv.y,pv.m);
+if(pb&&isV2(pv.y,pv.m)&&!pb.cl){const mr=monthReal(pv.y,pv.m);if(mr){if(mr.complete)items.push({t:'Clôturer '+ML[pv.m],s:'tout est complet',go:"bY="+pv.y+";bM="+pv.m+";go('budget')",k:'ok'});
+else items.push({t:'Compléter '+ML[pv.m],s:'manque : '+mr.missing.join(', '),go:"PG='more';SUB='import';go('more');SUB='import';rMore()",k:'warn'})}}
+else if(!pb&&isV2(pv.y,pv.m)&&n.getDate()<=7)items.push({t:'Faire la mise à jour de '+ML[pv.m],s:'import du relevé, soldes, supports',go:"wizStart()",k:'warn'});
+const d=n.getDate();if(d>=25||d<=5){const wm=d>=25?{y:cy,m:cm}:pv;const r=gardeCost(wm.y,wm.m);if(!r.before&&!r.after&&!gardeTrack(wm.y,wm.m).decl)items.push({t:'Déclarer '+ML[wm.m]+' sur Pajemploi',s:fh(r.paidH)+' h · net '+fE(r.net)+(r.nav.amt?' · transport '+fE(r.nav.amt):''),go:"gY="+wm.y+";gM="+wm.m+";go('garde')",k:(d<=5&&d>=3)?'bad':'warn'})}
+{const r=gardeCost(pv.y,pv.m);if(!r.before&&!r.after){const t=gardeTrack(pv.y,pv.m);const miss=[];if(!t.paid)miss.push('salaire à verser');if(!t.fiche)miss.push('fiche à envoyer');if(miss.length)items.push({t:'Nounou · '+ML[pv.m],s:miss.join(' · '),go:"gY="+pv.y+";gM="+pv.m+";go('garde')",k:'warn'})}}
+{const cs=cpStatus(cy,cm);cs.alerts.filter(a=>a.t==='warn').slice(0,1).forEach(a=>items.push({t:'Congés de la nounou',s:a.m.slice(0,90),go:"go('garde')",k:'warn'}))}
+{const B2=sBM().filter(x=>isV2(x.y,x.m)&&x.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(L){const mr=monthReal(L.y,L.m);if(mr&&mr.imp&&mr.imp.livretIn>0)items.push({t:'Retrait livret en '+MS[L.m],s:fE(mr.imp.livretIn)+' — le compte courant n\u2019a pas couvert le mois',go:"bY="+L.y+";bM="+L.m+";go('budget')",k:'info'})}}
+return items}
+function rTodo(){const items=todoList();if(!items.length)return'';const col={ok:'var(--up)',warn:'var(--gold)',bad:'var(--dn)',info:'var(--blue)'};
+return'<div class="card" style="border-color:rgba(229,195,106,.35)"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>À faire<span class="aux">'+items.length+'</span></div><div class="card-b" style="padding-top:4px">'+
+items.map(x=>'<div class="list-item" style="cursor:pointer;padding:9px 0" onclick="'+x.go.replace(/"/g,'&quot;')+'"><span style="width:8px;height:8px;border-radius:50%;background:'+col[x.k]+';flex:none;margin-right:10px"></span><span style="flex:1"><b style="font-size:13.5px">'+x.t+'</b><div style="font-size:11px;color:var(--td)">'+esc(x.s)+'</div></span><span style="color:var(--td)">›</span></div>').join('')+'</div></div>'}
+function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Mode d\u2019emploi</div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>La routine mensuelle</div><div class="card-b" style="font-size:13px;line-height:1.6">
+<div style="margin-bottom:10px"><b>Au fil du mois — Garde, 30 s.</b><br>Saisir uniquement les écarts au planning : heure en plus, congé, absence, jour non utilisé, récupération. Les jours normaux ne demandent rien.</div>
+<div style="margin-bottom:10px"><b>Du 25 au 5 — déclaration Pajemploi.</b><br>La carte « À faire » donne les trois chiffres (heures, net, transport). Après validation : cocher « déclaration validée » dans Garde → Suivi, saisir le CMG réel dans Coût réel, envoyer la fiche PDF.</div>
+<div style="margin-bottom:10px"><b>Du 1er au 5 — mise à jour du mois, 15 min.</b><br>Export CSV BoursoBank du mois écoulé. Bouton doré ⟳ : import + soldes de fin de mois, puis valeurs des supports, versements, aides CAF, charges, exceptionnel, clôture. Si quelque chose manque, la clôture le dit.</div>
+<div><b>Ensuite — lire.</b><br>Accueil : les deux thermomètres et le bloc Réel. Budget → Réel vs prévu : les écarts poste par poste. Projection : le mois par mois de l\u2019année.</div></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Où est quoi</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
+${[['Budget prévisionnel (fixes / variables, M+n)','Budget'],['Réel du mois, réconciliation, familles','Budget → Réel vs prévu'],['Relire ou corriger une ligne du relevé','Plus → Import → Relecture'],['Règles de classement','Plus → Règles'],['Hypothèses de revenus, cibles, régimes','Projection · Gouvernance'],['Nounou : calendrier, salaire, congés, compteur, fiche','Garde'],['Crédit d\u2019impôt, PER, échéances','Plus → Fiscal'],['Sauvegarde JSON, PIN, réinitialisation','Plus → Configuration']].map(x=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2)"><span>'+x[0]+'</span><span style="color:var(--td);text-align:right;margin-left:10px">'+x[1]+'</span></div>').join('')}</div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Automatique ou manuel</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
+<b>Automatique</b> : lignes budget de la nounou, classement du relevé (règles, puis catégories BoursoBank), détection du salaire versé et du CMG reçu, compteurs de congés et d\u2019heures, réconciliation, thermomètres.<br><br>
+<b>Manuel, une fois</b> : hypothèses de revenus, cible variables, régimes, chips F/V et M+n des charges, identité de la fiche.<br><br>
+<b>Manuel, chaque mois</b> : import, soldes de fin de mois, valeurs des supports, non reconnus, case « déclaration validée », montants réels Pajemploi.</div></div>`}
 function rProjHome(){const n=new Date();const K=yearKpi(n.getFullYear(),n.getMonth()+1);if(!K.n)return'';
 const F=K.fy;const ecartEp=K.cum.rEp-K.cum.tEp;
 return'<div class="eyebrow" style="margin:14px 0 8px">Année '+F.label+' · '+K.n+' mois réalisé'+(K.n>1?'s':'')+' sur 12</div>'+
@@ -2009,29 +2080,104 @@ let PJ_MOTIF='';
 function pjSet(path,val){const motif=PJ_MOTIF||(document.getElementById('pj-motif')||{}).value||'';if(!motif.trim()){alert('Modification refusée : renseigne d\u2019abord le champ « Motif » (cadre doré en haut de la carte Hypothèses), puis refais la modification. Chaque changement est journalisé avec ce motif.');rMore();return}
 const P=DB.params.proj;let old;const seg=path.split('.');if(seg.length===1){old=P[seg[0]];P[seg[0]]=val}else{old=P[seg[0]][+seg[1]][seg[2]];P[seg[0]][+seg[1]][seg[2]]=val}
 jrnl('proj.'+path,old==null?null:String(old),String(val),motif);rMore()}
+function pjMonthSel(path,cur,allowEmpty){const cy=new Date().getFullYear();const yrs=[cy-1,cy,cy+1,cy+2];const m=cur?+cur.slice(5,7):0,y=cur?+cur.slice(0,4):cy;
+const id='pjm_'+path.replace(/\W/g,'_');
+return'<select class="inp sm" id="'+id+'m" style="width:auto;font-size:11px" onchange="pjMonthSet(\''+path+'\',\''+id+'\')">'+(allowEmpty?'<option value="0"'+(!m?' selected':'')+'>—</option>':'')+[1,2,3,4,5,6,7,8,9,10,11,12].map(k=>'<option value="'+k+'"'+(m===k?' selected':'')+'>'+MS[k]+'</option>').join('')+'</select><select class="inp sm" id="'+id+'y" style="width:auto;font-size:11px" onchange="pjMonthSet(\''+path+'\',\''+id+'\')">'+yrs.map(k=>'<option value="'+k+'"'+(y===k?' selected':'')+'>'+k+'</option>').join('')+'</select>'}
+function pjMonthSet(path,id){const m=+document.getElementById(id+'m').value,y=+document.getElementById(id+'y').value;pjSet(path,m?y+'-'+p2(m):'')}
 function pjAdd(kind){const motif=PJ_MOTIF||(document.getElementById('pj-motif')||{}).value||'';if(!motif.trim()){alert('Renseigne d\u2019abord le motif.');return}const P=DB.params.proj;
-if(kind==='aides')P.aides.push({l:'Nouvelle aide',v:0,from:''});else P.ponctuels.push({l:'Nouvelle entrée',v:0,mois:1});jrnl('proj.'+kind,null,'ligne ajoutée',motif);rMore()}
-function pjDel(kind,i){const motif=PJ_MOTIF||(document.getElementById('pj-motif')||{}).value||'';if(!motif.trim()){alert('Renseigne d\u2019abord le motif.');return}const P=DB.params.proj;const x=P[kind][i];if(!confirm('Supprimer « '+x.l+' » ?'))return;P[kind].splice(i,1);jrnl('proj.'+kind,x.l+' '+x.v,'supprimée',motif);rMore()}
+if(kind==='aides')P.aides.push({l:'Nouvelle aide',v:0,from:'',to:''});else if(kind==='salaireEvo'){if(!P.salaireEvo)P.salaireEvo=[];P.salaireEvo.push({from:ym(new Date().getFullYear(),new Date().getMonth()+1),v:P.salaire})}else P.ponctuels.push({l:'Nouvelle entrée',v:0,mois:1});jrnl('proj.'+kind,null,'ligne ajoutée',motif);rMore()}
+function pjDel(kind,i){const motif=PJ_MOTIF||(document.getElementById('pj-motif')||{}).value||'';if(!motif.trim()){alert('Renseigne d\u2019abord le motif.');return}const P=DB.params.proj;const x=P[kind][i];if(!confirm('Supprimer « '+(x.l||x.from)+' » ?'))return;P[kind].splice(i,1);jrnl('proj.'+kind,(x.l||x.from)+' '+x.v,'supprimée',motif);rMore()}
 function rProj(el){ensureProj();const P=DB.params.proj;const n=new Date();const K=yearKpi(n.getFullYear(),n.getMonth()+1);
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Projection · ${K.fy.label}</div>
 <div class="card"><div class="card-b" style="font-size:12.5px;line-height:1.55"><b>Principe.</b> Chaque mois, théorique = revenus projetés − budget saisi (fixes et variables, avec leurs décalages). Réel = ce que le relevé et les soldes mesurent. Les deux se cumulent de ${MS[P.anneeDebut]} à ${MS[P.anneeDebut===1?12:P.anneeDebut-1]}. Les mois futurs sans budget reprennent le dernier mois saisi. Le flux employeur réel se lit dans Invest : une ligne de versement libellée « Participation Alpha », « Abondement »… le mois où il arrive.</div></div>
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Mois par mois</div><div class="card-b" style="padding:0 6px 10px"><table><thead><tr><th>Mois</th><th style="text-align:right">Rev. théo.</th><th style="text-align:right">Rev. réel</th><th style="text-align:right">Dép. théo.</th><th style="text-align:right">Dép. réel</th><th style="text-align:right">Ép. théo.</th><th style="text-align:right">Ép. réel</th></tr></thead><tbody>
-${K.rows.map(r=>'<tr style="opacity:'+(r.r.known?1:.55)+'"><td>'+MS[r.m]+' '+String(r.y).slice(2)+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.rev)+'</td><td class="mono" style="text-align:right">'+(r.r.known?fE(r.r.rev):'—')+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.dep)+'</td><td class="mono" style="text-align:right;color:'+(r.r.known?(r.r.dep<=r.p.dep?'var(--up)':'var(--dn)'):'inherit')+'">'+(r.r.known?fE(r.r.dep):'—')+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r.p.ep)+'</td><td class="mono" style="text-align:right;color:'+(r.r.known?(r.r.ep>=r.p.ep?'var(--up)':'var(--dn)'):'inherit')+'">'+(r.r.known?fE(r.r.ep):'—')+'</td></tr>').join('')}
-<tr style="border-top:2px solid var(--line2);font-weight:700"><td>Cumul réalisé</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tRev)}</td><td class="mono" style="text-align:right">${fE(K.cum.rRev)}</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tDep)}</td><td class="mono" style="text-align:right">${fE(K.cum.rDep)}</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.cum.tEp)}</td><td class="mono" style="text-align:right">${fE(K.cum.rEp)}</td></tr>
-<tr style="font-weight:700"><td>Année complète</td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.full.rev)}</td><td></td><td class="mono" style="text-align:right;color:var(--td)">${fE(K.full.dep)}</td><td></td><td class="mono" style="text-align:right;color:var(--gold)">${fE(K.full.ep)}</td><td></td></tr></tbody></table></div></div>
+${(()=>{const ipsT=DB.params.traj?DB.params.traj.epargneAn+DB.params.traj.employeur:19000;const ecart=K.cum.rEp-K.cum.tEp;const rest=12-K.n;
+// projection fin d'année : réalisé + théorique des mois restants
+const fin=K.cum.rEp+K.rows.filter(r=>!r.r.known).reduce((a,r)=>a+r.p.ep,0);
+// scénario : variables à la cible sur les mois restants
+const cible=DB.params.cibleVariables||2500;const finCible=K.cum.rEp+K.rows.filter(r=>!r.r.known).reduce((a,r)=>a+(r.p.rev-(r.p.fixe!=null?r.p.fixe:r.p.dep*0.5)-cible),0);
+// scénario : au rythme réel constaté (moyenne des mois réalisés)
+const mrs=K.rows.filter(r=>r.r.known);const avgDep=mrs.length?mrs.reduce((a,r)=>a+r.r.dep,0)/mrs.length:0;const finRythme=K.cum.rEp+K.rows.filter(r=>!r.r.known).reduce((a,r)=>a+(r.p.rev-avgDep),0);
+return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Épargne cumulée · '+K.fy.label+'<span class="aux mono" style="color:'+(ecart>=0?'var(--up)':'var(--dn)')+'">'+(ecart>=0?'+':'')+fE(ecart)+'</span></div><div class="card-b">'+
+'<div style="height:190px"><canvas id="ch-proj"></canvas></div>'+
+'<div class="row" style="gap:12px;font-size:10.5px;color:var(--td);margin-top:6px;flex-wrap:wrap"><span><span style="display:inline-block;width:18px;height:2px;background:var(--gold);vertical-align:middle"></span> théorique</span><span><span style="display:inline-block;width:18px;height:2px;background:var(--up);vertical-align:middle"></span> réel</span><span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--td);vertical-align:middle"></span> objectif IPS '+fE(ipsT)+'/an</span></div>'+
+'<div class="hr"></div><div class="eyebrow" style="margin-bottom:6px">Où finit l\u2019année ?</div>'+
+[['Si je tiens le budget saisi',fin,'réalisé + théorique des '+rest+' mois restants'],['Si les variables tombent à la cible '+fE(cible),finCible,'fixes prévus + variables à la cible'],['Au rythme réel constaté',finRythme,'dépenses moyennes de '+fE(avgDep)+'/mois maintenues']].map(x=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2)"><span style="font-size:12.5px">'+x[0]+'<div style="font-size:10.5px;color:var(--td)">'+x[2]+'</div></span><b class="mono" style="color:'+(x[1]>=ipsT?'var(--up)':'var(--dn)')+'">'+fE(x[1])+'</b></div>').join('')+
+'<div style="font-size:10.5px;color:var(--td);margin-top:7px">Objectif IPS : '+fE(ipsT)+' par an (épargne personnelle + flux employeur). Vert si le scénario l\u2019atteint.</div></div></div>'})()}
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Mois par mois<span class="aux" style="font-size:10px;color:var(--td)">théorique → réel</span></div><div class="card-b" style="padding:2px 10px 10px">
+${K.rows.map(r=>{const k=r.r.known;const c=(a,b,good)=>k?'<b class="mono" style="color:'+((good==='low'?b<=a:b>=a)?'var(--up)':'var(--dn)')+'">'+fE(b)+'</b>':'<span style="color:var(--td)">—</span>';
+return'<div style="padding:7px 0;border-bottom:1px solid var(--line2);opacity:'+(k?1:.6)+'"><div class="row rb"><b style="font-size:13px">'+ML[r.m]+' '+r.y+'</b>'+(k?'<span class="chip '+(r.r.closed?'tag-up':'')+'" style="font-size:9.5px">'+(r.r.closed?'clos':'en cours')+'</span>':'<span class="chip" style="font-size:9.5px">projeté</span>')+'</div>'+
+'<div class="grid2" style="grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px;font-size:11.5px">'+
+'<div><div style="color:var(--td);font-size:10px">Revenus</div><span class="mono" style="color:var(--td)">'+fE(r.p.rev)+'</span> → '+c(r.p.rev,r.r.rev,'high')+'</div>'+
+'<div><div style="color:var(--td);font-size:10px">Dépenses</div><span class="mono" style="color:var(--td)">'+fE(r.p.dep)+'</span> → '+c(r.p.dep,r.r.dep,'low')+'</div>'+
+'<div><div style="color:var(--td);font-size:10px">Épargne</div><span class="mono" style="color:var(--td)">'+fE(r.p.ep)+'</span> → '+c(r.p.ep,r.r.ep,'high')+'</div></div></div>'}).join('')}
+<div class="row rb" style="padding:9px 0 2px;font-size:12.5px"><b>Cumul réalisé (${K.n} mois)</b><span class="mono">ép. <span style="color:var(--td)">${fE(K.cum.tEp)}</span> → <b>${fE(K.cum.rEp)}</b></span></div>
+<div class="row rb" style="font-size:12.5px"><b>Année complète théorique</b><span class="mono" style="color:var(--gold)">${fE(K.full.ep)}</span></div></div></div>
+${(()=>{const mrs=K.rows.filter(r=>r.r.known);if(!mrs.length)return'';const sum=(f)=>mrs.reduce((a,r)=>a+f(r),0);
+const rows=[['Salaire',sum(r=>r.p.sal),sum(r=>r.r.sal)],['Aides CAF',sum(r=>r.p.aides),sum(r=>r.r.caf)],['Flux employeur',sum(r=>r.p.emp),sum(r=>r.r.emp)],['Autres entrées',sum(r=>r.p.autres),sum(r=>r.r.autres+r.r.impots)]];
+return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Revenus par source<span class="aux" style="font-size:10px;color:var(--td)">cumul réalisé</span></div><div class="card-b">'+rows.map(x=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2);font-size:12.5px"><span>'+x[0]+'</span><span class="mono"><span style="color:var(--td)">'+fE(x[1])+'</span> → <b style="color:'+(x[2]>=x[1]-1?'var(--up)':'var(--dn)')+'">'+fE(x[2])+'</b></span></div>').join('')+(()=>{const P=DB.params.proj;const pj=(P.ponctuels||[]).find(p=>/employeur|pee|perco|particip|abond/i.test(p.l));if(!pj)return'';const past=mrs.find(r=>r.m===+pj.mois);if(past&&past.r.emp===0)return'<div class="al alr" style="margin-top:8px">'+ML[pj.mois]+' est réalisé mais aucun flux employeur n\u2019est enregistré (attendu '+fE(pj.v)+'). Rouvrez le mois et relancez la mise à jour : le wizard le demande.</div>';return''})()+
+'<div style="font-size:10.5px;color:var(--td);margin-top:7px">Le flux employeur est demandé par le wizard le mois où il est attendu, et enregistré comme versement dans Invest. Les remboursements d\u2019impôts comptent en autres entrées.</div></div></div>'})()}
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Hypothèses de revenus<span class="aux" style="font-size:10px;color:var(--td)">journalisées</span></div><div class="card-b">
 <div style="background:var(--goldDim);border:1px solid rgba(229,195,106,.45);border-radius:12px;padding:10px;margin-bottom:12px"><div class="lbl" style="color:var(--gold);margin-bottom:5px">1. Motif — obligatoire avant toute modification</div><input class="inp sm" id="pj-motif" placeholder="ex. : prime vacances confirmée par la paie de juin" value="${esc(PJ_MOTIF)}" oninput="PJ_MOTIF=this.value"><div style="font-size:10.5px;color:var(--td);margin-top:5px">Puis modifie les champs ci-dessous : chaque changement est enregistré dans le journal de Gouvernance avec ce motif.</div></div>
 <div class="prm"><label>Début de l\u2019année de suivi<small>mois</small></label><select class="inp sm" onchange="pjSet('anneeDebut',+this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(i=>'<option value="'+i+'"'+(P.anneeDebut===i?' selected':'')+'>'+ML[i]+'</option>').join('')}</select></div>
 <div class="prm"><label>Salaire net mensuel<small>€</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.salaire}" onchange="pjSet('salaire',+this.value||0)"></div>
+${(P.salaireEvo||[]).map((e,i)=>'<div class="prm" style="flex-wrap:wrap"><div class="row" style="gap:4px;width:100%"><span style="font-size:11.5px;flex:1">→ salaire net à partir de</span>'+pjMonthSel('salaireEvo.'+i+'.from',e.from,false)+'<input class="inp sm mono" type="number" inputmode="decimal" style="width:84px" value="'+e.v+'" onchange="pjSet(\'salaireEvo.'+i+'.v\',+this.value||0)"><span class="xdel" onclick="pjDel(\'salaireEvo\','+i+')">×</span></div></div>').join('')}
+<button class="btn btn-ghost xs" style="margin-bottom:8px" onclick="pjAdd('salaireEvo')">+ Évolution du salaire</button>
 <div class="prm"><label>Autres entrées mensuelles<small>€ · remboursements de frais, divers</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.autresMensuels}" onchange="pjSet('autresMensuels',+this.value||0)"></div>
 <div class="eyebrow" style="margin:10px 0 4px">Aides mensuelles</div>
-${(P.aides||[]).map((a,i)=>'<div class="prm" style="flex-wrap:wrap"><div class="row" style="gap:4px;width:100%;margin-bottom:4px"><input class="inp sm" style="flex:1" value="'+esc(a.l)+'" onchange="pjSet(\'aides.'+i+'.l\',this.value)"><span class="xdel" onclick="pjDel(\'aides\','+i+')">×</span></div><div class="row" style="gap:4px;width:100%"><span style="font-size:10.5px;color:var(--td);flex:1">€ / mois · à partir de</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px" value="'+a.v+'" onchange="pjSet(\'aides.'+i+'.v\',+this.value||0)"><input class="inp sm mono" style="width:86px" value="'+esc(a.from||'')+'" placeholder="AAAA-MM" onchange="pjSet(\'aides.'+i+'.from\',this.value)"></div></div>').join('')}
+${(P.aides||[]).map((a,i)=>'<div class="prm" style="flex-wrap:wrap"><div class="row" style="gap:4px;width:100%;margin-bottom:4px"><input class="inp sm" style="flex:1" value="'+esc(a.l)+'" onchange="pjSet(\'aides.'+i+'.l\',this.value)"><span class="xdel" onclick="pjDel(\'aides\','+i+')">×</span></div><div class="row" style="gap:4px;width:100%;flex-wrap:wrap"><span style="font-size:10.5px;color:var(--td)">€ / mois</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:84px" value="'+a.v+'" onchange="pjSet(\'aides.'+i+'.v\',+this.value||0)"><span style="font-size:10.5px;color:var(--td)">du</span>'+pjMonthSel('aides.'+i+'.from',a.from,true)+'<span style="font-size:10.5px;color:var(--td)">au</span>'+pjMonthSel('aides.'+i+'.to',a.to,true)+'</div></div>').join('')}
 <button class="btn btn-ghost xs" onclick="pjAdd('aides')">+ Aide mensuelle</button>
 <div class="eyebrow" style="margin:10px 0 4px">Entrées ponctuelles annuelles</div>
 ${(P.ponctuels||[]).map((p,i)=>'<div class="prm" style="flex-wrap:wrap"><div class="row" style="gap:4px;width:100%;margin-bottom:4px"><input class="inp sm" style="flex:1" value="'+esc(p.l)+'" onchange="pjSet(\'ponctuels.'+i+'.l\',this.value)"><span class="xdel" onclick="pjDel(\'ponctuels\','+i+')">×</span></div><div class="row" style="gap:4px;width:100%"><span style="font-size:10.5px;color:var(--td);flex:1">€ · versé en</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px" value="'+p.v+'" onchange="pjSet(\'ponctuels.'+i+'.v\',+this.value||0)"><select class="inp sm" style="width:auto" onchange="pjSet(\'ponctuels.'+i+'.mois\',+this.value)">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(k=>'<option value="'+k+'"'+(+p.mois===k?' selected':'')+'>'+MS[k]+'</option>').join('')+'</select></div></div>').join('')}
 <button class="btn btn-ghost xs" onclick="pjAdd('ponctuels')">+ Entrée ponctuelle</button>
 <div style="font-size:10.5px;color:var(--td);margin-top:8px">Les dépenses théoriques ne se règlent pas ici : ce sont tes lignes Budget, mois par mois. Modifie-les là où tu les vois.</div>
-</div></div>`}
+</div></div>`;
+(()=>{const ipsT=DB.params.traj?DB.params.traj.epargneAn+DB.params.traj.employeur:19000;let ct=0,cr=0;const labs=[],T=[],Rr=[],O=[];K.rows.forEach((r,i)=>{ct+=r.p.ep;labs.push(MS[r.m]);T.push(Math.round(ct));if(r.r.known){cr+=r.r.ep;Rr.push(Math.round(cr))}else Rr.push(null);O.push(Math.round(ipsT*(i+1)/12))});
+mkC('ch-proj',{type:'line',data:{labels:labs,datasets:[{data:T,borderColor:'#E5C36A',backgroundColor:'rgba(229,195,106,.08)',fill:true,tension:.3,pointRadius:2},{data:Rr,borderColor:'#3DDC97',backgroundColor:'rgba(61,220,151,.1)',fill:true,tension:.3,pointRadius:3,spanGaps:false},{data:O,borderColor:'#6B7488',borderDash:[5,4],pointRadius:0,fill:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fE(c.parsed.y)}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{font:{size:10},callback:v=>Math.round(v/1000)+' k'}}}}})})()}
+
+/* ================= AUTOTEST ================= */
+function runSelfTests(){const saved=DB;const savedCache=GM_CACHE;const results=[];const ok=(n,c,d)=>results.push({n,ok:!!c,d:d||''});
+try{DB=defDB();ensure();DB.garde.cpStartM=9;DB.garde.nav.on=false;const g=DB.garde;
+// 1. mensualisation
+const o=gardeMonth(2026,10);ok('Mensualisation octobre = 374,83 €',Math.abs(o.net-374.83)<0.01,fE(o.net));
+// 2. mois d'embauche au réel
+const H={'11':2.5,'14':2.58,'16':2.5,'18':3,'21':2.5,'23':2.5,'25':2.5,'28':2.5,'30':2.5};Object.keys(H).forEach(d=>g.hours['2026-09-'+d]={s:H[d],p:0});GM_CACHE={};
+const s9=gardeMonth(2026,9);ok('Septembre au réel = 23,08 h · 276,96 €',Math.abs(s9.net-276.96)<0.01&&Math.abs(s9.h-23.08)<0.01,fh(s9.h)+' h · '+fE(s9.net));
+// 3. reclassement solo/partagé : 2,5 h solo un lundi prévu 0,5+2 → +3,50 €, 0 h complémentaire
+g.hours['2026-10-05']={s:2.5,p:0};GM_CACHE={};const o2=gardeMonth(2026,10);ok('Lundi solo → ajustement +3,50 €, 0 h compl.',Math.abs(o2.reclassEur-3.5)<0.01&&o2.extraH===0,fE(o2.reclassEur)+' · '+o2.extraH+' h');
+// 4. récupération : samedi 5 h en récup ne paie rien de plus
+delete g.hours['2026-10-05'];g.hours['2026-10-17']={s:5,p:0,r:5};g.unused['2026-10-05']=1;g.recup['2026-10-09']=1;GM_CACHE={};const o3=gardeMonth(2026,10);const L=hoursLedger(2026,10);
+ok('Compteur d\u2019heures : +2,5 +2,5 −5 = 0, salaire inchangé',L.end===0&&Math.abs(o3.net-374.83)<0.01,'solde '+L.end+' h · '+fE(o3.net));
+delete g.hours['2026-10-17'];delete g.unused['2026-10-05'];delete g.recup['2026-10-09'];
+// 5. congés : semaine = 6 j ouvrables ; férié non décompté
+['2026-11-09','2026-11-11','2026-11-13'].forEach(k=>g.leave[k]=1);GM_CACHE={};ok('CP : semaine du 11 nov = 5 j (férié exclu)',cpLedger(2026,11).taken===5,cpLedger(2026,11).taken+' j');
+g.leave={};g.leave['2026-10-09']=1;GM_CACHE={};ok('CP : vendredi isolé = 2 j (ven + sam)',cpLedger(2026,10).taken===2,cpLedger(2026,10).taken+' j');g.leave={};
+// 6. solde CP conservé au changement de période
+g.leave['2027-03-16']=1;GM_CACHE={};ok('Solde CP reporté au 1er sept 2027',Math.abs(cpLedger(2027,8).solde-cpLedger(2027,9).report)<0.01,cpLedger(2027,9).report+' j');g.leave={};GM_CACHE={};
+// 7. déclaration Pajemploi réelle de septembre 2026 reproduite
+const p=g.p;const brut=290/(1-p.txSal/100);const cot=brut*(p.txSal+p.txPat)/100;const rest=cot-23.33*p.abatH-Math.min(cot*p.cmgCotPct/100,p.cmgCotCap);const cmg=290*(1-p.rev/(p.chr/(p.effort/100)));
+ok('Pajemploi sept. 2026 : charge 273,04 €',Math.abs(290+rest-cmg-273.04)<0.6,fE(290+rest-cmg));
+// 8. import CSV BoursoBank (format FR, deux colonnes solde)
+const csv='"date opération";"date valeur";"libellé";"libellé suggéré";"catégorie";"catégorie parente";"solde";"commentaire";"numéro compte";"libellé compte";"solde";"pointage"\n2026-10-03;2026-10-03;"PRLV SEPA LOYER";"";"Logement";"Logement";-1650,00;"";"1";"BoursoBank";5000,00;0\n2026-10-02;2026-10-02;"CARTE 02/10/26 CARREFOUR MARKET CB*4512";"Carrefour Market";"Alimentation";"Vie quotidienne";-80,00;"";"1";"BoursoBank";6650,00;0\n2026-10-01;2026-10-01;"VIR SEPA ALPHA FINANCIAL MARKETS CONSULTING";"Alpha";"Salaire";"Revenus";6200,00;"";"1";"BoursoBank";6730,00;0\n2026-10-01;2026-10-01;"VIR SEPA VERS OURHOU SAADIA";"";"Virements";"Virements";-394,29;"";"1";"BoursoBank";530,00;0';
+const P=parseCsv(csv);const I=P&&P.tx?buildImport(P.tx):null;
+ok('CSV : montant en colonne 7, 4 lignes',!!I&&I.n===4,P&&P.cols?P.cols.montant:'—');
+ok('Classement : salaire, loyer fixe, courses variable, nounou fixe',!!I&&I.t.salaire===6200&&I.t.fixe===2044.29&&I.t.variable===80,I?fE(I.t.fixe)+' / '+fE(I.t.variable):'—');
+// 9. réel par les soldes
+DB.bm=[];const b9=gOBM(2026,9),b10=gOBM(2026,10);b9.cashFin=10000;b10.cashFin=14075.71;b10.imp=I;b10.entrees=I.entrees;GM_CACHE={};
+const mr=monthReal(2026,10);ok('Réel = début + salaire − fin : conso 2 124,29 €',!!mr&&Math.abs(mr.reelConso-2124.29)<0.01,mr?fE(mr.reelConso):'—');
+ok('Réconciliation relevé / soldes = 0',!!mr&&Math.abs(mr.recon)<0.01,mr?fE(mr.recon):'—');
+// 10. projection
+ensureProj();const pj=projRev(2026,10);ok('Projection : revenus d\u2019octobre > salaire',pj>DB.params.proj.salaire,fE(pj));
+// 11. fin de contrat
+g.contractTo='2027-06-30';GM_CACHE={};const st=soldeTout();ok('Solde de tout compte calculé (CP + préavis + indemnité)',!!st&&st.total>0,st?fE(st.total):'—');g.contractTo='';
+// 12. formatage : aucun k€
+ok('Format euros : 12 345 €',fE(12345)==='12\u202f345 €'||fE(12345)==='12 345 €',fE(12345));
+}catch(e){results.push({n:'Exception pendant les tests',ok:false,d:String(e.message||e).slice(0,120)})}
+finally{DB=saved;GM_CACHE=savedCache}
+return results}
+function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
+return'<div class="card" style="border-color:'+(nOk===R.length?'rgba(61,220,151,.4)':'rgba(240,113,111,.5)')+'"><div class="card-h"><span class="dot" style="background:'+(nOk===R.length?'var(--up)':'var(--dn)')+'"></span>Autotest<span class="aux mono" style="color:'+(nOk===R.length?'var(--up)':'var(--dn)')+'">'+nOk+' / '+R.length+'</span></div><div class="card-b" style="padding-top:4px">'+
+R.map(r=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2);font-size:12px"><span style="flex:1"><span style="color:'+(r.ok?'var(--up)':'var(--dn)')+'">'+(r.ok?'✓':'✗')+'</span> '+r.n+'</span><span class="mono" style="font-size:10.5px;color:var(--td)">'+esc(r.d)+'</span></div>').join('')+
+'<div style="font-size:10.5px;color:var(--td);margin-top:7px">Exécuté sur des données de test, jamais sur ta base. À lancer après chaque mise à jour de l\u2019app : tout doit être vert.</div></div></div>'}
 
 /* ================= PLUS (hub) ================= */
 function rMore(){
@@ -2040,12 +2186,16 @@ if(SUB==='hub'){
 const ftd=DB.fiscal.filter(f=>f.s==='a_faire').length;
 el.innerHTML=`
 <div class="pagetitle">Plus</div>
-<div class="hub-item" onclick="SUB='fiscal';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">◎</div><div class="ht"><b>Fiscal & PER</b><span>Objectif PER, actions${ftd?' · '+ftd+' à faire':''}, déductibles</span></div><span style="color:var(--td)">›</span></div>
+<div class="eyebrow" style="margin:4px 0 8px">Chaque mois</div>
 <div class="hub-item" onclick="SUB='import';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">⤒</div><div class="ht"><b>Import bancaire</b><span>CSV BoursoBank → réel du mois</span></div><span style="color:var(--td)">›</span></div>
-<div class="hub-item" onclick="SUB='rules';rMore()"><div class="hi" style="background:rgba(79,209,224,.13);color:var(--cyan)">≡</div><div class="ht"><b>Règles de correspondance</b><span>${(DB.rules||[]).length} règles · ${(DB.rules||[]).filter(r=>r.source==='user').length} créées</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='proj';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">◔</div><div class="ht"><b>Projection annuelle</b><span>Théorique vs réel, revenus et épargne</span></div><span style="color:var(--td)">›</span></div>
-<div class="hub-item" onclick="SUB='gouv';rMore()"><div class="hi" style="background:rgba(167,139,250,.13);color:var(--violet)">⚖</div><div class="ht"><b>Gouvernance</b><span>Cibles, trajectoire, régimes · v${(DB.params||{}).version||1}</span></div><span style="color:var(--td)">›</span></div>
+<div class="hub-item" onclick="SUB='guide';rMore()"><div class="hi" style="background:var(--upDim);color:var(--up)">?</div><div class="ht"><b>Mode d\u2019emploi</b><span>La routine mensuelle, où est quoi</span></div><span style="color:var(--td)">›</span></div>
+<div class="eyebrow" style="margin:16px 0 8px">Analyses</div>
+<div class="hub-item" onclick="SUB='fiscal';rMore()"><div class="hi" style="background:var(--goldDim);color:var(--gold)">◎</div><div class="ht"><b>Fiscal & PER</b><span>Objectif PER, actions${ftd?' · '+ftd+' à faire':''}, déductibles</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='analyses';rMore()"><div class="hi" style="background:rgba(110,168,254,.13);color:var(--blue)">◫</div><div class="ht"><b>Analyses</b><span>Versements, Δ compte, Amundi, tableau</span></div><span style="color:var(--td)">›</span></div>
+<div class="eyebrow" style="margin:16px 0 8px">Réglages</div>
+<div class="hub-item" onclick="SUB='rules';rMore()"><div class="hi" style="background:rgba(79,209,224,.13);color:var(--cyan)">≡</div><div class="ht"><b>Règles de correspondance</b><span>${(DB.rules||[]).length} règles · ${(DB.rules||[]).filter(r=>r.source==='user').length} créées</span></div><span style="color:var(--td)">›</span></div>
+<div class="hub-item" onclick="SUB='gouv';rMore()"><div class="hi" style="background:rgba(167,139,250,.13);color:var(--violet)">⚖</div><div class="ht"><b>Gouvernance</b><span>Cibles, trajectoire, régimes · v${(DB.params||{}).version||1}</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='notes';rMore()"><div class="hi" style="background:var(--upDim);color:var(--up)">✎</div><div class="ht"><b>Notes</b><span>Mémo global (enfants, clés, répartitions…)</span></div><span style="color:var(--td)">›</span></div>
 <div class="hub-item" onclick="SUB='config';rMore()"><div class="hi" style="background:rgba(167,139,250,.13);color:var(--violet)">⚙</div><div class="ht"><b>Configuration</b><span>Variables, indicateurs, graphes custom, PIN</span></div><span style="color:var(--td)">›</span></div>
 <div style="text-align:center;margin-top:22px">
@@ -2058,13 +2208,14 @@ if(SUB==='import'){rImport(el);return}
 if(SUB==='rules'){rRules(el);return}
 if(SUB==='gouv'){rGouv(el);return}
 if(SUB==='proj'){rProj(el);return}
+if(SUB==='guide'){rGuide(el);return}
 if(SUB==='analyses'){rAnalyses(el);return}
 if(SUB==='notes'){
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button>
 <div class="pagetitle">Notes</div>
 <div class="card"><div class="card-b"><textarea class="note-ta" style="min-height:300px" onchange="DB.gn=this.value;save()">${esc(DB.gn||'')}</textarea></div></div>`;
 return}
-if(SUB==='config'){rConfig(el);return}}
+if(SUB==='config'){rConfig(el);setTimeout(rBackups,50);return}}
 
 function rFiscal(el){
 const fp=DB.fp;
@@ -2138,26 +2289,26 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 à <select class="inp sm" onchange="dF.ty=+this.value;rMore()">${YRS.map(y=>'<option'+(y===dF.ty?' selected':'')+'>'+y+'</option>').join('')}</select>
 <select class="inp sm" onchange="dF.tm=+this.value;rMore()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===dF.tm?' selected':'')+'>'+MS[m]+'</option>').join('')}</select></div>
 </div></div>
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Versements mensuels</div><div class="card-b"><div class="chartbox s"><canvas id="ch-di"></canvas></div></div></div>
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Δ Compte mensuel</div><div class="card-b"><div class="chartbox s"><canvas id="ch-dc"></canvas></div><div class="formula">= Compte(M) − Compte(M-1), en k€</div></div></div>
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>PEE + PER Amundi</div><div class="card-b"><div class="chartbox s"><canvas id="ch-dpee"></canvas></div><div class="formula">Somme des supports Amundi (k€)</div></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Consommation réelle · fixes et variables</div><div class="card-b"><div class="chartbox s"><canvas id="ch-conso"></canvas></div><div class="formula">Par les soldes, depuis avril 2026 · empilé fixes / variables · trait = cible variables</div></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Épargne réelle mensuelle</div><div class="card-b"><div class="chartbox s"><canvas id="ch-ep"></canvas></div><div class="formula">Δ cash + investi</div></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Dépenses par famille</div><div class="card-b"><div class="chartbox s"><canvas id="ch-fam"></canvas></div><div class="formula">Somme sur la période, d’après les relevés importés</div></div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Patrimoine et versements</div><div class="card-b"><div class="chartbox s"><canvas id="ch-patri2"></canvas></div><div class="formula">Cash + investi (barres : versements du mois)</div></div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Tableau récapitulatif</div><div class="card-b" style="overflow-x:auto">
-<table><thead><tr><th>Mois</th><th>Patri</th><th>Gain</th><th>Compte</th><th>Δ Cpt</th></tr></thead><tbody id="ana-tb"></tbody></table>
+<table><thead><tr><th>Mois</th><th>Patrimoine</th><th>Conso</th><th>Variables</th><th>Épargne</th></tr></thead><tbody id="ana-tb"></tbody></table>
 </div></div>`;
 setTimeout(()=>{
-const fB=sBM().filter(d=>(d.y*12+d.m)>=(dF.fy*12+dF.fm)&&(d.y*12+d.m)<=(dF.ty*12+dF.tm));
-const fI=sIM().filter(d=>(d.y*12+d.m)>=(dF.fy*12+dF.fm)&&(d.y*12+d.m)<=(dF.ty*12+dF.tm));
-const lB=fB.map(d=>mLbl(d.y,d.m)),lI=fI.map(d=>mLbl(d.y,d.m));
-mkC('ch-di',{type:'bar',data:{labels:lI,datasets:[{data:fI.map(d=>d.contribs.reduce((s,c)=>s+c.v,0)),backgroundColor:'#A78BFA',borderRadius:5,maxBarThickness:26}]},options:{...NOLEG,scales:AX}});
-const dc=fB.map((d,i)=>i>0?kE(d.sav-fB[i-1].sav):0);
-mkC('ch-dc',{type:'bar',data:{labels:lB,datasets:[{data:dc,backgroundColor:dc.map(v=>v>=0?'#4FD1E0':'#F0716F'),borderRadius:5,maxBarThickness:26}]},options:{...NOLEG,scales:AX}});
-const peeD=fI.map(d=>Math.round(amundiT(d)));
-mkC('ch-dpee',{type:'line',data:{labels:lI,datasets:[{data:peeD,borderColor:'#E5C36A',borderWidth:2.5,pointRadius:2.5,tension:.35,fill:true,backgroundColor:'rgba(229,195,106,.07)'}]},options:{...NOLEG,scales:AX}});
+const fB=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null&&(d.y*12+d.m)>=(dF.fy*12+dF.fm)&&(d.y*12+d.m)<=(dF.ty*12+dF.tm));
+const M=fB.map(d=>({y:d.y,m:d.m,l:mLbl(d.y,d.m),r:monthReal(d.y,d.m),im:gIM(d.y,d.m)})).filter(x=>x.r&&x.r.reelConso!=null);
+const L=M.map(x=>x.l);const cible=DB.params.cibleVariables||2500;
+mkC('ch-conso',{type:'bar',data:{labels:L,datasets:[{label:'Fixes',data:M.map(x=>Math.round(x.r.fixes)),backgroundColor:'#6EA8FE',borderRadius:4,maxBarThickness:26,stack:'c'},{label:'Variables',data:M.map(x=>Math.round(x.r.variables)),backgroundColor:'#E5C36A',borderRadius:4,maxBarThickness:26,stack:'c'},{type:'line',data:M.map(()=>cible),borderColor:'#F0716F',borderDash:[5,4],pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,ticks:{font:{size:10},callback:v=>Math.round(v/1000)+' k'}}}}});
+const ep=M.map(x=>Math.round(x.r.epargne));
+mkC('ch-ep',{type:'bar',data:{labels:L,datasets:[{data:ep,backgroundColor:ep.map(v=>v>=0?'#3DDC97':'#F0716F'),borderRadius:5,maxBarThickness:26}]},options:{...NOLEG,scales:AX}});
+const fam={};M.forEach(x=>{if(!x.r.imp)return;['fixe','variable'].forEach(t=>{const o=(x.r.imp.byGrp||{})[t]||{};Object.keys(o).forEach(g=>{fam[g]=(fam[g]||0)+o[g]})})});
+const fk2=Object.entries(fam).sort((a,b)=>b[1]-a[1]).slice(0,10);
+mkC('ch-fam',{type:'bar',data:{labels:fk2.map(x=>x[0]),datasets:[{data:fk2.map(x=>Math.round(x[1])),backgroundColor:'#4FD1E0',borderRadius:5,maxBarThickness:22}]},options:{indexAxis:'y',...NOLEG,scales:{x:{ticks:{font:{size:10},callback:v=>Math.round(v/1000)+' k'}},y:{ticks:{font:{size:10}}}}}});
+mkC('ch-patri2',{type:'bar',data:{labels:L,datasets:[{type:'line',data:M.map(x=>Math.round(calcPatriV2(gBM(x.y,x.m),x.im))),borderColor:'#E5C36A',borderWidth:2.5,pointRadius:2.5,tension:.3,yAxisID:'y'},{data:M.map(x=>Math.round(x.r.invest)),backgroundColor:'#A78BFA',borderRadius:4,maxBarThickness:22,yAxisID:'y2'}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{font:{size:10},callback:v=>Math.round(v/1000)+' k'}},y2:{position:'right',grid:{display:false},ticks:{font:{size:10}}}}}});
 const tb=document.getElementById('ana-tb');
-tb.innerHTML=fB.slice(-10).reverse().map((r,i,a)=>{const p2=i<a.length-1?a[i+1]:null;
-const pN=calcPatri(r,gIM(r.y,r.m));const pP=p2?calcPatri(p2,gIM(p2.y,p2.m)):0;
-const g=pP>0?pN-pP:0;const dcc=p2?r.sav-p2.sav:0;
-return '<tr><td style="font-weight:600">'+mLbl(r.y,r.m)+'</td><td class="mono">'+fk(pN)+'</td><td class="mono" style="color:'+(g>=0?'var(--up)':'var(--dn)')+'">'+(g>=0?'+':'')+fk(g)+'</td><td class="mono" style="color:var(--cyan)">'+fE(kE(r.sav))+'</td><td class="mono" style="color:'+(dcc>=0?'var(--up)':'var(--dn)')+'">'+(dcc>=0?'+':'')+fE(kE(dcc))+'</td></tr>'}).join('')
+tb.innerHTML=M.slice(-12).reverse().map(x=>'<tr><td style="font-weight:600">'+x.l+'</td><td class="mono">'+fE(calcPatriV2(gBM(x.y,x.m),x.im))+'</td><td class="mono">'+fE(x.r.reelConso)+'</td><td class="mono" style="color:'+(x.r.variables<=cible?'var(--up)':'var(--dn)')+'">'+fE(x.r.variables)+'</td><td class="mono" style="color:'+(x.r.epargne>=0?'var(--up)':'var(--dn)')+'">'+fE(x.r.epargne)+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">Aucun mois réel sur la période</td></tr>';
 },60)}
 
 /* ================= CONFIG ================= */
@@ -2220,6 +2371,13 @@ ${DB.customCharts.map((gc,gi)=>'<div style="background:var(--bg2);border:1px sol
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--dn)"></span>Sécurité & données</div><div class="card-b">
 <button class="btn btn-ghost sm wide" style="margin-bottom:8px" onclick="var p=prompt('Nouveau PIN (4 chiffres) :');if(p&&/^\\d{4}$/.test(p)){DB.pin=p;save();alert('PIN modifié')}">🔐 Changer le PIN</button>
 <button class="btn btn-danger sm wide" onclick="if(confirm('Réinitialiser TOUTES les données ?')&&confirm('Vraiment sûr ? Action irréversible (le cloud sera aussi écrasé).')){DB=defDB();save();location.reload()}">🗑 Réinitialiser</button>
+<button class="btn btn-ghost sm wide" style="margin:8px 0" onclick="document.getElementById('selftest-out').innerHTML=rSelfTest()">▶ Lancer l\u2019autotest</button><div id="selftest-out"></div>
+<div class="eyebrow" style="margin:14px 0 6px">Sauvegardes cloud</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les six dernières sont conservées.</div>
+<div class="row" style="gap:6px;margin-bottom:8px"><button class="btn btn-ghost sm" onclick="backupNow('manuel',s=>{alert(s==='ok'?'Sauvegarde cloud effectuée.':s==='local'?'Pas de cloud sur cet appareil.':'Échec de la sauvegarde.');rBackups()})">Sauvegarder maintenant</button><button class="btn btn-ghost sm" onclick="rBackups()">Rafraîchir la liste</button></div>
+<div id="bk-list"></div>
+<div class="eyebrow" style="margin:14px 0 6px">Compte</div>
+<div class="row rb"><span style="font-size:12.5px">${FUSER?esc(FUSER.email||''):'non connecté (mode local)'}</span>${FUSER?'<button class="btn btn-ghost sm" onclick="authLogout()">Se déconnecter</button>':''}</div>
 <div style="font-size:10.5px;color:var(--td);margin-top:9px"><b style="color:var(--gold)">Version ${VERSION}</b> — ${VTAG}<br>PIN : ${DB.pin} · Stockage : hft7 · Firebase : ${fdb?'connecté ☁':'local 📴'}</div>
 </div></div>`;
 setTimeout(()=>{DB.customCharts.forEach((gc,gi)=>{
