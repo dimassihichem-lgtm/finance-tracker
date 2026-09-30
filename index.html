@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v42';const VTAG='fixes prévu/réel · réconciliation expliquée';
+const VERSION='v43';const VTAG='carte nounou : état du mois précédent';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -523,15 +523,16 @@ return'<div class="card"><div class="card-h"><span class="dot" style="background
   </div>
 </div>
 
-<div class="card">
-  <div class="card-b" style="cursor:pointer" onclick="GSEL=todayKey();gY=${cy};gM=${cm2};go('garde')">
-    <div class="row rb">
-      <div><div class="eyebrow">Nounou · ${ML[cm2]}</div>
-        <div style="font-size:15px;font-weight:600;margin-top:2px"><span class="mono" style="color:var(--gold)">${f$(gh.h)} h</span> <span style="color:var(--td);font-weight:500;font-size:13px">· ${gh.days} jour${gh.days>1?'s':''}${gh.cp?' · '+gh.cp+' CP':''} · ${f$(Math.round(gcost.toPay))} € à verser</span></div></div>
-      <span class="chip ${cpStatus(cy,cm2).alerts.some(a=>a.t==='warn')?'tag-dn':'tag-gold'}">${cpStatus(cy,cm2).alerts.some(a=>a.t==='warn')?'Congés à poser ⚠':'Planning ✓'}</span>
-    </div>
-  </div>
-</div>
+${(()=>{const pv=pM(cy,cm2);const rc=gardeCost(cy,cm2),rp=gardeCost(pv.y,pv.m);if(rc.before&&rp.before)return'';
+const tp=gardeTrack(pv.y,pv.m);const done=rp.before||rp.after||(tp.paid&&tp.decl&&tp.fiche&&(tp.caf||(rp.cmgRem-rp.cotRest)<=0));
+const items=(rp.before||rp.after)?[]:[['payé',tp.paid,'salaire'],['déclaré',tp.decl,'Pajemploi'],['fiche',tp.fiche,'fiche'],...((rp.cmgRem-rp.cotRest)>0?[['CAF reçue',tp.caf,'CAF']]:[])];
+const cs=cpStatus(cy,cm2);const warn=cs.alerts.some(a=>a.t==='warn');const n0=new Date();const dd=n0.getDate();const decl=(dd>=25||dd<=5);
+return'<div class="card"><div class="card-b" style="cursor:pointer" onclick="GSEL=todayKey();gY='+cy+';gM='+cm2+';go(\'garde\')">'+
+'<div class="row rb"><div><div class="eyebrow">Nounou · '+ML[cm2]+'</div>'+
+'<div style="font-size:15px;font-weight:600;margin-top:2px"><span class="mono" style="color:var(--gold)">'+f$(gh.h)+' h</span> <span style="color:var(--td);font-weight:500;font-size:13px">· '+gh.days+' jour'+(gh.days>1?'s':'')+(gh.cp?' · '+gh.cp+' CP':'')+' · '+fE(rc.toPay)+(rc.partial?' au réel':' à verser en fin de mois')+'</span></div></div>'+
+'<span class="chip '+(warn?'tag-dn':'tag-gold')+'">'+(warn?'Congés à poser ⚠':'Planning ✓')+'</span></div>'+
+(items.length?'<div class="hr" style="margin:9px 0 7px"></div><div class="row rb" style="flex-wrap:wrap;gap:6px"><span style="font-size:11.5px;color:var(--tm)">'+ML[pv.m]+(done?' <b style="color:var(--up)">soldé ✓</b>':' :')+'</span>'+(done?'':'<span class="row" style="gap:5px;flex-wrap:wrap">'+items.map(x=>'<span class="chip '+(x[1]?'tag-up':(decl&&x[2]==='Pajemploi'?'tag-dn':''))+'" style="font-size:10px">'+(x[1]?'✓ ':'○ ')+x[0]+'</span>').join('')+'</span>')+'</div>':'')+
+'</div></div>'})()}
 
 <div class="card">
   <div class="card-h"><span class="dot" style="background:var(--gold)"></span>Objectif PER ${cy}
