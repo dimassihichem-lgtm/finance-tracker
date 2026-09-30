@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v38';const VTAG='correctif Invest · variation globale';
+const VERSION='v39';const VTAG='point de départ mars';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1145,7 +1145,7 @@ const gs=(b.imp.groups||[]).filter(x=>x.type==='fixe'&&/nounou|ourhou|saadia/i.t
 for(const x of gs){const a=Math.abs(x.tot);if(tgt.some(v=>Math.abs(a-v)<1.5))return{amt:a}}const f=b.imp.bySub.fixe||{};const kk=Object.keys(f).find(x=>/nounou/i.test(x));return kk?{amt:f[kk],approx:true}:null})();
 // CAF nette : entrée CAF ≈ cmgRem − cotRest dans l'import de M+cmgLag
 const caf=(()=>{const net=r.cmgRem-r.cotRest;if(net<=0)return null;let i=y*12+m+(g.cmgLag||1);const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b||!b.entrees)return null;return b.entrees.find(e=>/caf/i.test(e.cat)&&Math.abs(e.v-net)<1.5)||null})();
-return{paid:!!t.paid||!!(pay&&!pay.approx),paidSrc:pay&&!pay.approx?'relevé':(t.paid?'manuel':null),paidAmt:pay?pay.amt:null,paidApprox:!!(pay&&pay.approx),decl:!!t.decl||!!(g.cmgReal&&g.cmgReal[k]),declSrc:(g.cmgReal&&g.cmgReal[k])?'montants réels saisis':(t.decl?'manuel':null),caf:!!t.caf||!!caf,cafSrc:caf?'relevé':(t.caf?'manuel':null),fiche:!!t.fiche}}
+return{paid:!!t.paid||!!(pay&&!pay.approx),paidSrc:pay&&!pay.approx?'relevé':(t.paid?'manuel':null),paidAmt:pay?pay.amt:null,paidApprox:!!(pay&&pay.approx),decl:!!t.decl,declSrc:t.decl?'manuel':null,caf:!!t.caf||!!caf,cafSrc:caf?'relevé':(t.caf?'manuel':null),fiche:!!t.fiche}}
 function gardeTrackSet(y,m,f,v){const g=DB.garde;if(!g.track)g.track={};const k=ym(y,m);g.track[k]=g.track[k]||{};g.track[k][f]=v;save();rGarde()}
 function isPP(y,m){const f=DB.garde.ppFrom||'';return !!f&&ym(y,m)>=f}
 function gardeRealDebit(y,m){const s=nM(y,m);const b=gBM(s.y,s.m);if(!b||!b.imp||!b.imp.done)return null;const f=b.imp.bySub.fixe||{};
@@ -1235,7 +1235,7 @@ const d=real-calc;return'<div class="al '+(Math.abs(d)>10?'alr':'alg')+'" style=
 ${(()=>{const st=gardeTrack(gY,gM);if(st.paid===undefined)return'';const row=(l,ok,src,f,note)=>'<div class="row rb" style="padding:6px 0;border-bottom:1px solid var(--line2)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" '+(ok?'checked':'')+' '+(src==='relevé'||src==='montants réels saisis'?'disabled':'')+' style="accent-color:var(--gold);width:16px;height:16px" onchange="gardeTrackSet('+gY+','+gM+',\''+f+'\',this.checked)">'+l+'</label><span style="font-size:10.5px;color:'+(ok?'var(--up)':'var(--td)')+'">'+(ok?'✓ '+(src||''):note||'en attente')+'</span></div>';
 return'<div class="card"><div class="card-h"><span class="dot" style="background:'+(st.paid&&st.decl&&st.fiche?'var(--up)':'var(--gold)')+'"></span>Suivi · '+ML[gM]+'</div><div class="card-b" style="padding-top:4px">'+
 row('Salaire versé'+(st.paidAmt?' <span class="mono" style="font-size:11px;color:var(--td)">'+fE(st.paidAmt)+'</span>':''),st.paid,st.paidSrc,'paid',st.paidApprox?'ligne nounou trouvée mais montant différent':'non trouvé dans le relevé du mois de paiement')+
-row('Déclaration Pajemploi faite',st.decl,st.declSrc,'decl','saisissez les montants réels ci-dessous ou cochez')+
+row('Déclaration Pajemploi validée',st.decl,st.declSrc,'decl','à cocher après le clic « Valider » sur Pajemploi')+
 row('CMG net reçu de la CAF',st.caf,st.cafSrc,'caf','attendu dans le relevé du mois suivant')+
 row('Fiche de paie envoyée',st.fiche,st.fiche?'manuel':null,'fiche','bouton Fiche mensuelle en haut')+
 '<div style="font-size:10px;color:var(--td);margin-top:7px">Coché automatiquement quand la ligne est reconnue dans un relevé importé ; sinon à cocher à la main. Le mois est soldé quand les quatre sont verts.</div></div></div>'})()}
@@ -1613,10 +1613,12 @@ const FIX=/loyer|cr[ée]dit|[ée]cole|cr[eè]che|nounou|cotisations|navigo|[ée]
 DB.bm.forEach(b=>b.ch.forEach(c=>{if(FIX.test(c.l))c.fixe=true;if(/cr[eè]che/i.test(c.l)&&!c.auto)c.payOffset=1}));
 }
 if(DB.garde&&!DB.params.sept26Real){if(!DB.garde.cmgReal)DB.garde.cmgReal={};if(!DB.garde.cmgReal['2026-09'])DB.garde.cmgReal['2026-09']={rem:95.49,cot:78.53};DB.params.sept26Real=true;
-DB.params.journal.push({date:'2026-09-30',champ:'cmgReal.2026-09',old:null,new:'CMG 95,49 · cotisations restantes 78,53',motif:'déclaration Pajemploi de septembre 2026 (première déclaration)'})}
+DB.params.journal.push({date:'2026-09-30',champ:'cmgReal.2026-09',old:null,new:'CMG 95,49 · cotisations restantes 78,53',motif:'aperçu de déclaration Pajemploi de septembre 2026 (montants avant validation)'})}
 if(DB.garde&&DB.garde.p&&!DB.params.recal26){const P=DB.garde.p;const old={txPat:P.txPat,abatH:P.abatH,rev:P.rev};P.txPat=43.059;P.abatH=1.80;P.rev=6823.9;DB.params.recal26=true;
 DB.params.journal.push({date:'2026-09-30',champ:'garde.p (txPat, rev)',old:JSON.stringify(old),new:'txPat 43,059 · rev 6 823,90 · abatH maintenu 1,80',motif:'recalage sur la déclaration Pajemploi réelle de septembre 2026 (290 € / 23 h) : cotisations 241,07, déduction 42,00, CMG 95,49'})}
-if(DB.params.recal26&&!DB.params.recal26b&&DB.garde&&DB.garde.p){DB.garde.p.abatH=1.80;DB.params.recal26b=true}}
+if(DB.params.recal26&&!DB.params.recal26b&&DB.garde&&DB.garde.p){DB.garde.p.abatH=1.80;DB.params.recal26b=true}
+if(!DB.params.mars26){const b3=DB.bm.find(x=>x.y===2026&&x.m===3);if(b3&&(!b3.cash||b3.cash.la==null)){b3.cash={cc:3128,la:9344,ldds:null};b3.cashFin=12472;
+DB.params.journal.push({date:'2026-09-30',champ:'cash.2026-03',old:String(b3.cashFin||'—'),new:'CC 3 128 · livrets 9 344 · total 12 472',motif:'point de départ du réel : CC = solde avant la 1re opération d\u2019avril (relevé), livrets reconstitués depuis les virements et validés par réconciliation (écart 0 sur avril-août)'})}DB.params.mars26=true}}
 function jrnl(champ,oldV,newV,motif){const n=new Date();const inWin=(DB.params.fenetre.mois.includes(n.getMonth()+1))&&n.getDate()>=DB.params.fenetre.jours[0]&&n.getDate()<=DB.params.fenetre.jours[1];
 DB.params.journal.push({date:n.toISOString().slice(0,10),champ,old:oldV,new:newV,motif:motif+(inWin?'':' [hors fenêtre]')});DB.params.version=(DB.params.version||1)+1;save()}
 function regimeFor(y,m){const k=ym(y,m);const rs=(DB.params.regimes||[]).filter(r=>r.from<=k).sort((a,b)=>a.from<b.from?1:-1);return rs.length?rs[0]:null}
