@@ -271,7 +271,7 @@ body.privacy .hdr .brand::after{content:' · privé';font-size:11px;color:var(--
 </head>
 <body>
 
-<div id="login" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
+<div id="login" style="display:none;position:fixed;inset:0;background:radial-gradient(120% 90% at 50% 0%,#141B2E 0%,var(--bg) 60%);z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">
   <div class="mark">H · Finances</div>
   <h1 style="font-family:var(--serif);font-size:26px;margin:14px 0 8px">Connexion</h1>
   <div style="font-size:13px;color:var(--tm);max-width:320px;line-height:1.55;margin-bottom:22px">Les données sont protégées par votre compte Google. Une seule connexion par appareil, puis le code PIN suffit.</div>
@@ -357,7 +357,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v55';const VTAG='connexion Google · sauvegardes cloud';
+const VERSION='v56';const VTAG='connexion Google · sauvegardes cloud';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -382,8 +382,9 @@ try{if(typeof firebase!=='undefined'){firebase.initializeApp({apiKey:"AIzaSyD1aR
 function authLogin(){if(!fauth)return;const p=new firebase.auth.GoogleAuthProvider();const msg=document.getElementById('login-msg');msg.textContent='';
 fauth.signInWithPopup(p).catch(e=>{if(/popup|cancelled|blocked/i.test(e.code||''))return fauth.signInWithRedirect(p);msg.textContent='Connexion refusée : '+(e.message||e.code)})}
 function authLogout(){if(!confirm('Se déconnecter ? Les données locales de cet appareil seront effacées ; elles restent dans le cloud.'))return;try{localStorage.removeItem('hft7')}catch(e){}if(fauth)fauth.signOut().then(()=>location.reload());else location.reload()}
-function authGate(next){const lg=document.getElementById('login');if(!fauth){next();return}
-fauth.onAuthStateChanged(u=>{FUSER=u;if(u){lg.style.display='none';next()}else{lg.style.display='flex'}})}
+function authGate(next){const lg=document.getElementById('login');if(!fauth){next();return}let fired=false;
+fauth.onAuthStateChanged(u=>{fired=true;FUSER=u;if(u){lg.style.display='none';next()}else{lg.style.display='flex'}});
+setTimeout(()=>{if(!fired){lg.style.display='flex';const m=document.getElementById('login-msg');if(m)m.textContent='Le service de connexion ne répond pas — vérifiez la connexion internet, puis réessayez.'}},6000)}
 const DID='hichem_finance';
 function sss(s){const el=document.getElementById('ss');if(!el)return;
 if(s==='ok'){el.textContent='☁ sync';el.style.color='var(--up)'}
@@ -395,10 +396,8 @@ else{el.textContent='…';el.style.color='var(--td)'}}
 let DB,svT=null;
 function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
 if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj()}
-function load(){
-try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}
-ensure();
-if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
+function loadLocal(){try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}ensure()}
+function loadCloud(){if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
   if(doc.exists&&doc.data().db){const c=doc.data().db;if((c._ts||0)>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB))}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok')}).catch(e=>{postLoad();sss('error');if(/permission|insufficient/i.test(String(e.message||e.code)))setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
@@ -454,7 +453,7 @@ function perAutoSum(){const fp=DB.fp;return DB.im.filter(m=>(m.y*12+m.m)>=(fp.pe
 
 /* ===== PIN ===== */
 let pe='';
-function initPin(){authGate(()=>{load();});const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
+function initPin(){loadLocal();authGate(()=>{loadCloud()});const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
 const p=document.getElementById('ppad');[1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(k=>{
 if(k===''){p.innerHTML+='<div></div>';return}
 p.innerHTML+='<button class="pkey'+(k==='⌫'?' fn':'')+'" onclick="pp(\''+k+'\')">'+k+'</button>'})}
