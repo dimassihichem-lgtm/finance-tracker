@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v39';const VTAG='point de départ mars';
+const VERSION='v40';const VTAG='fiche : base mensuelle';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1426,7 +1426,7 @@ function ficheData(y,m){
 const g=DB.garde;const r=gardeCost(y,m);const L=cpLedger(y,m);const pr=cpPeriod(y,m);
 const nd=new Date(y,m,0).getDate();
 const pl=planFor(gKey(y,m,nd))||g.plans[g.plans.length-1];const wk=pl?planWeekly(pl):{s:0,p:0};
-const hebdo=wk.s+wk.p;const mens=g.mode==='mensualise'&&!r.partial;const B=[];
+const hebdo=wk.s+wk.p;const baseFull=(wk.s*g.rate+wk.p*g.rateShared)*52/12;const mens=g.mode==='mensualise'&&!r.partial;const B=[];
 
 const pay=[{l:'Salaire net',v:fEur(r.net)}];
 if(g.nav.on){
@@ -1437,7 +1437,7 @@ B.push({t:'Ce que vous percevez ce mois',rows:pay});
 
 const calc=[];let intro='';
 if(r.partial&&r.partialIn){
- intro='Votre contrat a débuté le '+kDate(r.from).toLocaleDateString('fr-FR')+'. Ce premier mois est payé sur les heures réellement travaillées. Dès le mois suivant, vous percevrez chaque mois le même salaire de '+fEur(r.base)+', congés et jours fériés compris.';
+ intro='Votre contrat a débuté le '+kDate(r.from).toLocaleDateString('fr-FR')+'. Ce premier mois est payé sur les heures réellement travaillées. Dès le mois suivant, vous percevrez chaque mois le même salaire de '+fEur(baseFull)+' ('+fh(hebdo)+' h par semaine lissées sur l\u2019année), congés et jours fériés compris.';
  calc.push({l:fH(r.hS)+' \u00D7 '+fEur(g.rate),v:fEur(r.hS*g.rate)});
  if(r.hP>0)calc.push({l:fH(r.hP)+' en garde partagée \u00D7 '+fEur(g.rateShared),v:fEur(r.hP*g.rateShared)});
 }else if(r.partial){
