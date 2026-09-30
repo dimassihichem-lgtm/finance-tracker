@@ -347,7 +347,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v40';const VTAG='fiche : base mensuelle';
+const VERSION='v41';const VTAG='règle nounou';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1565,7 +1565,7 @@ add(50,'GENERALI VIE','invest','AV');add(50,'E CIE VIE','invest','AV enfants');a
 add(60,'HENNER','fixe','Mutuelle',{sign:'debit'});
 [['AMAZON','Amazon'],['AMZN','Amazon'],['DELIVEROO','Livraison repas'],['UBER','Transport / livraison'],['CARREFOUR','Courses'],['MONOPRIX','Courses'],['FRANPRIX','Courses'],['LIDL','Courses'],['AUCHAN','Courses'],['PICARD','Courses'],['SNCF','Transport'],['RATP','Transport'],['TOTALENERGIES','Carburant'],['ESSO','Carburant'],['PHARMA','Santé'],['DOCTOLIB','Santé'],['AIR FRANCE','Transport'],['BOOKING','Hébergement'],['AIRBNB','Hébergement'],['REVOLUT','Revolut'],['PAYPAL','Achats en ligne'],['FDJ','Loisirs'],['RETRAIT','Retrait espèces']].forEach(x=>add(70,x[0],'variable',x[1],{sign:'debit'}));
 add(70,'SALMA','variable','Virement conjoint',{sign:'debit'});
-[['LE PGDR','variable','Bien-être'],['LES BELLES AIRES','variable','Boulangerie'],['LA SURIESNE','variable','Boulangerie'],['BDM PUTEAUX','variable','Boulangerie'],['NOTAIRES','variable','Services professionnels'],['DON PEPE','variable','Restaurants'],['SC-COMPOSE','variable','Restaurants'],['SURESNES FUTSAL','variable','Club & association'],['MARCHE D','variable','Courses'],['MG MENDES','variable','Courses'],['GIE DES MAE','fixe','École'],['CHARGEMAP','variable','Carburant'],['BELIB','variable','Carburant'],['OOREDOO','variable','Sur place'],['BITAKSI','variable','Sur place'],['AVOLTA','variable','Sur place'],['MANAR FOOD','variable','Sur place'],['GLOVOAPP','variable','Sur place'],['AIRALO','variable','Sur place']].forEach(x=>add(x[1]==='fixe'?66:71,x[0],x[1],x[2],{sign:'debit'}));
+[['OURHOU','fixe','Nounou salaire'],['LE PGDR','variable','Bien-être'],['LES BELLES AIRES','variable','Boulangerie'],['LA SURIESNE','variable','Boulangerie'],['BDM PUTEAUX','variable','Boulangerie'],['NOTAIRES','variable','Services professionnels'],['DON PEPE','variable','Restaurants'],['SC-COMPOSE','variable','Restaurants'],['SURESNES FUTSAL','variable','Club & association'],['MARCHE D','variable','Courses'],['MG MENDES','variable','Courses'],['GIE DES MAE','fixe','École'],['CHARGEMAP','variable','Carburant'],['BELIB','variable','Carburant'],['OOREDOO','variable','Sur place'],['BITAKSI','variable','Sur place'],['AVOLTA','variable','Sur place'],['MANAR FOOD','variable','Sur place'],['GLOVOAPP','variable','Sur place'],['AIRALO','variable','Sur place']].forEach(x=>add(x[1]==='fixe'?66:71,x[0],x[1],x[2],{sign:'debit'}));
 return R}
 function defCats(){return{
 'Logement':['Loyer','Charges copropriété','Énergie','Eau','Internet & télécom','Assurance habitation','Maison & entretien','Mobilier'],
