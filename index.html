@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v70';const VTAG='navigation simplifiée · Invest vide signalé';
+const VERSION='v71';const VTAG='fiche sans signatures';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1590,7 +1590,7 @@ ${d.blocks.map(b=>`<div class="fsec"><h2>${b.t}</h2>
 ${b.intro?'<div class="fintro">'+b.intro+'</div>':''}
 <table>${b.rows.map(r=>'<tr class="'+(r.strong?'grand':'')+'"><td>'+r.l+(r.note?'<div class="rn">'+r.note+'</div>':'')+'</td><td class="v">'+r.v+'</td></tr>').join('')}</table>
 ${b.foot?'<div class="ffootnote">'+b.foot+'</div>':''}</div>`).join('')}
-<div class="fsign"><div>Fait le ……………………<br><br>Signature de l'employeur</div><div>Signature de la salariée</div></div>
+<div style="font-size:10.5px;color:var(--td);font-style:italic;margin-top:14px">Document d’information établi par l’employeur · le bulletin officiel est émis par Pajemploi.</div>
 </div>`;}
 
 function shareFiche(){const d=ficheData(FY,FM);
