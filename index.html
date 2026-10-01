@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v67';const VTAG='virement précaution · livrets par l\'import';
+const VERSION='v68';const VTAG='réel fait foi : livrets, prévisionnel figé, wizard';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -545,8 +545,9 @@ return'<span class="chip '+(d>=0?'tag-up':'tag-dn')+'" title="patrimoine aujourd
 
 <div class="statrow">
   <div class="stat"><div class="sl">Variation patrimoine</div><div class="sv mono" style="color:${gain>=0?'var(--up)':'var(--dn)'}">${gain>=0?'+':''}${fk(gain)}</div><div class="sf">vs mois précédent, marché inclus</div></div>
-  <div class="stat"><div class="sl">Δ Compte</div><div class="sv mono" style="color:${dC>=0?'var(--up)':'var(--dn)'}">${dC>=0?'+':''}${fE(kE(dC))}</div><div class="sf">Avant sal.</div></div>
-  <div class="stat"><div class="sl">Épargné</div><div class="sv mono" style="color:var(--blue)">${totRev>0?txE+'%':'—'}</div><div class="sf">${totRev>0?f$(Math.round(ep))+' € / '+f$(Math.round(totRev))+' €'+(revs?' (dont aides)':''):'Salaire manquant'}</div></div>
+  ${(()=>{const mr=last&&isV2(last.y,last.m)?monthReal(last.y,last.m):null;if(mr&&mr.reelConso!=null){const rev=mr.salaire+mr.autres;const tx=rev>0?Math.round(mr.epargne/rev*100):null;return'<div class="stat"><div class="sl">Épargne '+MS[last.m]+'</div><div class="sv mono" style="color:'+(mr.epargne>=0?'var(--up)':'var(--dn)')+'">'+(mr.epargne>=0?'+':'')+fk(mr.epargne)+'</div><div class="sf">Δ cash + investi</div></div><div class="stat"><div class="sl">Taux d\u2019épargne</div><div class="sv mono" style="color:var(--blue)">'+(tx!=null?tx+' %':'—')+'</div><div class="sf">sur '+fE(rev)+' de revenus</div></div>'}
+return'<div class="stat"><div class="sl">Δ Compte</div><div class="sv mono" style="color:'+(dC>=0?'var(--up)':'var(--dn)')+'">'+(dC>=0?'+':'')+fE(kE(dC))+'</div><div class="sf">Avant sal.</div></div>'})()}
+  ${(last&&isV2(last.y,last.m)&&monthReal(last.y,last.m)&&monthReal(last.y,last.m).reelConso!=null)?'':`<div class="stat"><div class="sl">Épargné</div><div class="sv mono" style="color:var(--blue)">${totRev>0?txE+'%':'—'}</div><div class="sf">${totRev>0?f$(Math.round(ep))+' € / '+f$(Math.round(totRev))+' €'+(revs?' (dont aides)':''):'Salaire manquant'}</div></div>`}
 </div>
 
 ${rTodo()}
@@ -629,10 +630,11 @@ function wizShift(d){const r=d>0?nM(WZ.y,WZ.m):pM(WZ.y,WZ.m);wizStartFor(r.y,r.m
 function wizStartFor(y,m){
 WZ.y=y;WZ.m=m;WZ.step=0;
 gOBM(y,m);const im=gOIM(y,m);syncMonth(gBM(y,m));
+const v2w=isV2(y,m);const nx=nM(y,m);WZ.py=v2w?nx.y:y;WZ.pm=v2w?nx.m:m;
 WZ.steps=[{t:'soldes'}];
 im.supports.forEach((s,i)=>{if((s.owner||'moi')!=='cash')WZ.steps.push({t:'sup',i})});
 if(DB.params&&DB.params.proj&&(DB.params.proj.ponctuels||[]).some(p=>/employeur|pee|perco|particip|abond/i.test(p.l)&&+p.mois===m))WZ.steps.push({t:'employeur'});
-WZ.steps.push({t:'contribs'},{t:'revenus'},{t:'charges'},{t:'excep'},{t:'recap'});
+WZ.steps.push({t:'contribs'},{t:'revenus'},{t:'charges'},{t:'excep'},{t:'recap'});if(v2w)gOBM(WZ.py,WZ.pm);
 WZ.on=true;document.getElementById('wiz').classList.add('on');
 document.getElementById('wiz-month').textContent=ML[m]+' '+y;
 wizRender()}
@@ -646,7 +648,7 @@ const st=WZ.steps[WZ.step];const body=document.getElementById('wiz-body');
 document.getElementById('wiz-bar').style.width=Math.round((WZ.step)/(WZ.steps.length-1)*100)+'%';
 document.getElementById('wiz-back').style.visibility=WZ.step===0?'hidden':'visible';
 document.getElementById('wiz-next').textContent=WZ.step===WZ.steps.length-1?'Enregistrer ✓':'Continuer →';
-const cm=gOBM(WZ.y,WZ.m);const im=gOIM(WZ.y,WZ.m);
+const cm=gOBM(WZ.y,WZ.m);const im=gOIM(WZ.y,WZ.m);const cmP=gOBP();const PLAN=(WZ.py&&(WZ.py!==WZ.y||WZ.pm!==WZ.m));const PL=PLAN?' · prévisionnel '+ML[WZ.pm]:'';
 const pv=pM(WZ.y,WZ.m);const pvB=gBM(pv.y,pv.m);const pvI=gIM(pv.y,pv.m);
 const stepN='Étape '+(WZ.step+1)+' / '+WZ.steps.length;
 
@@ -701,26 +703,32 @@ body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Versements</div>
 <div class="row" style="margin-top:10px"><input class="inp sm" id="wzc-l" placeholder="Support"><input class="inp sm mono" id="wzc-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><button class="btn btn-ghost sm" onclick="wzAddContrib()">+</button></div>`}
 
 else if(st.t==='revenus'){
-body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Revenus</div>
-<div class="wiz-q">Aides reçues ce mois</div>
-<div class="wiz-where">🏦 Allocations familiales, CMG… — montants réellement crédités</div>
-<div id="wz-rev">${wzRevHtml(cm)}</div>
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Revenus${PL}</div>
+<div class="wiz-q">${PLAN?'Aides attendues en '+ML[WZ.pm]:'Aides reçues ce mois'}</div>
+<div class="wiz-where">🏦 Allocations familiales, CMG… ${PLAN?'— ce que vous prévoyez de recevoir (le réel viendra du relevé)':'— montants réellement crédités'}</div>
+<div id="wz-rev">${wzRevHtml(cmP)}</div>
 <div class="row" style="margin-top:10px"><input class="inp sm" id="wzr-l" placeholder="Aide"><input class="inp sm mono" id="wzr-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><button class="btn btn-ghost sm" onclick="wzAddRev()">+</button></div>`}
 
 else if(st.t==='charges'){
-body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Charges</div>
-<div class="wiz-q">Charges du mois</div>
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Charges${PL}</div>
+<div class="wiz-q">${PLAN?'Charges prévues en '+ML[WZ.pm]:'Charges du mois'}</div>
 <div class="wiz-where">🏠 Reprises du mois dernier — ajuster si besoin</div>
-<div id="wz-charges">${wzChargesHtml(cm)}</div>
+<div id="wz-charges">${wzChargesHtml(cmP)}</div>
 <div class="row" style="margin-top:10px"><input class="inp sm" id="wzch-l" placeholder="Charge"><input class="inp sm mono" id="wzch-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><button class="btn btn-ghost sm" onclick="wzAddCharge()">+</button></div>`}
 
 else if(st.t==='excep'){
-body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Exceptionnel</div>
-<div class="wiz-q">Dépenses exceptionnelles ?</div>
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Exceptionnel${PL}</div>
+<div class="wiz-q">${PLAN?'Dépenses exceptionnelles prévues en '+ML[WZ.pm]+' ?':'Dépenses exceptionnelles ?'}</div>
 <div class="wiz-where">✈️ Voyages, achats importants, remboursements (négatif)…</div>
-<div id="wz-excep">${wzExcepHtml(cm)}</div>
+<div id="wz-excep">${wzExcepHtml(cmP)}</div>
 <div class="row" style="margin-top:10px"><input class="inp sm" id="wze-l" placeholder="Libellé"><input class="inp sm mono" id="wze-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><button class="btn btn-ghost sm" onclick="wzAddExcep()">+</button></div>`}
 
+else if(st.t==='recap'&&isV2(WZ.y,WZ.m)){const mr=monthReal(WZ.y,WZ.m);const ok=mr&&mr.complete;const V=DB.params.virementPrecaution||0;
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Récapitulatif</div><div class="wiz-q">${ML[WZ.m]} ${WZ.y} en réel</div>
+${mr&&mr.reelConso!=null?`<div class="wiz-recap"><div class="wiz-recap-line"><span>Salaire + entrées</span><b style="color:var(--up)">${fE(mr.salaire+mr.autres)}</b></div><div class="wiz-recap-line"><span>Consommation</span><b style="color:var(--dn)">−${fE(mr.reelConso)}</b></div><div class="wiz-recap-line"><span>Investi</span><b>−${fE(mr.invest)}</b></div><div class="wiz-recap-line" style="border:none"><span style="font-weight:600">Épargne</span><b style="color:${mr.epargne>=0?'var(--up)':'var(--dn)'}">${fE(mr.epargne)}</b></div></div>
+<div class="wiz-sug"><div class="eyebrow" style="color:var(--gold)">Livrets, d\u2019après le relevé</div><div style="font-size:13px;margin-top:4px">versé ${fE(mr.imp?mr.imp.livretOut||0:0)} · retiré ${fE(mr.imp?mr.imp.livretIn||0:0)}${V?' · virement précaution attendu '+fE(V):''}</div></div>`:'<div class="al ala">Réel incomplet : '+(mr?mr.missing.join(', '):'')+'</div>'}
+${(WZ.py!==WZ.y||WZ.pm!==WZ.m)?'<div style="font-size:11.5px;color:var(--tm);margin-top:10px">Prévisionnel de '+ML[WZ.pm]+' préparé : '+gOBP().ch.length+' charges, '+(gOBP().rev||[]).length+' aides, '+gOBP().ex.length+' exceptionnel'+(gOBP().ex.length>1?'s':'')+'.</div>':''}
+<button class="btn ${ok?'btn-gold':'btn-ghost'} wide" style="margin-top:16px" onclick="if(closeMonth(WZ.y,WZ.m)){gOIM(WZ.y,WZ.m).cl=true;save();wizClose()}">${ok?'✓ Clôturer le mois':'Clôturer quand même'}</button>`}
 else if(st.t==='recap'){
 const tCh=cm.ch.reduce((s,c)=>s+c.v,0);const tEx=cm.ex.reduce((s,d)=>s+d.v,0);
 const tRev=(cm.rev||[]).reduce((s,c)=>s+c.v,0);
@@ -750,12 +758,13 @@ const fi=body.querySelector('.wiz-input');if(fi&&st.t!=='recap')setTimeout(()=>f
 
 function wzContribsHtml(im){return im.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOIM(WZ.y,WZ.m).contribs['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOIM(WZ.y,WZ.m).contribs.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucun versement</div>'}
 function wzAddContrib(){const l=document.getElementById('wzc-l').value.trim();if(!l)return;gOIM(WZ.y,WZ.m).contribs.push({l,v:+document.getElementById('wzc-v').value||0});save();wizRender()}
-function wzRevHtml(cm){return (cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).rev['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).rev.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune aide</div>'}
-function wzAddRev(){const l=document.getElementById('wzr-l').value.trim();if(!l)return;const d=gOBM(WZ.y,WZ.m);if(!d.rev)d.rev=[];d.rev.push({l,v:+document.getElementById('wzr-v').value||0});save();wizRender()}
-function wzChargesHtml(cm){return cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBM(WZ.y,WZ.m).ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
-function wzAddCharge(){const l=document.getElementById('wzch-l').value.trim();if(!l)return;gOBM(WZ.y,WZ.m).ch.push({l,v:+document.getElementById('wzch-v').value||0});save();wizRender()}
-function wzExcepHtml(cm){return cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:14px">'+d.l+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(WZ.y,WZ.m).ex.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Rien pour l\u2019instant — c\u2019est bon signe</div>'}
-function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();const v=+document.getElementById('wze-v').value;if(!l||!v)return;gOBM(WZ.y,WZ.m).ex.push({l,v});save();wizRender()}
+function wzRevHtml(cm){return (cm.rev||[]).map((c,i)=>c.auto?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600;color:var(--up)">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBP().rev['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBP().rev['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBP().rev.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune aide</div>'}
+function gOBP(){return gOBM(WZ.py||WZ.y,WZ.pm||WZ.m)}
+function wzAddRev(){const l=document.getElementById('wzr-l').value.trim();if(!l)return;const d=gOBP();if(!d.rev)d.rev=[];d.rev.push({l,v:+document.getElementById('wzr-v').value||0});save();wizRender()}
+function wzChargesHtml(cm){return cm.ch.map((c,i)=>c.auto==='garde'?'<div class="list-item"><span style="flex:1;font-size:14px">'+c.l+' <span class="chip tag-gold" style="font-size:9px">auto</span></span><span class="mono" style="font-weight:600">'+f$(c.v)+' €</span><span style="width:31px"></span></div>':'<div class="list-item"><input class="inp sm" style="flex:1" value=\"'+esc(c.l)+'\" onchange="gOBP().ch['+i+'].l=this.value;save()"><input class="inp sm mono" type="number" inputmode="decimal" style="width:90px;text-align:right" value="'+(c.v||'')+'" onchange="gOBP().ch['+i+'].v=+this.value||0;save()"><span class="xdel" onclick="gOBP().ch.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Aucune charge</div>'}
+function wzAddCharge(){const l=document.getElementById('wzch-l').value.trim();if(!l)return;gOBP().ch.push({l,v:+document.getElementById('wzch-v').value||0});save();wizRender()}
+function wzExcepHtml(cm){return cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:14px">'+d.l+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBP().ex.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Rien pour l\u2019instant — c\u2019est bon signe</div>'}
+function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();const v=+document.getElementById('wze-v').value;if(!l||!v)return;gOBP().ex.push({l,v});save();wizRender()}
 /* ================= BUDGET ================= */
 function monthTools(prefix,y,m,onCreate,onDel,onPurge){
 return `<div class="mtools">
@@ -797,6 +806,8 @@ ${exists&&isV2(bY,bM)?'<div class="segtabs" style="margin-bottom:12px"><button c
 ${exists?completeBanner(bY,bM):''}
 ${exists&&(BTAB==='reel'||!isV2(bY,bM))?reelCard(bY,bM):''}
 <div style="${exists&&isV2(bY,bM)&&BTAB==='reel'?'display:none':''}">
+${exists&&isV2(bY,bM)&&cm.imp?'<div class="al '+(cm.cl?'alb':'ala')+'" style="margin-bottom:10px">'+(cm.cl?'Mois clos : le prévisionnel est <b>figé</b>. C\u2019est la référence de l\u2019écart prévu / réel. Pour prévoir, travaillez sur le mois suivant.':'Ce mois a un relevé : le réel fait foi. Modifier le prévisionnel maintenant déplace la référence de l\u2019écart — réservez-le aux corrections (chips F/V, décalages).')+'</div>':''}
+<div style="${exists&&cm.cl&&isV2(bY,bM)?'pointer-events:none;opacity:.72':''}">
 
 <div class="statrow">
 <div class="stat"><div class="sl">Δ hors sal.</div><div class="sv mono" style="color:${deltaHS>=0?'var(--up)':'var(--dn)'}">${deltaHS>=0?'+':''}${fE(kE(deltaHS))}</div><div class="sf">FinAvSal − DébAvSal</div></div>
@@ -846,15 +857,15 @@ return c.auto?'<div class="list-item"><span style="flex:1;font-size:13.5px">'+es
 ${im?im.contribs.map(c=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(c.l)+'</span><span class="mono" style="color:var(--violet);font-weight:600">'+f$(c.v)+' €</span></div>').join(''):'<div class="empty">Mois Invest non créé</div>'}
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Livret A<span class="aux mono" style="color:${cm.lv-tRt>=0?'var(--up)':'var(--dn)'}">net ${cm.lv-tRt>=0?'+':''}${f$(cm.lv-tRt)} €</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Livrets<span class="aux mono" style="color:${(isV2(bY,bM)&&cm.imp?(cm.imp.livretOut||0)-(cm.imp.livretIn||0):cm.lv-tRt)>=0?'var(--up)':'var(--dn)'}">net ${(()=>{const n=isV2(bY,bM)&&cm.imp?(cm.imp.livretOut||0)-(cm.imp.livretIn||0):cm.lv-tRt;return (n>=0?'+':'')+f$(Math.round(n))})()} €</span></div>
 <div class="card-b">
 ${isV2(bY,bM)&&cm.imp?'<div style="font-size:12px;line-height:1.6"><div class="row rb"><span>Versé vers les livrets <small style="color:var(--td)">(d\u2019après le relevé)</small></span><b class="mono">'+fE(cm.imp.livretOut||0)+'</b></div><div class="row rb"><span>Retiré des livrets</span><b class="mono" style="color:'+(cm.imp.livretIn>0?'var(--dn)':'inherit')+'">'+fE(cm.imp.livretIn||0)+'</b></div><div style="font-size:10.5px;color:var(--td);margin-top:4px">Valeurs d\u2019import, non modifiables. livretOut = compte courant → livret · livretIn = livret → compte courant.</div></div>':'<div class="row"><span class="lbl" style="margin:0;min-width:60px">Versé</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:110px" value="'+(cm.lv||'')+'" onchange="gOBM(bY,bM).lv=+this.value||0;save();rBudget()"><span style="font-size:12px;color:var(--td)">€ · après salaire</span></div>'}
 <div class="hr"></div>
-${isV2(bY,bM)&&cm.imp?'':cm.lr.map((r,i)=>'<div class="list-item"><span class="mono" style="color:var(--dn);font-weight:600">−'+f$(r.v)+' €</span><span style="flex:1;font-size:12px;color:var(--td)">'+r.d+'</span><span class="xdel" onclick="gOBM(bY,bM).lr.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucun retrait</div>'}
-<div class="row" style="margin-top:9px"><input class="inp sm mono" id="r-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><input class="inp sm" id="r-d" placeholder="Date" style="width:80px"><button class="btn btn-ghost sm" onclick="var v=+document.getElementById('r-v').value;if(!v)return;gOBM(bY,bM).lr.push({v,d:document.getElementById('r-d').value||'?'});save();rBudget()">+</button></div>
+${isV2(bY,bM)&&cm.imp?'':`${cm.lr.map((r,i)=>'<div class="list-item"><span class="mono" style="color:var(--dn);font-weight:600">−'+f$(r.v)+' €</span><span style="flex:1;font-size:12px;color:var(--td)">'+r.d+'</span><span class="xdel" onclick="gOBM(bY,bM).lr.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucun retrait</div>'}
+<div class="row" style="margin-top:9px"><input class="inp sm mono" id="r-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><input class="inp sm" id="r-d" placeholder="Date" style="width:80px"><button class="btn btn-ghost sm" onclick="var v=+document.getElementById('r-v').value;if(!v)return;gOBM(bY,bM).lr.push({v,d:document.getElementById('r-d').value||'?'});save();rBudget()">+</button>`}</div>
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--pink)"></span>Exceptionnel<span class="aux mono" style="color:var(--pink)">${f$(tEx)} €</span></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--pink)"></span>Exceptionnel prévu<span class="aux mono" style="color:var(--pink)">${f$(tEx)} €</span></div>
 <div class="card-b">
 ${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(d.l)+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBM(bY,bM).ex.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Rien ce mois</div>'}
 <div class="row" style="margin-top:9px"><input class="inp sm" id="e-l" placeholder="Libellé"><input class="inp sm mono" id="e-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('e-l').value;var v=+document.getElementById('e-v').value;if(!l||!v)return;gOBM(bY,bM).ex.push({l,v});save();rBudget()">+</button></div>
@@ -863,7 +874,7 @@ ${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px"
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Notes du mois</div>
 <div class="card-b"><textarea class="note-ta" style="min-height:70px" onchange="gOBM(bY,bM).nt=this.value;save()">${esc(cm.nt||'')}</textarea></div></div>
 
-</div>
+</div></div>
 <button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="closeMonth(bY,bM);rBudget()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[bM]}</button>
 ${cm.cl&&isV2(bY,bM)?'<div style="font-size:10.5px;color:var(--td);margin:-8px 0 14px;text-align:center">clos le '+(cm.closedAt||'—')+' · paramètres v'+(cm.paramsVersion||1)+(cm.regime?' · '+esc(cm.regime):'')+(cm.reconst?' · reconstitué':'')+'</div>':''}
 
