@@ -367,14 +367,14 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v66';const VTAG='poches budgétaires';
+const VERSION='v67';const VTAG='virement précaution · livrets par l\'import';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
 function defBM(y,m){return{y,m,sav:0,sap:0,ch:defCh(),rev:defRev(),lv:0,lr:[],ex:[],nt:'',cl:false}}
 function defIM(y,m){return{y,m,supports:[{n:'PEA',v:0,det:[]},{n:'PEE AMUNDI',v:0,det:[]},{n:'PER AMUNDI',v:0,det:[]},{n:'Assurance Vie',v:0,det:[]},{n:'Livret A',v:0,det:[]}],contribs:[{l:'Assurance Vie',v:300},{l:'PER',v:200},{l:'PEA',v:200}],cl:false}}
 function defKPI(){return[
-{id:'patri',label:'Patrimoine',formula:'Compte + PEE + PER AMUNDI',desc:'Solde compte (avant sal.) + PEE AMUNDI + PER AMUNDI. Le compte inclut déjà PEA, AV, Livret A, PER Bourso.'},
+{id:'patri',label:'Patrimoine',formula:'Compte + PEE + PER AMUNDI',desc:'Cash (compte courant + Livret A + LDDS en fin de mois) + supports d\u2019investissement (PEA, AV, PER, PEE, PERECOI). Le Livret A n\u2019est jamais compté deux fois : il est dans le cash, pas dans les supports.'},
 {id:'gain',label:'Gain/Perte',formula:'Patrimoine(M) - Patrimoine(M-1)',desc:'Variation du patrimoine total d\'un mois à l\'autre.'},
 {id:'gapCompte',label:'Δ Compte',formula:'Compte(M) - Compte(M-1)',desc:'Variation du solde compte avant salaire d\'un mois à l\'autre.'},
 {id:'rav',label:'Reste à vivre',formula:'Salaire + Aides CAF - Charges - Invest - Excep',desc:'Salaire = (AprèsSal - AvantSal) × 1000. Les aides CAF perçues s\'ajoutent aux revenus du mois.'},
@@ -550,6 +550,7 @@ return'<span class="chip '+(d>=0?'tag-up':'tag-dn')+'" title="patrimoine aujourd
 </div>
 
 ${rTodo()}
+${rVirement()}
 ${rProjHome()}
 ${(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
 return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?'régime : '+mr.regime.label:'')+'</span></div><div class="card-b">'+
@@ -847,9 +848,9 @@ ${im?im.contribs.map(c=>'<div class="list-item"><span style="flex:1;font-size:13
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Livret A<span class="aux mono" style="color:${cm.lv-tRt>=0?'var(--up)':'var(--dn)'}">net ${cm.lv-tRt>=0?'+':''}${f$(cm.lv-tRt)} €</span></div>
 <div class="card-b">
-<div class="row"><span class="lbl" style="margin:0;min-width:60px">Versé</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:110px" value="${cm.lv||''}" onchange="gOBM(bY,bM).lv=+this.value||0;save();rBudget()"><span style="font-size:12px;color:var(--td)">€ · après salaire</span></div>
+${isV2(bY,bM)&&cm.imp?'<div style="font-size:12px;line-height:1.6"><div class="row rb"><span>Versé vers les livrets <small style="color:var(--td)">(d\u2019après le relevé)</small></span><b class="mono">'+fE(cm.imp.livretOut||0)+'</b></div><div class="row rb"><span>Retiré des livrets</span><b class="mono" style="color:'+(cm.imp.livretIn>0?'var(--dn)':'inherit')+'">'+fE(cm.imp.livretIn||0)+'</b></div><div style="font-size:10.5px;color:var(--td);margin-top:4px">Valeurs d\u2019import, non modifiables. livretOut = compte courant → livret · livretIn = livret → compte courant.</div></div>':'<div class="row"><span class="lbl" style="margin:0;min-width:60px">Versé</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:110px" value="'+(cm.lv||'')+'" onchange="gOBM(bY,bM).lv=+this.value||0;save();rBudget()"><span style="font-size:12px;color:var(--td)">€ · après salaire</span></div>'}
 <div class="hr"></div>
-${cm.lr.map((r,i)=>'<div class="list-item"><span class="mono" style="color:var(--dn);font-weight:600">−'+f$(r.v)+' €</span><span style="flex:1;font-size:12px;color:var(--td)">'+r.d+'</span><span class="xdel" onclick="gOBM(bY,bM).lr.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucun retrait</div>'}
+${isV2(bY,bM)&&cm.imp?'':cm.lr.map((r,i)=>'<div class="list-item"><span class="mono" style="color:var(--dn);font-weight:600">−'+f$(r.v)+' €</span><span style="flex:1;font-size:12px;color:var(--td)">'+r.d+'</span><span class="xdel" onclick="gOBM(bY,bM).lr.splice('+i+',1);save();rBudget()">×</span></div>').join('')||'<div class="empty">Aucun retrait</div>'}
 <div class="row" style="margin-top:9px"><input class="inp sm mono" id="r-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><input class="inp sm" id="r-d" placeholder="Date" style="width:80px"><button class="btn btn-ghost sm" onclick="var v=+document.getElementById('r-v').value;if(!v)return;gOBM(bY,bM).lr.push({v,d:document.getElementById('r-d').value||'?'});save();rBudget()">+</button></div>
 </div></div>
 
@@ -920,7 +921,7 @@ ${monthTools('i',iY,iM,"var y=+document.getElementById('iAY').value,m=+document.
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Supports<span class="aux" style="font-size:10.5px;color:var(--td)">valeur au dernier jour du mois</span></div>
 <div class="card-b">
-${cm.supports.map((s,si)=>{
+${cm.supports.map((s,si)=>{if((s.owner||'moi')==='cash')return'';
 const open=ACC_OPEN[si]||(s.det&&s.det.length&&ACC_OPEN[si]!==false);
 return '<div class="acc'+(open?' open':'')+'" id="acc'+si+'">'+
 '<div class="acc-h" onclick="ACC_OPEN['+si+']=!(ACC_OPEN['+si+']||false);if(ACC_OPEN['+si+']===false)ACC_OPEN['+si+']=false;this.parentElement.classList.toggle(\'open\')">'+
@@ -1633,7 +1634,7 @@ return doc;}
 const p2=n=>String(n).padStart(2,'0');const ym=(y,m)=>y+'-'+p2(m);
 const TYPES=['salaire','entree','interneLivret','interneAutre','invest','fixe','variable'];
 const TYPE_LBL={salaire:'Salaire',entree:'Entrée',interneLivret:'Interne · livret',interneAutre:'Interne · autre compte',invest:'Investissement',fixe:'Charge fixe',variable:'Variable'};
-function defParams(){return{version:1,v2From:'2026-04',cibleVariables:2500,cibleprecaution:10000,
+function defParams(){return{version:1,v2From:'2026-04',cibleVariables:2500,cibleprecaution:10000,virementPrecaution:300,ccPlancher:2500,
 traj:{date0:'2026-08-24',base:60959,taux:0.05,epargneAn:6000,employeur:13000},
 poids:{A:0.35,B:0.30,C:0.15,E:0.20},
 ancres:{A:{n5:0.20,n3:0.10,n1:0},B:{n5:0.90,n3:1.00,n1:1.40},C:{n5:1.00,n3:0.60,n1:0.30},E:{n5:1.02,n3:1.00,n1:0.95}},
@@ -1714,6 +1715,7 @@ setTimeout(()=>{const i=document.getElementById('motif-in');if(i)i.focus()},50)}
 function motifOk(){const v=(document.getElementById('motif-in')||{}).value||'';if(!v.trim()){alert('Une ligne de motif est nécessaire.');return}const cb=MOTIF_PENDING;MOTIF_PENDING=null;document.getElementById('motif-modal').innerHTML='';if(cb)cb(v.trim())}
 function motifCancel(){MOTIF_PENDING=null;const m=document.getElementById('motif-modal');if(m)m.innerHTML='';rMore()}
 function withMotif(field,apply){const f=document.getElementById(field);const v=(f&&f.value||'').trim()||(field==='pj-motif'?PJ_MOTIF:'');if(v){apply(v);return}askMotif(apply)}
+function qSearch(id,fn){fn();rMore();setTimeout(()=>{const i=document.getElementById(id);if(i){i.focus();const n=i.value.length;try{i.setSelectionRange(n,n)}catch(e){}}},0)}
 function jrnl(champ,oldV,newV,motif){const n=new Date();const inWin=(DB.params.fenetre.mois.includes(n.getMonth()+1))&&n.getDate()>=DB.params.fenetre.jours[0]&&n.getDate()<=DB.params.fenetre.jours[1];
 DB.params.journal.push({date:n.toISOString().slice(0,10),champ,old:oldV,new:newV,motif:motif+(inWin?'':' [hors fenêtre]')});DB.params.version=(DB.params.version||1)+1;save()}
 function regimeFor(y,m){const k=ym(y,m);const rs=(DB.params.regimes||[]).filter(r=>r.from<=k).sort((a,b)=>a.from<b.from?1:-1);return rs.length?rs[0]:null}
@@ -1799,12 +1801,13 @@ if(dt.length===8&&!isNaN(amt))out.push({d:dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt
 return out.length?{tx:out}:null}
 function buildImport(txs,force){force=force||{};const t={salaire:0,entree:0,interneLivret:0,interneAutre:0,invest:0,fixe:0,variable:0};
 const bySub={fixe:{},variable:{},entree:{},invest:{}};const byGrp={fixe:{},variable:{},entree:{},invest:{}};const unmatched=[],big=[],entrees=[],internes=[],lines=[];
-const ccL=txs.filter(x=>x.bal!=null&&!/livret|ldds/i.test(x.acc||''));const lastD=ccL.length?ccL.map(x=>x.d).sort().pop():null;const ccEnd=lastD?ccL.filter(x=>x.d===lastD)[0].bal:null;let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0;const bourso={};const groups={};
+const ccL=txs.filter(x=>x.bal!=null&&!/livret|ldds/i.test(x.acc||''));const lastD=ccL.length?ccL.map(x=>x.d).sort().pop():null;const ccEnd=lastD?ccL.filter(x=>x.d===lastD)[0].bal:null;let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0,payDate=null,ccBeforePay=null;const bourso={};const groups={};
 const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
 txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const a=Math.abs(x.v);const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};if(c.via==='bourso')viaBourso++;
 if(!c.unmatched){const mk=(x.s||suggestPattern(x.l)).toUpperCase();const key=mk+'|'+c.type+'|'+(c.grp||'')+'|'+(c.sub||'');const src=c.ruleId==='manual'?'manuel':c.via==='bourso'?'bourso':c.ruleId==='acc'?'compte':'règle';(groups[key]=groups[key]||{key,s:mk,type:c.type,grp:c.grp||'',sub:c.sub||'',src,n:0,tot:0,lines:[]}).n++;groups[key].tot+=x.v;groups[key].lines.push({d:x.d,l:x.l,v:x.v})}if(x.v<0)debits+=a;
 if(['interneLivret','interneAutre','invest'].includes(c.type)&&internes.length<40)internes.push({d:x.d,l:x.l.slice(0,50),v:x.v,t:c.type});
-if(['fixe','variable','entree'].includes(c.type))lines.push({d:x.d,l:x.l.slice(0,48),v:Math.round(x.v*100)/100,t:c.type,s:c.sub||''});
+if(['fixe','variable','entree','interneLivret','salaire'].includes(c.type))lines.push({d:x.d,l:x.l.slice(0,48),v:Math.round(x.v*100)/100,t:c.type,s:c.sub||''});
+if(c.type==='salaire'&&x.bal!=null&&payDate==null){payDate=x.d;ccBeforePay=Math.round((x.bal-x.v)*100)/100}
 if(c.type==='salaire'){t.salaire+=x.v;salaireCount++;entrees.push({l:x.l,v:x.v,cat:'salaire'})}
 else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v);G('entree',x.v)}}
 else if(c.type==='interneLivret'){t.interneLivret+=x.v;if(!/livret|ldds/i.test(x.acc||'')){if(x.v>0)livretIn+=a;else livretOut+=a}}
@@ -1814,7 +1817,7 @@ else if(c.type==='fixe'){if(x.v<0){t.fixe+=a;add(bySub.fixe,c.sub,a);G('fixe',a)
 else{if(x.v<0){t.variable+=a;add(bySub.variable,c.sub,a);G('variable',a);if(a>=100)big.push({l:x.l,v:a,sub:c.sub||'',grp:c.grp||'',d:x.d})}}
 if(c.unmatched)unmatched.push({l:x.l,v:x.v,d:x.d,s:x.s||'',cat:x.cat||''})});
 unmatched.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));big.sort((a,b)=>b.v-a.v);
-return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,groups:Object.values(groups).sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot)),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,internes,lines,ccEnd,ccEndDate:lastD,consoCsv:t.fixe+t.variable}}
+return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,groups:Object.values(groups).sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot)),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,internes,lines,ccEnd,ccEndDate:lastD,payDate,ccBeforePay,consoCsv:t.fixe+t.variable}}
 /* ---- calcul mensuel ---- */
 function prevuConso(y,m){let fixe=0,varb=0;const idx=y*12+m;
 for(let o=0;o<=2;o++){const i=idx-o;const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b)continue;b.ch.forEach(c=>{if(((+c.payOffset)||0)===o){if(c.fixe)fixe+=c.v;else varb+=c.v}})}
@@ -1839,7 +1842,7 @@ if(cashFin!=null&&cc.la==null&&cc.ldds==null)warn.push('livrets non renseignés 
 const pc=(pb&&pb.cash)||{};if(cashDeb!=null&&pc.la==null&&pc.ldds==null)warn.push('livrets non renseignés fin '+MS[pv.m]);
 return{cashDeb,cashFin,imp,salaire,autres,invest,investSrc:imp?'import':'prévisionnel',reelConso,fixes,fixesSrc:imp?'import':'prévisionnel',variables,prevu,ecart:reelConso!=null?reelConso-prevu.total:null,epargne,recon,missing,warn,info,complete:missing.length===0,regime:regimeFor(y,m)}}
 function variablesMoy3(y,m){let s=0,n=0;let yy=y,mm=m;for(let i=0;i<6&&n<3;i++){const r=pM(yy,mm);yy=r.y;mm=r.m;const b=gBM(yy,mm);if(b&&b.cl){const mr=monthReal(yy,mm);if(mr&&mr.variables!=null){s+=mr.variables;n++}}}return n?{v:s/n,n}:null}
-function investiT(im){return im?im.supports.filter(s=>(s.owner||'moi')==='moi').reduce((a,s)=>a+s.v,0):0}
+function investiT(im){return im?im.supports.filter(s=>(s.owner||'moi')!=='cash').reduce((a,s)=>a+s.v,0):0}
 function calcPatriV2(bm,im){return(bm&&bm.cashFin!=null)?bm.cashFin+investiT(im):calcPatri(bm,im)}
 /* ---- application d'un import ---- */
 let IMP_STATE=null,IMP_RETURN=null;
@@ -1874,6 +1877,7 @@ if(b.imp&&b.imp.lines){const old={};b.imp.lines.forEach(l=>{if(l.poche)old[l.d+'
 b.imp=clean;b.entrees=clean.entrees;b.lvAuto=clean.livretOut;b.lrAuto=clean.livretIn;
 const n0=new Date();if((n0.getFullYear()*12+n0.getMonth()+1)-(y*12+m)>=2)b.reconst=true;save();
 delete IMP_STATE.byM[k];IMP_STATE.months=IMP_STATE.months.filter(x=>x!==k);delete IMP_STATE.res[k];
+if(((DB.params.proj||{}).depPonctuels||[]).some(x=>+x.v>0)&&clean.lines&&clean.lines.length){setTimeout(()=>{if(confirm(ML[m]+' validé. Pointer maintenant les lignes de ce mois vers une poche (vacances…) ? Vous pourrez le faire plus tard depuis Projection.')){PO_M=ym(y,m);SUB='poches';PG='more';go('more');rMore()}},300)}
 if(!IMP_STATE.months.length){IMP_STATE=null;if(IMP_RETURN&&IMP_RETURN.y===y&&IMP_RETURN.m===m){IMP_RETURN=null;go('home');wizStartFor(y,m);WZ.step=Math.min(1,WZ.steps.length-1);wizRender()}else{bY=y;bM=m;go('budget')}}else{IMP_STATE.sel=IMP_STATE.months[0];rMore()}}
 function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>importCsvText(e.target.result);r.readAsText(f,'UTF-8')}
 /* ---- clôture v2 ---- */
@@ -1909,6 +1913,7 @@ ${row('Investi',invT4M(y,m),mr.invest,null)}
 ${row('<b>Épargne</b>',null,mr.epargne,null)}
 </tbody></table>
 <div style="font-size:10.5px;color:var(--td);margin-top:7px">Réel = début + salaire + entrées − investi − fin. Fixes ${mr.fixesSrc==='import'?'depuis l\u2019import':'prévisionnels (pas d\u2019import)'}. Investi ${mr.investSrc==='import'?'depuis l\u2019import':'programmé'}.</div>
+${mr.imp&&mr.imp.lines&&mr.imp.lines.length&&((DB.params.proj||{}).depPonctuels||[]).some(x=>+x.v>0)?'<button class="btn btn-ghost xs" style="margin-top:8px" onclick="PO_M=\''+ym(y,m)+'\';PG=\'more\';SUB=\'poches\';go(\'more\');rMore()">Pointer des lignes vers une poche ('+mr.imp.lines.filter(l=>l.poche).length+' pointée'+(mr.imp.lines.filter(l=>l.poche).length>1?'s':'')+')</button>':''}
 ${mr.imp?'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Fixes : prévu vs réel <span class="mono" style="color:'+((mr.fixes-mr.prevu.fixe)>0?'var(--dn)':'var(--up)')+'">'+((mr.fixes-mr.prevu.fixe)>0?'+':'')+fS(mr.fixes-mr.prevu.fixe)+'</span></summary>'+(()=>{const P=prevuFixeLines(y,m);const R=Object.entries(mr.imp.bySub.fixe||{}).sort((a,b)=>b[1]-a[1]);const n=Math.max(P.length,R.length);let h='<div class="grid2" style="gap:12px;margin-top:6px"><div><div class="eyebrow">Prévu · Budget</div>';P.forEach(x=>{h+='<div class="row rb" style="font-size:11.5px;padding:2px 0"><span>'+esc(x.l)+'</span><span class="mono">'+fS(x.v)+'</span></div>'});h+='<div class="row rb" style="font-size:12px;padding:4px 0;border-top:1px solid var(--line2);margin-top:4px"><b>Total</b><b class="mono">'+fS(mr.prevu.fixe)+'</b></div></div><div><div class="eyebrow">Réel · relevé</div>';R.forEach(x=>{h+='<div class="row rb" style="font-size:11.5px;padding:2px 0"><span>'+esc(x[0])+'</span><span class="mono">'+fS(x[1])+'</span></div>'});h+='<div class="row rb" style="font-size:12px;padding:4px 0;border-top:1px solid var(--line2);margin-top:4px"><b>Total</b><b class="mono">'+fS(mr.fixes)+'</b></div></div></div><div style="font-size:10px;color:var(--td);margin-top:6px">Un poste présent à droite et absent à gauche : à ajouter au Budget. Présent à gauche et absent à droite : pas encore sorti du compte (décalage M+n ?) ou classé en variable dans le relevé.</div>';return h})()+'</details>':''}
 ${mr.recon!=null?'<details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Réconciliation relevé / soldes <span class="mono" style="color:'+(Math.abs(mr.recon)/Math.max(1,Math.abs(mr.reelConso))>0.02?'var(--dn)':'var(--up)')+'">'+(mr.recon>0?'+':'')+fS(mr.recon)+'</span></summary><div style="font-size:11.5px;line-height:1.6;margin-top:6px"><div class="row rb"><span>Par le relevé : fixes + variables</span><b class="mono">'+fS(mr.imp.consoCsv)+'</b></div><div class="row rb"><span>Par les soldes : début + salaire + entrées − investi − fin</span><b class="mono">'+fS(mr.reelConso)+'</b></div><div style="font-size:10.5px;color:var(--td);margin-top:5px">'+(mr.recon<0?'Les soldes montrent '+fS(-mr.recon)+' de sorties de plus que le relevé n\u2019en classe en dépense : un mouvement « interne » parti ailleurs, des frais ou intérêts absents du relevé, ou un solde de livret imprécis.':'Le relevé classe '+fS(mr.recon)+' de dépenses de plus que les soldes n\u2019en montrent : une entrée non classée (argent arrivé de l\u2019extérieur en « interne »), ou un solde de livret imprécis.')+' Sous 2 % de la consommation, c\u2019est de la finition.</div>'+
 (mr.imp.ccEnd===undefined?'<div class="al ala" style="margin-top:8px">Import réalisé avec une version antérieure : ré-importez '+MS[m]+' (même fichier) pour activer le contrôle du compte courant et la liste des lignes internes. Vos classements manuels sont conservés.</div>':'')+
@@ -1967,7 +1972,7 @@ const ed=g=>{const id='ed_'+g.key.replace(/[^a-z0-9]/gi,'_').slice(0,40);return'
 (g.lines.length>1?'<div style="margin-top:6px;font-size:10.5px;color:var(--td)">Ou une seule ligne :</div>'+g.lines.map((x,i)=>'<div class="row rb" style="font-size:11px;padding:2px 0"><span style="flex:1">'+x.d.slice(8)+'/'+x.d.slice(5,7)+' · '+esc(x.l.slice(0,34))+'</span><span class="mono">'+fS(x.v)+'</span><button class="btn btn-ghost xs" style="margin-left:6px" onclick="var c=catRead(\''+id+'\');impReclass(\''+k+'\',\''+esc(g.key)+'\',c.type,c.sub,c.grp,false,\'\','+i+')">↩</button></div>').join(''):'')+'</div>'};
 return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Relecture des lignes classées<span class="aux">'+tot+' groupes</span></div><div class="card-b">'+
 '<div class="row" style="gap:5px;flex-wrap:wrap;margin-bottom:8px">'+chip('','Tout')+chip('big','≥ 100 €')+chip('bourso','via BoursoBank')+chip('regle','par règle')+chip('manuel','manuel')+'</div>'+
-'<input class="inp sm" placeholder="Rechercher un commerçant, une catégorie…" value="'+esc(IMP_Q)+'" oninput="IMP_Q=this.value;rMore()" style="margin-bottom:8px">'+
+'<input class="inp sm" id="q-imp" placeholder="Rechercher un commerçant, une catégorie…" value="'+esc(IMP_Q)+'" oninput="qSearch(\'q-imp\',()=>IMP_Q=this.value)" style="margin-bottom:8px">'+
 (G.length?G.slice(0,80).map(g=>'<div style="border-bottom:1px solid rgba(36,44,66,.5);padding:6px 0">'+
 '<div class="row rb"><span style="flex:1;font-size:12px"><b>'+esc(g.s.slice(0,30))+'</b> <span style="color:var(--td)">×'+g.n+'</span><div style="font-size:10.5px;color:var(--tm)">'+TYPE_LBL[g.type]+' · '+esc(g.grp)+' › '+esc(g.sub)+' <span class="chip" style="font-size:9px;padding:1px 5px">'+g.src+'</span></div></span><span class="mono" style="font-size:12px;color:'+(g.tot<0?'inherit':'var(--up)')+'">'+fS(g.tot)+'</span><button class="btn btn-ghost xs" style="margin-left:8px" onclick="IMP_EDIT=\''+esc(g.key)+'\';rMore()">✎</button></div>'+
 (IMP_EDIT===g.key?ed(g):'')+'</div>').join('')+(G.length>80?'<div class="empty">… '+(G.length-80)+' autres — affinez la recherche</div>':''):'<div class="empty">Aucune ligne pour ce filtre</div>')+
@@ -1984,7 +1989,7 @@ function rRules(el){const rules=(DB.rules||[]).slice().sort((a,b)=>a.priority-b.
 const q=RQ.toUpperCase();const list=q?rules.filter(r=>r.pattern.includes(q)||(r.sub||'').toUpperCase().includes(q)||TYPE_LBL[r.type].toUpperCase().includes(q)):rules;
 const last=IMP_STATE?Object.values(IMP_STATE.byM).flat():null;
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Règles de correspondance</div>
-<div class="row" style="margin-bottom:10px"><input class="inp sm" placeholder="Rechercher…" value="${esc(RQ)}" oninput="RQ=this.value;rMore()"><span class="chip">${rules.length}</span></div>
+<div class="row" style="margin-bottom:10px"><input class="inp sm" id="q-rules" placeholder="Rechercher…" value="${esc(RQ)}" oninput="qSearch('q-rules',()=>RQ=this.value)"><span class="chip">${rules.length}</span></div>
 <div class="card"><div class="card-b" style="font-size:11px;color:var(--td);line-height:1.5">Première règle qui matche gagne, par priorité croissante : salaire &lt; entrée &lt; interne livret &lt; interne autre &lt; invest &lt; fixe &lt; variable. Le libellé est mis en majuscules et débarrassé des dates et numéros de carte avant comparaison.${last?' Test sur '+last.length+' lignes de l\u2019import en cours.':''}</div></div>
 ${list.map(r=>{const idx=DB.rules.indexOf(r);const hits=last?last.filter(t=>ruleMatch(r,t)).length:null;return'<div class="card" style="margin-bottom:8px;opacity:'+(r.active===false?.5:1)+'"><div class="card-b" style="padding:10px 14px">'+
 '<div class="row" style="gap:6px"><input class="inp sm mono" style="flex:1;font-size:12px" value="'+esc(r.pattern)+'" onchange="DB.rules['+idx+'].pattern=this.value.toUpperCase().trim();save();rMore()"><span class="chip" style="font-size:9.5px">'+r.priority+'</span></div>'+
@@ -2019,6 +2024,8 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Cibles</div><div class="card-b">
 <div class="prm"><label>Cible variables mensuelles<small>€ · courses, Amazon, restaurants, transport…</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.cibleVariables}" onchange="gvSet('cibleVariables',+this.value||0)"></div>
 <div class="prm"><label>Cible précaution<small>€ · Livret A + LDDS</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.cibleprecaution}" onchange="gvSet('cibleprecaution',+this.value||0)"></div>
+<div class="prm"><label>Virement précaution mensuel<small>€ · vers Livret A, tant que la cible n\u2019est pas atteinte</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.virementPrecaution}" onchange="gvSet('virementPrecaution',+this.value||0)"></div>
+<div class="prm"><label>Plancher compte courant<small>€ · condition du virement, la veille de la paie</small></label><input class="inp sm mono" type="number" inputmode="decimal" value="${P.ccPlancher}" onchange="gvSet('ccPlancher',+this.value||0)"></div>
 </div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Garde à domicile · mode de paiement</div><div class="card-b">
 <div class="prm"><label>Pajemploi+ à partir de<small>AAAA-MM · vide = paiement manuel · s\u2019applique aux mois travaillés à partir de cette date</small></label><input class="inp sm mono" value="${DB.garde.ppFrom||''}" placeholder="2026-10" onchange="gvSetG('ppFrom',/^\d{4}-\d{2}$/.test(this.value)?this.value:'')"></div>
@@ -2047,7 +2054,7 @@ return Object.values(G).sort((a,b)=>a.date<b.date?1:-1).map(g=>'<details style="
 function defProj(){return{anneeDebut:9,salaire:6200,salaireEvo:[],autresMensuels:90,
 aides:[{l:'Allocations familiales',v:150.44,from:'2026-01'},{l:'CMG micro-crèche',v:715,from:'2026-10'},{l:'CMG garde à domicile (net)',v:20,from:'2026-10'}],
 ponctuels:[{l:'Flux employeur PEE / PERECOI',v:13000,mois:8},{l:'Crédit d\u2019impôt (garde + emploi à domicile)',v:1750,mois:7},{l:'Bonus',v:0,mois:3}]}}
-function ensureProj(){if(!DB.params)return;if(!DB.params.proj)DB.params.proj=defProj();const d=defProj();Object.keys(d).forEach(k=>{if(DB.params.proj[k]==null)DB.params.proj[k]=d[k]});const P=DB.params.proj;
+function ensureProj(){if(!DB.params)return;if(DB.params.virementPrecaution==null)DB.params.virementPrecaution=300;if(DB.params.ccPlancher==null)DB.params.ccPlancher=2500;if(!DB.virement)DB.virement={};if(!DB.params.proj)DB.params.proj=defProj();const d=defProj();Object.keys(d).forEach(k=>{if(DB.params.proj[k]==null)DB.params.proj[k]=d[k]});const P=DB.params.proj;
 if(!P.depPonctuels)P.depPonctuels=[{l:'Vacances de Noël',v:1500,mois:12},{l:'Vacances d\u2019été',v:4500,mois:8}];
 {const n=new Date();const F=fyOf(n.getFullYear(),n.getMonth()+1);P.depPonctuels.forEach(d=>{if(!d.id)d.id='p'+Math.random().toString(36).slice(2,8);if(!d.an)d.an=(+d.mois>=(P.anneeDebut||9))?F.fy:F.fy+1})}
 if(!DB.params.primeJuin26){const b=(P.ponctuels||[]).find(x=>/bonus|prime/i.test(x.l));if(b){b.l='Prime vacances';b.v=1500;b.mois=6}else P.ponctuels.push({l:'Prime vacances',v:1500,mois:6});DB.params.primeJuin26=true;DB.params.journal.push({date:'2026-10-01',champ:'proj.ponctuels',old:'Bonus 0 (mars)',new:'Prime vacances 1 500 (juin)',motif:'demande du 01/10/2026'});DB.params.journal.push({date:'2026-10-01',champ:'proj.depPonctuels',old:null,new:'Noël 1 500 (déc.) · été 4 500 (août)',motif:'poches vacances — été 2026 observé à ~5 300 € ; à ajuster'})}}
@@ -2080,6 +2087,25 @@ return'<div class="card"><div class="card-b"><div class="row rb"><div class="eye
 '<div class="row rb" style="margin-top:6px"><span style="font-size:12px;color:var(--tm)">réel <b class="mono" style="color:var(--t)">'+fE(real)+'</b></span><span style="font-size:12px;color:var(--tm)">théorique <b class="mono" style="color:var(--t)">'+fE(theo)+'</b></span></div>'+
 '<div class="gauge-track" style="margin-top:8px;position:relative"><div class="gauge-fill '+(pct==null?'':ok?'ok':'bad')+'" style="width:'+Math.round(p/1.5*100)+'%"></div><div style="position:absolute;left:'+Math.round(1/1.5*100)+'%;top:-2px;width:2px;height:calc(100% + 4px);background:var(--gold)"></div></div>'+
 '<div class="row rb" style="font-size:10px;color:var(--td);margin-top:4px"><span>0</span><span>100 % = théorique</span><span>150 %</span></div></div></div>'}
+function virementCheck(y,m){const b=gBM(y,m);const V=DB.params.virementPrecaution||0;if(!b||!b.imp||!b.imp.lines||!b.imp.payDate)return{known:false};
+const pd=b.imp.payDate;const end=new Date(pd);end.setDate(end.getDate()+5);const endK=end.toISOString().slice(0,10);
+const W=b.imp.lines.filter(l=>l.t==='interneLivret'&&l.d>=pd&&l.d<=endK);const out=W.filter(l=>l.v<0).reduce((a,l)=>a-l.v,0),inn=W.filter(l=>l.v>0).reduce((a,l)=>a+l.v,0);
+const exact=W.some(l=>l.v<0&&Math.abs(-l.v-V)<=1);const net=out-inn;
+return{known:true,payDate:pd,ccBefore:b.imp.ccBeforePay,condOk:b.imp.ccBeforePay==null?null:b.imp.ccBeforePay>=(DB.params.ccPlancher||0),constate:exact?'exact':(net>=V?'net':null),out,inn,net}}
+function virementActive(){const B=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B.length?B[B.length-1]:null;if(!L||!L.cash)return{active:false};const liv=(+L.cash.la||0)+(+L.cash.ldds||0);const c=DB.params.cibleprecaution||0;
+if(liv>=c)DB.params.precOk=true;else if(liv<c*0.9)DB.params.precOk=false;return{active:!DB.params.precOk&&c>0,liv,cible:c,ref:L}}
+function virementSet(k,st,motif){const old=DB.virement[k]||'planifie';DB.virement[k]=st;if(DB.params.journal)DB.params.journal.push({date:new Date().toISOString().slice(0,10),champ:'virement.'+k,old,new:st,motif:motif||(st==='reporte'?'condition non remplie':'')});save();RA()}
+function rVirement(){const A=virementActive();if(!A.active)return'';const n=new Date();const cy=n.getFullYear(),cm=n.getMonth()+1;const k=ym(cy,cm);const V=DB.params.virementPrecaution||0;const st=DB.virement[k]||'planifie';
+const pv=pM(cy,cm);const ck=virementCheck(pv.y,pv.m);const kp=ym(pv.y,pv.m);const stp=DB.virement[kp]||'planifie';
+let reports=0;for(let i=0;i<6;i++){const d=i===0?{y:cy,m:cm}:(()=>{let yy=cy,mm=cm-i;while(mm<1){mm+=12;yy--}return{y:yy,m:mm}})();if(DB.virement[ym(d.y,d.m)]==='reporte')reports++}
+const col={planifie:'',fait:'tag-up',reporte:'tag-dn'};
+let prevLine='';if(!gardeCost&&false){}if(gBM(pv.y,pv.m)&&isV2(pv.y,pv.m)){if(ck.known){prevLine=ML[pv.m]+' : '+(ck.constate==='exact'?'<b style="color:var(--up)">constaté</b> (virement de '+fE(V)+')':ck.constate==='net'?'<b style="color:var(--up)">constaté</b> (net livrets +'+fE(ck.net)+')':(stp==='fait'?'<b style="color:var(--gold)">déclaré fait, non constaté</b>':stp==='reporte'?'reporté':'<b style="color:var(--dn)">non constaté</b>'))+(ck.ccBefore!=null?' · CC avant paie '+fE(ck.ccBefore)+(ck.condOk?' ✓':' < plancher'):'')}else prevLine=ML[pv.m]+' : '+(stp==='fait'?'déclaré fait':stp==='reporte'?'reporté':'en attente du relevé')}
+return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Virement précaution · '+ML[cm]+'<span class="aux mono">'+fE(A.liv)+' / '+fE(A.cible)+'</span></div><div class="card-b">'+
+'<div class="row rb"><div><div style="font-size:15px;font-weight:600"><span class="mono" style="color:var(--gold)">'+fE(V)+'</span> → Livret A</div><div style="font-size:11px;color:var(--td);margin-top:2px">Condition : compte courant ≥ '+fE(DB.params.ccPlancher||0)+' la veille de la paie · échéance : 1er du mois suivant</div></div>'+
+'<span class="chip '+col[st]+'">'+({planifie:'À faire',fait:'Fait',reporte:'Reporté'})[st]+'</span></div>'+
+'<div class="row" style="gap:6px;margin-top:9px">'+(st!=='fait'?'<button class="btn btn-gold xs" onclick="virementSet(\''+k+'\',\'fait\')">Fait</button>':'')+(st!=='reporte'?'<button class="btn btn-ghost xs" onclick="const m=prompt(\'Motif du report (laisser vide = condition non remplie)\');if(m!==null)virementSet(\''+k+'\',\'reporte\',m)">Reporter</button>':'')+(st!=='planifie'?'<button class="btn btn-ghost xs" onclick="virementSet(\''+k+'\',\'planifie\')">Annuler</button>':'')+'</div>'+
+(prevLine?'<div style="font-size:11px;color:var(--tm);margin-top:9px">'+prevLine+'</div>':'')+
+(reports>=3?'<div class="al alr" style="margin-top:9px">Le virement est reporté une fois sur deux ('+reports+' sur 6 mois) : le montant est trop élevé ou les variables trop fortes.</div>':'<div style="font-size:10.5px;color:var(--td);margin-top:7px">Reports sur 6 mois : '+reports+' · le report ne cumule pas. L\u2019app constate, elle n\u2019exécute pas : le virement permanent est dans BoursoBank.</div>')+'</div></div>'}
 function todoList(){const n=new Date();const cy=n.getFullYear(),cm=n.getMonth()+1;const items=[];
 const pv=pM(cy,cm);const pb=gBM(pv.y,pv.m);
 if(pb&&isV2(pv.y,pv.m)&&!pb.cl){const mr=monthReal(pv.y,pv.m);if(mr){if(mr.complete)items.push({t:'Clôturer '+ML[pv.m],s:'tout est complet',go:"bY="+pv.y+";bM="+pv.m+";go('budget')",k:'ok'});
@@ -2096,11 +2122,11 @@ items.map(x=>'<div class="list-item" style="cursor:pointer;padding:9px 0" onclic
 let PO_M='',PO_Q='',PO_ONLY=false;
 function rPoches(el){ensureProj();const PO=(DB.params.proj.depPonctuels||[]).filter(p=>+p.v>0);const months=sBM().filter(b=>b.imp&&b.imp.lines&&b.imp.lines.length);
 if(!PO_M&&months.length){const l=months[months.length-1];PO_M=ym(l.y,l.m)}const [y,m]=PO_M?PO_M.split('-').map(Number):[0,0];const b=y?gBM(y,m):null;
-let L=(b&&b.imp&&b.imp.lines||[]).map((l,i)=>Object.assign({i},l)).filter(l=>l.t!=='entree'||l.poche);const q=PO_Q.toUpperCase();if(q)L=L.filter(l=>l.l.toUpperCase().includes(q)||(l.s||'').toUpperCase().includes(q));if(PO_ONLY)L=L.filter(l=>l.poche);
+let L=(b&&b.imp&&b.imp.lines||[]).map((l,i)=>Object.assign({i},l)).filter(l=>['fixe','variable'].includes(l.t)||l.poche);const q=PO_Q.toUpperCase();if(q)L=L.filter(l=>l.l.toUpperCase().includes(q)||(l.s||'').toUpperCase().includes(q));if(PO_ONLY)L=L.filter(l=>l.poche);
 L.sort((a,b)=>a.d<b.d?1:-1);
 el.innerHTML=`<button class="backlink" onclick="SUB='proj';rMore()">‹ Projection</button><div class="pagetitle">Pointer des lignes</div>
 <div class="card"><div class="card-b" style="font-size:12px;line-height:1.5;color:var(--tm)">Choisis une poche sur chaque ligne concernée. Le classement de la ligne ne change pas : elle reste une dépense du mois ; elle est en plus comptée dans la poche.</div></div>
-${months.length?`<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap"><select class="inp sm" style="width:auto" onchange="PO_M=this.value;rMore()">${months.map(x=>'<option value="'+ym(x.y,x.m)+'"'+(ym(x.y,x.m)===PO_M?' selected':'')+'>'+ML[x.m]+' '+x.y+'</option>').join('')}</select><input class="inp sm" style="flex:1;min-width:120px" placeholder="Rechercher…" value="${esc(PO_Q)}" oninput="PO_Q=this.value;rMore()"><label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" ${PO_ONLY?'checked':''} onchange="PO_ONLY=this.checked;rMore()" style="accent-color:var(--gold)">pointées</label></div>
+${months.length?`<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap"><select class="inp sm" style="width:auto" onchange="PO_M=this.value;rMore()">${months.map(x=>'<option value="'+ym(x.y,x.m)+'"'+(ym(x.y,x.m)===PO_M?' selected':'')+'>'+ML[x.m]+' '+x.y+'</option>').join('')}</select><input class="inp sm" style="flex:1;min-width:120px" id="q-po" placeholder="Rechercher…" value="${esc(PO_Q)}" oninput="qSearch('q-po',()=>PO_Q=this.value)"><label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" ${PO_ONLY?'checked':''} onchange="PO_ONLY=this.checked;rMore()" style="accent-color:var(--gold)">pointées</label></div>
 <div class="card"><div class="card-b" style="padding:4px 10px">${L.map(l=>'<div class="row rb" style="padding:7px 0;border-bottom:1px solid var(--line2);gap:8px"><span style="flex:1;min-width:0"><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.d.slice(8)+'/'+l.d.slice(5,7)+' · '+esc(l.l)+'</div><div style="font-size:10px;color:var(--td)">'+esc(l.s||TYPE_LBL[l.t]||'')+'</div></span><b class="mono" style="font-size:12px;color:'+(l.v<0?'var(--t)':'var(--up)')+'">'+fE(-l.v)+'</b><select class="inp sm" style="width:auto;max-width:150px;font-size:11px;'+(l.poche?'border-color:var(--violet);color:var(--violet)':'')+'" onchange="pocheSet('+y+','+m+','+l.i+',this.value)"><option value="">—</option>'+PO.map(p=>'<option value="'+p.id+'"'+(l.poche===p.id?' selected':'')+'>'+esc(pocheLabel(p))+'</option>').join('')+'</select></div>').join('')||'<div class="empty">Aucune ligne</div>'}</div></div>`:'<div class="al alb">Aucun mois ne contient encore de lignes conservées. Ré-importe un relevé (Plus → Import) : les lignes seront gardées et pointables.</div>'}`}
 function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Mode d\u2019emploi</div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>La routine mensuelle</div><div class="card-b" style="font-size:13px;line-height:1.6">
