@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v64';const VTAG='appareil vide → cloud sans question';
+const VERSION='v65';const VTAG='heure locale · version sur l\'accueil';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -435,12 +435,13 @@ const id=DID+'_bk_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23)+'_
 fdb.collection('data').doc(id).set({db:c,at:new Date().toISOString(),reason:reason||'manuel',parent:DID}).then(()=>{sss('ok');backupPrune();if(cb)cb('ok')}).catch(e=>{if(cb)cb('error')})}
 function backupList(cb){if(!fdb){cb([]);return}fdb.collection('data').where('parent','==',DID).get().then(q=>{const L=[];q.forEach(d=>{const x=d.data();L.push({id:d.id,at:x.at,reason:x.reason,months:(x.db&&x.db.bm||[]).filter(b=>b.cl).length})});L.sort((a,b)=>a.at<b.at?1:-1);cb(L)}).catch(()=>cb(null))}
 function backupPrune(){backupList(L=>{if(!L)return;L.slice(BK_KEEP).forEach(b=>fdb.collection('data').doc(b.id).delete().catch(()=>{}))})}
-function backupRestore(id,at){if(!confirm('Restaurer la sauvegarde du '+at.slice(0,16).replace('T',' ')+' ? La base actuelle sera remplacée (une sauvegarde de sécurité de l\u2019état actuel est prise avant).'))return;
+function backupRestore(id,at){const d=new Date(at);const lt=isNaN(d)?at.slice(0,16).replace('T',' '):d.toLocaleDateString('fr-FR')+' '+d.toTimeString().slice(0,5);if(!confirm('Restaurer la sauvegarde du '+lt+' ? La base actuelle sera remplacée (une sauvegarde de sécurité de l\u2019état actuel est prise avant).'))return;
 backupNow('avant restauration',()=>{fdb.collection('data').doc(id).get().then(d=>{if(!d.exists||!d.data().db){alert('Sauvegarde introuvable');return}DB=d.data().db;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c();setTimeout(()=>location.reload(),800)}).catch(()=>alert('Restauration impossible (accès refusé ?)'))})}
 function rBackups(){const el=document.getElementById('bk-list');if(!el)return;el.innerHTML='<div class="empty">Chargement…</div>';
 backupList(L=>{if(L===null){el.innerHTML='<div class="al alr">Impossible de lire les sauvegardes (hors ligne ou accès refusé).</div>';return}
 if(!L.length){el.innerHTML='<div class="empty">Aucune sauvegarde cloud pour l\u2019instant — la première sera prise à la prochaine clôture.</div>';return}
-el.innerHTML=L.map(b=>'<div class="list-item"><span style="flex:1;font-size:12.5px"><b>'+b.at.slice(0,10)+' '+b.at.slice(11,16)+'</b><div style="font-size:10.5px;color:var(--td)">'+esc(b.reason||'')+' · '+b.months+' mois clos</div></span><button class="btn btn-ghost xs" onclick="backupRestore(\''+b.id+'\',\''+b.at+'\')">Restaurer</button></div>').join('')})}
+const lt=a=>{const d=new Date(a);return isNaN(d)?a.slice(0,16).replace('T',' '):d.toLocaleDateString('fr-FR')+' '+d.toTimeString().slice(0,5)};
+el.innerHTML=L.map(b=>'<div class="list-item"><span style="flex:1;font-size:12.5px"><b>'+lt(b.at)+'</b><div style="font-size:10.5px;color:var(--td)">'+esc(b.reason||'')+' · '+b.months+' mois clos</div></span><button class="btn btn-ghost xs" onclick="backupRestore(\''+b.id+'\',\''+b.at+'\')">Restaurer</button></div>').join('')})}
 function xport(){try{localStorage.setItem('hft7_xport',new Date().toISOString().slice(0,10))}catch(e){}const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||!Array.isArray(d.bm))throw 0;const rl=richness(d);if(!confirm('Restaurer ce fichier ? '+d.bm.length+' mois, '+d.bm.filter(b=>b.cl).length+' clos, '+rl+' points de données. Il remplacera la base de cet appareil ET celle du cloud.'))return;DB=d;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(x){}CLOUD_READ=true;S2C_FORCE=true;if(fdb){s2cNow(()=>location.reload())}else location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
 
@@ -494,7 +495,7 @@ bY=lb.y;bM=lb.m;
 const lastI=sIM();const li=lastI.length?lastI[lastI.length-1]:{y:bY,m:bM};
 iY=li.y;iM=li.m;
 dF.ty=n.getFullYear();dF.tm=n.getMonth()+1;iCf.ty=dF.ty;iCf.tm=dF.tm;bCf.ty=dF.ty;bCf.tm=dF.tm;
-document.getElementById('hdr-sub').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+document.getElementById('hdr-sub').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+' · '+VERSION;
 RA();listenSync()}
 function go(p){PG=p;if(p==='more')SUB='hub';
 document.querySelectorAll('.nbtn').forEach(b=>b.classList.toggle('on',b.dataset.pg===p));
@@ -2410,7 +2411,7 @@ ${DB.customCharts.map((gc,gi)=>'<div style="background:var(--bg2);border:1px sol
 <button class="btn btn-danger sm wide" onclick="if(confirm('Réinitialiser TOUTES les données ?')&&confirm('Vraiment sûr ? Action irréversible (le cloud sera aussi écrasé).')){DB=defDB();save();location.reload()}">🗑 Réinitialiser</button>
 <button class="btn btn-ghost sm wide" style="margin:8px 0" onclick="document.getElementById('selftest-out').innerHTML=rSelfTest()">▶ Lancer l\u2019autotest</button><div id="selftest-out"></div>
 <div class="eyebrow" style="margin:14px 0 6px">Sauvegardes cloud</div>
-<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les six dernières sont conservées.</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les dix dernières sont conservées, en heure locale.</div>
 <div class="row" style="gap:6px;margin-bottom:8px"><button class="btn btn-ghost sm" onclick="backupNow('manuel',s=>{alert(s==='ok'?'Sauvegarde cloud effectuée.':s==='local'?'Pas de cloud sur cet appareil.':'Échec de la sauvegarde.');rBackups()})">Sauvegarder maintenant</button><button class="btn btn-ghost sm" onclick="rBackups()">Rafraîchir la liste</button></div>
 <div id="bk-list"></div>
 <button class="btn btn-ghost sm wide" style="margin:6px 0" onclick="if(confirm('Remplacer la base de cet appareil par celle du cloud ? (une copie de l\u2019état actuel est prise avant)')){CLOUD_READ=true;backupNow('cet appareil, avant remplacement',()=>{fdb.collection('data').doc(DID).get().then(d=>{if(d.exists&&d.data().db){DB=d.data().db;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}location.reload()}else alert('Rien dans le cloud')}).catch(()=>alert('Lecture cloud impossible'))})}">⇩ Prendre la version du cloud</button>
