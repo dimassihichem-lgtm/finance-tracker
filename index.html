@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v71';const VTAG='fiche sans signatures';
+const VERSION='v72';const VTAG='détection de mise à jour';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -473,7 +473,8 @@ function perAutoSum(){const fp=DB.fp;return DB.im.filter(m=>(m.y*12+m.m)>=(fp.pe
 
 /* ===== PIN ===== */
 let pe='';
-function initPin(){loadLocal();authGate(()=>{loadCloud()});const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
+function checkUpdate(){try{const u=location.href.split('?')[0].split('#')[0];fetch(u+'?nocache='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const m=t.match(/const VERSION='(v\d+)'/);if(!m)return;const online=m[1];if(+online.slice(1)>+VERSION.slice(1)){let b=document.getElementById('upd-bar');if(!b){b=document.createElement('div');b.id='upd-bar';b.style.cssText='position:fixed;left:12px;right:12px;bottom:84px;z-index:150;background:var(--gold);color:#14171F;border-radius:14px;padding:11px 14px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.4)';document.body.appendChild(b)}b.innerHTML='<span style="flex:1">'+online+' disponible (vous êtes en '+VERSION+')</span><button class="btn xs" style="background:#14171F;color:var(--gold)" onclick="location.replace(location.pathname+\'?v=\'+Date.now())">Mettre à jour</button>'}}).catch(()=>{})}catch(e){}}
+function initPin(){loadLocal();authGate(()=>{loadCloud()});setTimeout(checkUpdate,2500);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});const d=document.getElementById('pdots');for(let i=0;i<4;i++)d.innerHTML+='<div class="pdot" id="pd'+i+'"></div>';
 const p=document.getElementById('ppad');[1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(k=>{
 if(k===''){p.innerHTML+='<div></div>';return}
 p.innerHTML+='<button class="pkey'+(k==='⌫'?' fn':'')+'" onclick="pp(\''+k+'\')">'+k+'</button>'})}
