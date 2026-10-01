@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v68';const VTAG='réel fait foi : livrets, prévisionnel figé, wizard';
+const VERSION='v69';const VTAG='clôture ouvre le mois suivant · mode d\'emploi';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1634,11 +1634,7 @@ d.blocks.forEach(b=>{
  if(b.foot){y+=2*K;doc.setFont('helvetica','italic');doc.setFontSize(9.2*K);doc.setTextColor('#6B7488');
   doc.splitTextToSize(b.foot,RW-2).forEach(l=>{doc.text(l,M,y);y+=4.2*K})}
  y+=9*K});
-if(y>262){doc.addPage();y=24}
-y=Math.max(y+8,268);doc.setDrawColor('#9AA2B4');doc.setLineWidth(.3);
-doc.line(M,y,M+72,y);doc.line(W-M-72,y,W-M,y);y+=5;
-doc.setFont('helvetica','normal');doc.setFontSize(10*K);doc.setTextColor('#14171F');
-doc.text('Signature de l\u2019employeur',M,y);doc.text('Signature de la salariée',W-M-72,y);
+y=Math.max(y+6,276);doc.setFont('helvetica','italic');doc.setFontSize(8.5*K);doc.setTextColor('#9AA2B4');doc.text('Document d\u2019information établi par l\u2019employeur · le bulletin officiel est émis par Pajemploi.',M,y);
 return doc;}
 
 /* ================= RÉEL v2 : périmètre cash, import CSV, règles, gouvernance ================= */
@@ -1895,7 +1891,7 @@ function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new File
 function canClose(y,m){if(!isV2(y,m))return{ok:true,missing:[]};const mr=monthReal(y,m);if(!mr)return{ok:false,missing:['mois inexistant']};return{ok:mr.complete,missing:mr.missing}}
 function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){d.cl=false;save();return true}
 if(!c.ok){alert('Impossible de clôturer '+ML[m]+' : '+c.missing.join(', '));return false}
-d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;save();backupNow('clôture '+ML[m]+' '+y);return true}
+d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;const nx=nM(y,m);gOBM(nx.y,nx.m);gOIM(nx.y,nx.m);save();backupNow('clôture '+ML[m]+' '+y);return true}
 
 /* ---- UI Réel v2 ---- */
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
@@ -2143,14 +2139,16 @@ function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rM
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>La routine mensuelle</div><div class="card-b" style="font-size:13px;line-height:1.6">
 <div style="margin-bottom:10px"><b>Au fil du mois — Garde, 30 s.</b><br>Saisir uniquement les écarts au planning : heure en plus, congé, absence, jour non utilisé, récupération. Les jours normaux ne demandent rien.</div>
 <div style="margin-bottom:10px"><b>Du 25 au 5 — déclaration Pajemploi.</b><br>La carte « À faire » donne les trois chiffres (heures, net, transport). Après validation : cocher « déclaration validée » dans Garde → Suivi, saisir le CMG réel dans Coût réel, envoyer la fiche PDF.</div>
-<div style="margin-bottom:10px"><b>Du 1er au 5 — mise à jour du mois, 15 min.</b><br>Export CSV BoursoBank du mois écoulé. Bouton doré ⟳ : import + soldes de fin de mois, puis valeurs des supports, versements, aides CAF, charges, exceptionnel, clôture. Si quelque chose manque, la clôture le dit.</div>
-<div><b>Ensuite — lire.</b><br>Accueil : les deux thermomètres et le bloc Réel. Budget → Réel vs prévu : les écarts poste par poste. Projection : le mois par mois de l\u2019année.</div></div></div>
+<div style="margin-bottom:10px"><b>Du 1er au 5 — mise à jour du mois, 15 min.</b><br>Export CSV BoursoBank du mois écoulé. Bouton doré ⟳ : import + soldes de fin de mois (compte courant, Livret A, LDDS), valeurs des supports, versements, puis <b>relecture du prévisionnel du mois suivant</b> (aides attendues, charges, exceptionnel prévu) et clôture. La clôture ouvre le mois suivant dans Budget et Invest.</div>
+<div style="margin-bottom:10px"><b>Le prévisionnel, c\u2019est le théorique.</b><br>Tes lignes Budget (fixes, variables, exceptionnel) sont la référence que le réel vient challenger. Il se saisit <b>avant</b> le mois — ou en début de mois — jamais après avoir vu le relevé. Un mois clos a son prévisionnel figé.</div>
+<div style="margin-bottom:10px"><b>Après validation d\u2019un import — pointer.</b><br>Si des poches existent (vacances…), l\u2019app propose de pointer les lignes du mois. Le pointage n\u2019altère pas le réel : la ligne reste une dépense du mois, elle est en plus comptée dans la poche.</div>
+<div><b>Ensuite — lire.</b><br>Accueil : à faire, virement de précaution, thermomètres, réel du mois. Budget → Réel : les écarts poste par poste. Projection : le mois par mois, les poches, les scénarios de fin d\u2019année.</div></div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Où est quoi</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
 ${[['Budget prévisionnel (fixes / variables, M+n)','Budget'],['Réel du mois, réconciliation, familles','Budget → Réel vs prévu'],['Relire ou corriger une ligne du relevé','Plus → Import → Relecture'],['Règles de classement','Plus → Règles'],['Hypothèses de revenus, cibles, régimes','Projection · Gouvernance'],['Nounou : calendrier, salaire, congés, compteur, fiche','Garde'],['Crédit d\u2019impôt, PER, échéances','Plus → Fiscal'],['Sauvegarde JSON, PIN, réinitialisation','Plus → Configuration']].map(x=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2)"><span>'+x[0]+'</span><span style="color:var(--td);text-align:right;margin-left:10px">'+x[1]+'</span></div>').join('')}</div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Automatique ou manuel</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
 <b>Automatique</b> : lignes budget de la nounou, classement du relevé (règles, puis catégories BoursoBank), détection du salaire versé et du CMG reçu, compteurs de congés et d\u2019heures, réconciliation, thermomètres.<br><br>
 <b>Manuel, une fois</b> : hypothèses de revenus, cible variables, régimes, chips F/V et M+n des charges, identité de la fiche.<br><br>
-<b>Manuel, chaque mois</b> : import, soldes de fin de mois, valeurs des supports, non reconnus, case « déclaration validée », montants réels Pajemploi.<br><br><b>Après chaque mise à jour de l\u2019app</b> : Plus → Autotest, tout doit être vert.</div></div>`}
+<b>Manuel, chaque mois</b> : import, soldes de fin de mois, valeurs des supports, versements, non reconnus, prévisionnel du mois suivant, case « déclaration validée », montants réels Pajemploi, statut du virement de précaution.<br><br><b>Vient du relevé, plus jamais à la main</b> : versements et retraits livrets, salaire, aides reçues, consommation, lignes à pointer.<br><br><b>Après chaque mise à jour de l\u2019app</b> : Plus → Autotest, tout doit être vert.</div></div>`}
 function rProjHome(){const n=new Date();const K=yearKpi(n.getFullYear(),n.getMonth()+1);if(!K.n)return'';
 const F=K.fy;const ecartEp=K.cum.rEp-K.cum.tEp;
 return'<div class="eyebrow" style="margin:14px 0 8px">Année '+F.label+' · '+K.n+' mois réalisé'+(K.n>1?'s':'')+' sur 12</div>'+
