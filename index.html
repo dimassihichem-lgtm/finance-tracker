@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v60';const VTAG='autotest accessible';
+const VERSION='v61';const VTAG='protection anti-écrasement';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -407,13 +407,19 @@ let DB,svT=null;
 function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
 if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj()}
 function loadLocal(){try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}ensure()}
-function loadCloud(){if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{
-  if(doc.exists&&doc.data().db){const c=doc.data().db;if((c._ts||0)>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB))}}
+let CLOUD_READ=false,CLOUD_RICH=0,S2C_FORCE=false;
+function richness(d){if(!d||!d.bm)return 0;return d.bm.reduce((a,b)=>a+(b.cl?2:0)+(b.imp&&b.imp.done?2:0)+(b.cashFin!=null?1:0),0)}
+function loadCloud(){if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{CLOUD_READ=true;
+  if(doc.exists&&doc.data().db){const c=doc.data().db;CLOUD_RICH=richness(c);const rl=richness(DB),rc=CLOUD_RICH;
+    if((c._ts||0)>(DB._ts||0)){
+      if(rc+2<rl&&confirm('Attention : le cloud est daté plus récent, mais il contient une base PLUS PAUVRE que celle de cet appareil ('+rc+' contre '+rl+' points de données : mois clos, imports, soldes). Garder la version de cet appareil et l\u2019envoyer au cloud ?\n\nOK = garder la version locale (recommandé)\nAnnuler = prendre la version du cloud')){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c()}
+      else{DB=c;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}}}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok')}).catch(e=>{postLoad();sss('error');if(/permission|insufficient/i.test(String(e.message||e.code)))setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
 function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
 function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
-function s2c(){if(!fdb)return;sss('saving');const c=JSON.parse(JSON.stringify(DB));
+function s2cNow(cb){const c=JSON.parse(JSON.stringify(DB));if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img=null})})});fdb.collection('data').doc(DID).set({db:c,at:new Date().toISOString()}).then(()=>{sss('ok');if(cb)cb()}).catch(()=>{sss('error');alert('Écriture cloud impossible — la restauration est faite sur cet appareil seulement.');if(cb)cb()})}
+function s2c(){if(!fdb)return;if(!CLOUD_READ){sss('error');return}const rl=richness(DB);if(CLOUD_RICH&&rl+2<CLOUD_RICH&&!S2C_FORCE){if(!confirm('La base de cet appareil est plus pauvre que celle du cloud ('+rl+' contre '+CLOUD_RICH+'). Envoyer quand même et écraser le cloud ?')){sss('error');return}}CLOUD_RICH=rl;sss('saving');const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).then(()=>sss('ok')).catch(e=>sss('error'))}
 function listenSync(){if(!fdb)return;fdb.collection('data').doc(DID).onSnapshot(doc=>{
@@ -433,7 +439,7 @@ backupList(L=>{if(L===null){el.innerHTML='<div class="al alr">Impossible de lire
 if(!L.length){el.innerHTML='<div class="empty">Aucune sauvegarde cloud pour l\u2019instant — la première sera prise à la prochaine clôture.</div>';return}
 el.innerHTML=L.map(b=>'<div class="list-item"><span style="flex:1;font-size:12.5px"><b>'+b.at.slice(0,10)+' '+b.at.slice(11,16)+'</b><div style="font-size:10.5px;color:var(--td)">'+esc(b.reason||'')+' · '+b.months+' mois clos</div></span><button class="btn btn-ghost xs" onclick="backupRestore(\''+b.id+'\',\''+b.at+'\')">Restaurer</button></div>').join('')})}
 function xport(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
-function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{DB=JSON.parse(ev.target.result);ensure();save();location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
+function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||!Array.isArray(d.bm))throw 0;const rl=richness(d);if(!confirm('Restaurer ce fichier ? '+d.bm.length+' mois, '+d.bm.filter(b=>b.cl).length+' clos, '+rl+' points de données. Il remplacera la base de cet appareil ET celle du cloud.'))return;DB=d;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(x){}CLOUD_READ=true;S2C_FORCE=true;if(fdb){s2cNow(()=>location.reload())}else location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
 
 /* ===== HELPERS DONNÉES (logique v7 conservée) ===== */
 function gBM(y,m){return DB.bm.find(x=>x.y===y&&x.m===m)}
