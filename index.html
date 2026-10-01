@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v69';const VTAG='clôture ouvre le mois suivant · mode d\'emploi';
+const VERSION='v70';const VTAG='navigation simplifiée · Invest vide signalé';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -768,12 +768,10 @@ function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();cons
 /* ================= BUDGET ================= */
 function monthTools(prefix,y,m,onCreate,onDel,onPurge){
 return `<div class="mtools">
-<select class="inp sm" style="width:auto" id="${prefix}AY">${YRS.map(yy=>'<option'+(yy===y?' selected':'')+'>'+yy+'</option>').join('')}</select>
-<select class="inp sm" style="width:auto" id="${prefix}AM">${[1,2,3,4,5,6,7,8,9,10,11,12].map(mm=>'<option value="'+mm+'"'+(mm===m?' selected':'')+'>'+MS[mm]+'</option>').join('')}</select>
-<button class="btn btn-gold xs" onclick="${onCreate}">+ Créer</button>
+<select class="inp sm" style="width:auto" id="${prefix}AY" onchange="${onCreate}">${YRS.map(yy=>'<option'+(yy===y?' selected':'')+'>'+yy+'</option>').join('')}</select>
+<select class="inp sm" style="width:auto" id="${prefix}AM" onchange="${onCreate}">${[1,2,3,4,5,6,7,8,9,10,11,12].map(mm=>'<option value="'+mm+'"'+(mm===m?' selected':'')+'>'+MS[mm]+'</option>').join('')}</select>
 <span style="flex:1"></span>
-<button class="btn btn-danger xs" onclick="${onDel}">Suppr.</button>
-<button class="btn btn-danger xs" onclick="${onPurge}">Purger…</button>
+<details style="position:relative"><summary style="list-style:none;cursor:pointer;font-size:16px;color:var(--td);padding:2px 8px">⋯</summary><div style="position:absolute;right:0;top:26px;background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:6px;z-index:5;min-width:170px"><button class="btn btn-danger xs wide" style="margin-bottom:4px" onclick="${onDel}">Supprimer ce mois</button><button class="btn btn-danger xs wide" onclick="${onPurge}">Purger les anciens…</button></div></details>
 </div>`}
 
 function rBudget(){if(!bY){const n=new Date();bY=n.getFullYear();bM=n.getMonth()+1}
@@ -913,7 +911,7 @@ const cT2=cm.contribs.reduce((s,c)=>s+c.v,0);const sT=supT(cm);
 const pv=pM(iY,iM);const pvIM=gIM(pv.y,pv.m);
 const pvST=pvIM?supT(pvIM):0;const pvCT=pvIM?pvIM.contribs.reduce((s,c)=>s+c.v,0):0;
 const gl=pvST>0?sT-pvST-pvCT:0;
-const hasPrev=!!prevIM(iY,iM),hasNext=!!nextIM(iY,iM);
+const hasPrev=!!prevIM(iY,iM),hasNext=!!nextIM(iY,iM);const vide=exists&&sT===0&&cm.supports.some(s=>(s.owner||'moi')!=='cash');
 
 el.innerHTML=`
 <div class="pagetitle">Investissements</div>
@@ -922,6 +920,7 @@ el.innerHTML=`
 <div class="mt"><b>${ML[iM]} ${iY}</b><div>${!exists?'⚠ non créé':cm.cl?'✓ Clôturé':'En cours'}</div></div>
 <button class="arrbtn" onclick="navI(1)" ${hasNext?'':'disabled'}>▶</button>
 </div>
+${vide?'<div class="al alb" style="margin-bottom:10px">Valeurs de '+ML[iM]+' non encore saisies : la mise à jour mensuelle (⟳) les demandera. Sans impact sur l\u2019accueil, qui s\u2019appuie sur le dernier mois complet.</div>':''}
 ${monthTools('i',iY,iM,"var y=+document.getElementById('iAY').value,m=+document.getElementById('iAM').value;gOIM(y,m);iY=y;iM=m;rInvest()","delIM2()","bulkDelIM()")}
 
 <div class="statrow">
@@ -977,7 +976,7 @@ ${cm.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="fl
 
 <button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="var d=gOIM(iY,iM);d.cl=!d.cl;save();rInvest()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[iM]}</button>`;
 setTimeout(rIC,60)}
-function rIC(){const raw=sIM().filter(d=>(d.y*12+d.m)>=(iCf.fy*12+iCf.fm)&&(d.y*12+d.m)<=(iCf.ty*12+iCf.tm));if(!raw.length)return;
+function rIC(){const raw=sIM().filter(d=>(d.y*12+d.m)>=(iCf.fy*12+iCf.fm)&&(d.y*12+d.m)<=(iCf.ty*12+iCf.tm)&&supT(d)>0);if(!raw.length)return;
 const names=[...new Set(raw.flatMap(m=>m.supports.map(s=>s.n)))];const labels=raw.map(d=>mLbl(d.y,d.m));
 const isAm=n=>n.toLowerCase().includes('pee')||n.toLowerCase().includes('perco')||(n.toLowerCase().includes('per')&&n.toLowerCase().includes('amundi'));
 const mkDS=list=>list.map((n,i)=>({label:n,data:raw.map(m=>{const s=m.supports.find(x=>x.n===n);return s?s.v:0}),borderColor:COLORS[i%COLORS.length],backgroundColor:'transparent',tension:.32,pointRadius:2,borderWidth:2}));
