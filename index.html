@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v61';const VTAG='protection anti-écrasement';
+const VERSION='v63';const VTAG='copies local + cloud avant fusion';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -412,12 +412,14 @@ function richness(d){if(!d||!d.bm)return 0;return d.bm.reduce((a,b)=>a+(b.cl?2:0
 function loadCloud(){if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{CLOUD_READ=true;
   if(doc.exists&&doc.data().db){const c=doc.data().db;CLOUD_RICH=richness(c);const rl=richness(DB),rc=CLOUD_RICH;
     if((c._ts||0)>(DB._ts||0)){
+      if(Math.abs(rc-rl)>=1){CLOUD_READ=true;backupNow('cet appareil, avant fusion');const keep=DB;DB=c;backupNow('cloud, avant fusion');DB=keep} // les deux états sont mis à l\u2019abri avant toute décision
       if(rc+2<rl&&confirm('Attention : le cloud est daté plus récent, mais il contient une base PLUS PAUVRE que celle de cet appareil ('+rc+' contre '+rl+' points de données : mois clos, imports, soldes). Garder la version de cet appareil et l\u2019envoyer au cloud ?\n\nOK = garder la version locale (recommandé)\nAnnuler = prendre la version du cloud')){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c()}
       else{DB=c;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}}}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok')}).catch(e=>{postLoad();sss('error');if(/permission|insufficient/i.test(String(e.message||e.code)))setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
 function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
-function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}}
+function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
+const today=new Date().toISOString().slice(0,10);let last='';try{last=localStorage.getItem('hft7_bkday')||''}catch(e){}if(CLOUD_READ&&last!==today){try{localStorage.setItem('hft7_bkday',today)}catch(e){}setTimeout(()=>backupNow('quotidienne'),4000)}}}
 function s2cNow(cb){const c=JSON.parse(JSON.stringify(DB));if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img=null})})});fdb.collection('data').doc(DID).set({db:c,at:new Date().toISOString()}).then(()=>{sss('ok');if(cb)cb()}).catch(()=>{sss('error');alert('Écriture cloud impossible — la restauration est faite sur cet appareil seulement.');if(cb)cb()})}
 function s2c(){if(!fdb)return;if(!CLOUD_READ){sss('error');return}const rl=richness(DB);if(CLOUD_RICH&&rl+2<CLOUD_RICH&&!S2C_FORCE){if(!confirm('La base de cet appareil est plus pauvre que celle du cloud ('+rl+' contre '+CLOUD_RICH+'). Envoyer quand même et écraser le cloud ?')){sss('error');return}}CLOUD_RICH=rl;sss('saving');const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
@@ -425,7 +427,7 @@ fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).the
 function listenSync(){if(!fdb)return;fdb.collection('data').doc(DID).onSnapshot(doc=>{
 if(!doc.exists||!doc.data().db)return;const c=doc.data().db;
 if(c._ts&&c._ts>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));migrateGarde();sss('ok');if(typeof RA==='function')RA()}},e=>{})}
-const BK_KEEP=6;
+const BK_KEEP=10;
 function backupNow(reason,cb){if(!fdb){if(cb)cb('local');return}const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 const id=DID+'_bk_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23)+'_'+Math.random().toString(36).slice(2,6);
@@ -438,7 +440,7 @@ function rBackups(){const el=document.getElementById('bk-list');if(!el)return;el
 backupList(L=>{if(L===null){el.innerHTML='<div class="al alr">Impossible de lire les sauvegardes (hors ligne ou accès refusé).</div>';return}
 if(!L.length){el.innerHTML='<div class="empty">Aucune sauvegarde cloud pour l\u2019instant — la première sera prise à la prochaine clôture.</div>';return}
 el.innerHTML=L.map(b=>'<div class="list-item"><span style="flex:1;font-size:12.5px"><b>'+b.at.slice(0,10)+' '+b.at.slice(11,16)+'</b><div style="font-size:10.5px;color:var(--td)">'+esc(b.reason||'')+' · '+b.months+' mois clos</div></span><button class="btn btn-ghost xs" onclick="backupRestore(\''+b.id+'\',\''+b.at+'\')">Restaurer</button></div>').join('')})}
-function xport(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+function xport(){try{localStorage.setItem('hft7_xport',new Date().toISOString().slice(0,10))}catch(e){}const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='patrimoine-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function imp(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||!Array.isArray(d.bm))throw 0;const rl=richness(d);if(!confirm('Restaurer ce fichier ? '+d.bm.length+' mois, '+d.bm.filter(b=>b.cl).length+' clos, '+rl+' points de données. Il remplacera la base de cet appareil ET celle du cloud.'))return;DB=d;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(x){}CLOUD_READ=true;S2C_FORCE=true;if(fdb){s2cNow(()=>location.reload())}else location.reload()}catch(er){alert('Fichier invalide')}};r.readAsText(f)}
 
 /* ===== HELPERS DONNÉES (logique v7 conservée) ===== */
@@ -2078,6 +2080,7 @@ else if(!pb&&isV2(pv.y,pv.m)&&n.getDate()<=7)items.push({t:'Faire la mise à jou
 const d=n.getDate();if(d>=25||d<=5){const wm=d>=25?{y:cy,m:cm}:pv;const r=gardeCost(wm.y,wm.m);if(!r.before&&!r.after&&!gardeTrack(wm.y,wm.m).decl)items.push({t:'Déclarer '+ML[wm.m]+' sur Pajemploi',s:fh(r.paidH)+' h · net '+fE(r.net)+(r.nav.amt?' · transport '+fE(r.nav.amt):''),go:"gY="+wm.y+";gM="+wm.m+";go('garde')",k:(d<=5&&d>=3)?'bad':'warn'})}
 {const r=gardeCost(pv.y,pv.m);if(!r.before&&!r.after){const t=gardeTrack(pv.y,pv.m);const miss=[];if(!t.paid)miss.push('salaire à verser');if(!t.fiche)miss.push('fiche à envoyer');if(miss.length)items.push({t:'Nounou · '+ML[pv.m],s:miss.join(' · '),go:"gY="+pv.y+";gM="+pv.m+";go('garde')",k:'warn'})}}
 {const cs=cpStatus(cy,cm);cs.alerts.filter(a=>a.t==='warn').slice(0,1).forEach(a=>items.push({t:'Congés de la nounou',s:a.m.slice(0,90),go:"go('garde')",k:'warn'}))}
+{let lx='';try{lx=localStorage.getItem('hft7_xport')||''}catch(e){}const days=lx?Math.round((Date.now()-new Date(lx).getTime())/864e5):99;if(days>7)items.push({t:'Exporter une sauvegarde JSON',s:lx?'dernier fichier il y a '+days+' jours':'aucun export enregistré sur cet appareil — bouton ⤓ en haut',go:"xport()",k:'info'})}
 return items}
 function rTodo(){const items=todoList();if(!items.length)return'';const col={ok:'var(--up)',warn:'var(--gold)',bad:'var(--dn)',info:'var(--blue)'};
 return'<div class="card" style="border-color:rgba(229,195,106,.35)"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>À faire<span class="aux">'+items.length+'</span></div><div class="card-b" style="padding-top:4px">'+
