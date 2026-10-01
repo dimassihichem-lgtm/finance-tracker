@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v63';const VTAG='copies local + cloud avant fusion';
+const VERSION='v64';const VTAG='appareil vide → cloud sans question';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -414,7 +414,8 @@ function loadCloud(){if(fdb){fdb.collection('data').doc(DID).get().then(doc=>{CL
     if((c._ts||0)>(DB._ts||0)){
       if(Math.abs(rc-rl)>=1){CLOUD_READ=true;backupNow('cet appareil, avant fusion');const keep=DB;DB=c;backupNow('cloud, avant fusion');DB=keep} // les deux états sont mis à l\u2019abri avant toute décision
       if(rc+2<rl&&confirm('Attention : le cloud est daté plus récent, mais il contient une base PLUS PAUVRE que celle de cet appareil ('+rc+' contre '+rl+' points de données : mois clos, imports, soldes). Garder la version de cet appareil et l\u2019envoyer au cloud ?\n\nOK = garder la version locale (recommandé)\nAnnuler = prendre la version du cloud')){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c()}
-      else{DB=c;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}}}}
+      else{DB=c;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}}}
+    else if(rl<=2||rc>=rl*3||(rc>=rl+2&&confirm('Cet appareil contient une base plus pauvre que le cloud ('+rl+' contre '+rc+' points de données), même si elle est datée plus récente. Prendre la version du cloud ?\n\nOK = prendre le cloud (recommandé)\nAnnuler = garder cet appareil'))){if(rl>0){CLOUD_READ=true;backupNow('cet appareil, avant remplacement')}DB=c;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}}}
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok')}).catch(e=>{postLoad();sss('error');if(/permission|insufficient/i.test(String(e.message||e.code)))setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
 function postLoad(){migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
@@ -2412,6 +2413,7 @@ ${DB.customCharts.map((gc,gi)=>'<div style="background:var(--bg2);border:1px sol
 <div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les six dernières sont conservées.</div>
 <div class="row" style="gap:6px;margin-bottom:8px"><button class="btn btn-ghost sm" onclick="backupNow('manuel',s=>{alert(s==='ok'?'Sauvegarde cloud effectuée.':s==='local'?'Pas de cloud sur cet appareil.':'Échec de la sauvegarde.');rBackups()})">Sauvegarder maintenant</button><button class="btn btn-ghost sm" onclick="rBackups()">Rafraîchir la liste</button></div>
 <div id="bk-list"></div>
+<button class="btn btn-ghost sm wide" style="margin:6px 0" onclick="if(confirm('Remplacer la base de cet appareil par celle du cloud ? (une copie de l\u2019état actuel est prise avant)')){CLOUD_READ=true;backupNow('cet appareil, avant remplacement',()=>{fdb.collection('data').doc(DID).get().then(d=>{if(d.exists&&d.data().db){DB=d.data().db;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}location.reload()}else alert('Rien dans le cloud')}).catch(()=>alert('Lecture cloud impossible'))})}">⇩ Prendre la version du cloud</button>
 <div class="eyebrow" style="margin:14px 0 6px">Compte</div>
 <div class="row rb"><span style="font-size:12.5px">${FUSER?esc(FUSER.email||''):'non connecté (mode local)'}</span>${FUSER?'<button class="btn btn-ghost sm" onclick="authLogout()">Se déconnecter</button>':''}</div>
 <div style="font-size:10.5px;color:var(--td);margin-top:9px"><b style="color:var(--gold)">Version ${VERSION}</b> — ${VTAG}<br>PIN : ${DB.pin} · Stockage : hft7 · Firebase : ${fdb?'connecté ☁':'local 📴'}</div>
