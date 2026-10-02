@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v79';const VTAG='compensation automatique des heures';
+const VERSION='v81';const VTAG='PAS par période · PER en dur puis réel';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -405,7 +405,7 @@ else{el.textContent='…';el.style.color='var(--td)'}}
 /* ===== STORAGE (clé hft7 conservée) ===== */
 let DB,svT=null;
 function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
-if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj()}
+if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj();ensureFisc()}
 function loadLocal(){try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}ensure()}
 let CLOUD_READ=false,CLOUD_RICH=0,S2C_FORCE=false;
 function richness(d){if(!d||!d.bm)return 0;return d.bm.reduce((a,b)=>a+(b.cl?2:0)+(b.imp&&b.imp.done?2:0)+(b.cashFin!=null?1:0),0)}
@@ -522,9 +522,9 @@ const inv=last?invT4M(last.y,last.m):0;
 const lvNet=last?(last.lv-(last.lr||[]).reduce((s,r)=>s+r.v,0)):0;
 const ep=inv+Math.max(0,lvNet);
 const txE=totRev>0?Math.round(ep/totRev*100):0;
-const fp=DB.fp;const perA=perAutoSum();const perT=perA+(fp.perExcep||0);
-const perP=fp.perObj>0?Math.min(100,Math.round(perT/fp.perObj*100)):0;
-const perR=Math.max(0,fp.perObj-perT);
+const fp=DB.fp;ensureFisc();const perY=new Date().getFullYear();const perE=perEng(perY)||{engagement:0};const perRY=perRealYear(perY);const perT=perRY.tot;
+const perP=perE.engagement>0?Math.min(100,Math.round(perT/perE.engagement*100)):0;
+const perR=Math.max(0,perE.engagement-perT);
 const now=new Date();const cy=now.getFullYear(),cm2=now.getMonth()+1;
 const curB=gBM(cy,cm2);syncMonth(curB);
 const gh=gHours(cy,cm2);const gcost=gardeCost(cy,cm2);
@@ -591,14 +591,14 @@ return'<div class="card"><div class="card-b" style="cursor:pointer" onclick="GSE
 '</div></div>'})()}
 
 <div class="card">
-  <div class="card-h"><span class="dot" style="background:var(--gold)"></span>Objectif PER ${cy}
+  <div class="card-h"><span class="dot" style="background:var(--gold)"></span>PER ${cy}
     <span class="aux mono" style="color:${perR>0?'var(--gold)':'var(--up)'}">${perR>0?f$(perR)+' € restants':'Atteint ✓'}</span></div>
   <div class="card-b">
     <div class="gauge-track"><div class="gauge-fill ${perP>=100?'ok':''}" style="width:${perP}%"></div></div>
     <div class="row rb" style="margin-top:8px;font-size:12px;color:var(--tm)">
-      <span class="mono">${f$(perT)} € versés</span><span>${perP}%</span><span class="mono">Objectif ${f$(fp.perObj)} €</span>
+      <span class="mono">${f$(perT)} € versés</span><span>${perP}%</span><span class="mono">Engagement ${f$(perE.engagement)} €</span>
     </div>
-    <div style="font-size:10.5px;color:var(--td);margin-top:5px">Depuis ${MS[fp.perStartM]} ${fp.perStartY} · déduction fiscale TMI — détail dans Plus → Fiscal</div>
+    <div style="font-size:10.5px;color:var(--td);margin-top:5px">${perRY.src==='relevé'?'D\u2019après les relevés':perRY.src==='mixte'?'En dur jusqu\u2019à '+DB.fp.fisc.perReelDepuis+', relevés ensuite':'Montants en dur (Invest)'} · PAS ${perE.pas||'—'} % · détail dans Plus → Fiscal</div>
   </div>
 </div>
 
@@ -1660,7 +1660,7 @@ add(30,'VIREMENT DEPUIS LIVRET','interneLivret');add(30,'DEPUIS LDDS','interneLi
 add(30,'VIREMENT DEPUIS BOURSOBANK','interneLivret','Livret A');
 add(25,'VIREMENT DE SALMA','entree','Virement conjoint reçu',{sign:'credit'});add(24,'NOTAIRES','entree','Remboursement frais',{sign:'credit'});add(26,'VIR INST','entree','Autre entrée',{sign:'credit'});
 add(70,'MAMAN','variable','Aide maman',{sign:'debit'});add(70,'MERE','variable','Aide maman',{sign:'debit'});
-add(50,'GENERALI VIE','invest','AV');add(50,'E CIE VIE','invest','AV enfants');add(50,'ORADEA','invest','PER');add(50,'PEA','invest','PEA');
+add(50,'GENERALI VIE','invest','AV');add(50,'E CIE VIE','invest','AV enfants');add(50,'ORADEA','invest','Oradea · PER ou AV');add(50,'PEA','invest','PEA');
 [['LOYER','Logement'],['ECH PRET','Crédit auto'],['PREST ENFANT','École'],['MICRO','Crèche'],['PAJEMPLOI','Nounou cotisations'],['ORANGE','Télécom'],['EDF','Énergie'],['SOGESSUR','Assurance auto'],['FLITTER','Assurance'],['UNICEF','Don'],['CLAUDE','Abonnement'],['ANTHROPIC','Abonnement'],['WELLPASS','Sport'],['DISNEY','Abonnement'],['GOOGLE ONE','Abonnement'],['APPLE.COM/BILL','Abonnement'],['YOUTUBE','Abonnement'],['WHOOP','Abonnement'],['FRAIS OFFRE METAL','Banque']].forEach(x=>add(60,x[0],'fixe',x[1]));
 add(60,'HENNER','fixe','Mutuelle',{sign:'debit'});
 [['AMAZON','Amazon'],['AMZN','Amazon'],['DELIVEROO','Livraison repas'],['UBER','Transport / livraison'],['CARREFOUR','Courses'],['MONOPRIX','Courses'],['FRANPRIX','Courses'],['LIDL','Courses'],['AUCHAN','Courses'],['PICARD','Courses'],['SNCF','Transport'],['RATP','Transport'],['TOTALENERGIES','Carburant'],['ESSO','Carburant'],['PHARMA','Santé'],['DOCTOLIB','Santé'],['AIR FRANCE','Transport'],['BOOKING','Hébergement'],['AIRBNB','Hébergement'],['REVOLUT','Revolut'],['PAYPAL','Achats en ligne'],['FDJ','Loisirs'],['RETRAIT','Retrait espèces']].forEach(x=>add(70,x[0],'variable',x[1],{sign:'debit'}));
@@ -1818,7 +1818,7 @@ const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
 txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const a=Math.abs(x.v);const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};if(c.via==='bourso')viaBourso++;
 if(!c.unmatched){const mk=(x.s||suggestPattern(x.l)).toUpperCase();const key=mk+'|'+c.type+'|'+(c.grp||'')+'|'+(c.sub||'');const src=c.ruleId==='manual'?'manuel':c.via==='bourso'?'bourso':c.ruleId==='acc'?'compte':'règle';(groups[key]=groups[key]||{key,s:mk,type:c.type,grp:c.grp||'',sub:c.sub||'',src,n:0,tot:0,lines:[]}).n++;groups[key].tot+=x.v;groups[key].lines.push({d:x.d,l:x.l,v:x.v})}if(x.v<0)debits+=a;
 if(['interneLivret','interneAutre','invest'].includes(c.type)&&internes.length<40)internes.push({d:x.d,l:x.l.slice(0,50),v:x.v,t:c.type});
-if(['fixe','variable','entree','interneLivret','salaire'].includes(c.type))lines.push({d:x.d,l:x.l.slice(0,48),v:Math.round(x.v*100)/100,t:c.type,s:c.sub||''});
+if(['fixe','variable','entree','interneLivret','salaire','invest'].includes(c.type))lines.push({d:x.d,l:x.l.slice(0,48),v:Math.round(x.v*100)/100,t:c.type,s:c.sub||''});
 if(c.type==='salaire'&&x.bal!=null&&payDate==null){payDate=x.d;ccBeforePay=Math.round((x.bal-x.v)*100)/100}
 if(c.type==='salaire'){t.salaire+=x.v;salaireCount++;entrees.push({l:x.l,v:x.v,cat:'salaire'})}
 else if(c.type==='entree'){if(x.v>0){t.entree+=x.v;entrees.push({l:x.l,v:x.v,cat:c.sub||'entrée'});add(bySub.entree,c.sub,x.v);G('entree',x.v)}}
@@ -1885,7 +1885,7 @@ if(nNew>=nOld&&!confirm('Remplacer l\u2019import de '+ML[m]+' ('+nOld+' lignes) 
 if(b.cl){alert(ML[m]+' est clôturé. Rouvrez le mois dans Budget avant de ré-importer.');return}
 const force={};Object.keys(IMP_STATE.unRes).forEach(fk=>{if(fk.startsWith(k+'|'))force[fk]=IMP_STATE.unRes[fk]});b.impForce=force;
 const clean=JSON.parse(JSON.stringify(buildImport(IMP_STATE.byM[k],IMP_STATE.unRes)));clean.big=clean.big.slice(0,25);clean.groups=(clean.groups||[]).slice(0,60).map(g=>({s:g.s,type:g.type,grp:g.grp,sub:g.sub,src:g.src,n:g.n,tot:Math.round(g.tot*100)/100}));
-if(b.imp&&b.imp.lines){const old={};b.imp.lines.forEach(l=>{if(l.poche)old[l.d+'|'+l.l+'|'+l.v]=l.poche});(clean.lines||[]).forEach(l=>{const pk=old[l.d+'|'+l.l+'|'+l.v];if(pk)l.poche=pk})}
+if(b.imp&&b.imp.lines){const old={},oldD={};b.imp.lines.forEach(l=>{const k=l.d+'|'+l.l+'|'+l.v;if(l.poche)old[k]=l.poche;if(l.dest)oldD[k]=l.dest});(clean.lines||[]).forEach(l=>{const k=l.d+'|'+l.l+'|'+l.v;if(old[k])l.poche=old[k];if(oldD[k])l.dest=oldD[k]})}
 b.imp=clean;b.entrees=clean.entrees;b.lvAuto=clean.livretOut;b.lrAuto=clean.livretIn;
 const n0=new Date();if((n0.getFullYear()*12+n0.getMonth()+1)-(y*12+m)>=2)b.reconst=true;save();
 delete IMP_STATE.byM[k];IMP_STATE.months=IMP_STATE.months.filter(x=>x!==k);delete IMP_STATE.res[k];
@@ -2137,6 +2137,7 @@ function fyMonths(fy){const s=DB.params.proj.anneeDebut||9;const out=[];for(let 
 function projDepPonct(y,m){return ((DB.params.proj||{}).depPonctuels||[]).filter(x=>+x.mois===m&&(!x.an||+x.an===y)).reduce((a,x)=>a+(+x.v||0),0)}
 function pocheLabel(p){return p.l+' '+(p.an||'')}
 function pocheSpent(id){const L=[];sBM().forEach(b=>{if(b.imp&&b.imp.lines)b.imp.lines.forEach((l,i)=>{if(l.poche===id)L.push({y:b.y,m:b.m,i,d:l.d,l:l.l,v:l.v})})});return{spent:L.reduce((a,x)=>a-x.v,0),lines:L}}
+function destSet(y,m,i,d){const b=gBM(y,m);if(!b||!b.imp||!b.imp.lines||!b.imp.lines[i])return;if(d)b.imp.lines[i].dest=d;else delete b.imp.lines[i].dest;save();rMore()}
 function pocheSet(y,m,i,id){const b=gBM(y,m);if(!b||!b.imp||!b.imp.lines||!b.imp.lines[i])return;if(id)b.imp.lines[i].poche=id;else delete b.imp.lines[i].poche;save();rMore()}
 function projDep(y,m){const b=gBM(y,m);if(b&&(b.ch.length||b.ex.length))return prevuConso(y,m).total;const pc=projDepPonct(y,m);
 const all=sBM().filter(d=>d.ch.length);const t=all.length?all[all.length-1]:null;if(!t)return pc;
@@ -2195,6 +2196,8 @@ else if(!pb&&isV2(pv.y,pv.m)&&n.getDate()<=7)items.push({t:'Faire la mise à jou
 const d=n.getDate();if(d>=25||d<=5){const wm=d>=25?{y:cy,m:cm}:pv;const r=gardeCost(wm.y,wm.m);if(!r.before&&!r.after&&!gardeTrack(wm.y,wm.m).decl)items.push({t:'Déclarer '+ML[wm.m]+' sur Pajemploi',s:fh(r.paidH)+' h · net '+fE(r.net)+(r.nav.amt?' · transport '+fE(r.nav.amt):''),go:"gY="+wm.y+";gM="+wm.m+";go('garde')",k:(d<=5&&d>=3)?'bad':'warn'})}
 {const r=gardeCost(pv.y,pv.m);if(!r.before&&!r.after){const t=gardeTrack(pv.y,pv.m);const miss=[];if(!t.paid)miss.push('salaire à verser');if(!t.fiche)miss.push('fiche à envoyer');if(miss.length)items.push({t:'Nounou · '+ML[pv.m],s:miss.join(' · '),go:"gY="+pv.y+";gM="+pv.m+";go('garde')",k:'warn'})}}
 {const cs=cpStatus(cy,cm);cs.alerts.filter(a=>a.t==='warn').slice(0,1).forEach(a=>items.push({t:'Congés de la nounou',s:a.m.slice(0,90),go:"go('garde')",k:'warn'}))}
+{const np=perPending();if(np)items.push({t:'Attribuer '+np+' prélèvement'+(np>1?'s':'')+' Oradea (PER ou AV)',s:'le suivi PER est incomplet tant qu\u2019ils ne sont pas attribués',go:"PG='more';SUB='poches';go('more');SUB='poches';rMore()",k:'warn'})}
+{if(cm===12&&!perEng(cy+1))items.push({t:'Définir l\u2019engagement PER '+(cy+1)+' et mettre à jour l\u2019IPS',s:'avant le dernier versement déductible · IPS §10 : PER gelé tant que Luxembourg n\u2019est pas tranché',go:"PG='more';SUB='fiscal';go('more');SUB='fiscal';rMore()",k:'warn'})}
 {let lx='';try{lx=localStorage.getItem('hft7_xport')||''}catch(e){}const days=lx?Math.round((Date.now()-new Date(lx).getTime())/864e5):99;if(days>7)items.push({t:'Exporter une sauvegarde JSON',s:lx?'dernier fichier il y a '+days+' jours':'aucun export enregistré sur cet appareil — bouton ⤓ en haut',go:"xport()",k:'info'})}
 return items}
 function rTodo(){const items=todoList();if(!items.length)return'';const col={ok:'var(--up)',warn:'var(--gold)',bad:'var(--dn)',info:'var(--blue)'};
@@ -2203,12 +2206,12 @@ items.map(x=>'<div class="list-item" style="cursor:pointer;padding:9px 0" onclic
 let PO_M='',PO_Q='',PO_ONLY=false;
 function rPoches(el){ensureProj();const PO=(DB.params.proj.depPonctuels||[]).filter(p=>+p.v>0);const months=sBM().filter(b=>b.imp&&b.imp.lines&&b.imp.lines.length);
 if(!PO_M&&months.length){const l=months[months.length-1];PO_M=ym(l.y,l.m)}const [y,m]=PO_M?PO_M.split('-').map(Number):[0,0];const b=y?gBM(y,m):null;
-let L=(b&&b.imp&&b.imp.lines||[]).map((l,i)=>Object.assign({i},l)).filter(l=>['fixe','variable'].includes(l.t)||l.poche);const q=PO_Q.toUpperCase();if(q)L=L.filter(l=>l.l.toUpperCase().includes(q)||(l.s||'').toUpperCase().includes(q));if(PO_ONLY)L=L.filter(l=>l.poche);
+let L=(b&&b.imp&&b.imp.lines||[]).map((l,i)=>Object.assign({i},l)).filter(l=>['fixe','variable','invest'].includes(l.t)||l.poche);const q=PO_Q.toUpperCase();if(q)L=L.filter(l=>l.l.toUpperCase().includes(q)||(l.s||'').toUpperCase().includes(q));if(PO_ONLY)L=L.filter(l=>l.poche);
 L.sort((a,b)=>a.d<b.d?1:-1);
 el.innerHTML=`<button class="backlink" onclick="SUB='proj';rMore()">‹ Projection</button><div class="pagetitle">Pointer des lignes</div>
-<div class="card"><div class="card-b" style="font-size:12px;line-height:1.5;color:var(--tm)">Choisis une poche sur chaque ligne concernée. Le classement de la ligne ne change pas : elle reste une dépense du mois ; elle est en plus comptée dans la poche.</div></div>
+<div class="card"><div class="card-b" style="font-size:12px;line-height:1.5;color:var(--tm)">Dépenses : choisis une poche (vacances…) sur les lignes concernées ; le classement ne change pas. Investissements : attribue chaque prélèvement à son support — les prélèvements Oradea sont ambigus (PER ou AV), seul toi peux trancher.</div></div>
 ${months.length?`<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap"><select class="inp sm" style="width:auto" onchange="PO_M=this.value;rMore()">${months.map(x=>'<option value="'+ym(x.y,x.m)+'"'+(ym(x.y,x.m)===PO_M?' selected':'')+'>'+ML[x.m]+' '+x.y+'</option>').join('')}</select><input class="inp sm" style="flex:1;min-width:120px" id="q-po" placeholder="Rechercher…" value="${esc(PO_Q)}" oninput="qSearch('q-po',()=>PO_Q=this.value)"><label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" ${PO_ONLY?'checked':''} onchange="PO_ONLY=this.checked;rMore()" style="accent-color:var(--gold)">pointées</label></div>
-<div class="card"><div class="card-b" style="padding:4px 10px">${L.map(l=>'<div class="row rb" style="padding:7px 0;border-bottom:1px solid var(--line2);gap:8px"><span style="flex:1;min-width:0"><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.d.slice(8)+'/'+l.d.slice(5,7)+' · '+esc(l.l)+'</div><div style="font-size:10px;color:var(--td)">'+esc(l.s||TYPE_LBL[l.t]||'')+'</div></span><b class="mono" style="font-size:12px;color:'+(l.v<0?'var(--t)':'var(--up)')+'">'+fE(-l.v)+'</b><select class="inp sm" style="width:auto;max-width:150px;font-size:11px;'+(l.poche?'border-color:var(--violet);color:var(--violet)':'')+'" onchange="pocheSet('+y+','+m+','+l.i+',this.value)"><option value="">—</option>'+PO.map(p=>'<option value="'+p.id+'"'+(l.poche===p.id?' selected':'')+'>'+esc(pocheLabel(p))+'</option>').join('')+'</select></div>').join('')||'<div class="empty">Aucune ligne</div>'}</div></div>`:'<div class="al alb">Aucun mois ne contient encore de lignes conservées. Ré-importe un relevé (Plus → Import) : les lignes seront gardées et pointables.</div>'}`}
+<div class="card"><div class="card-b" style="padding:4px 10px">${L.map(l=>'<div class="row rb" style="padding:7px 0;border-bottom:1px solid var(--line2);gap:8px"><span style="flex:1;min-width:0"><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.d.slice(8)+'/'+l.d.slice(5,7)+' · '+esc(l.l)+'</div><div style="font-size:10px;color:var(--td)">'+esc(l.s||TYPE_LBL[l.t]||'')+'</div></span><b class="mono" style="font-size:12px;color:'+(l.v<0?'var(--t)':'var(--up)')+'">'+fE(-l.v)+'</b>'+(l.t==='invest'?'<select class="inp sm" style="width:auto;max-width:150px;font-size:11px;'+(l.dest?'border-color:var(--gold);color:var(--gold)':'border-color:var(--dn)')+'" onchange="destSet('+y+','+m+','+l.i+',this.value)"><option value="">support ?</option>'+['PER','AV','AV enfants','PEA','Autre'].map(d=>'<option value="'+d+'"'+(l.dest===d?' selected':'')+'>'+d+'</option>').join('')+'</select>':'<select class="inp sm" style="width:auto;max-width:150px;font-size:11px;'+(l.poche?'border-color:var(--violet);color:var(--violet)':'')+'" onchange="pocheSet('+y+','+m+','+l.i+',this.value)"><option value="">—</option>'+PO.map(p=>'<option value="'+p.id+'"'+(l.poche===p.id?' selected':'')+'>'+esc(pocheLabel(p))+'</option>').join('')+'</select>')+'</div>').join('')||'<div class="empty">Aucune ligne</div>'}</div></div>`:'<div class="al alb">Aucun mois ne contient encore de lignes conservées. Ré-importe un relevé (Plus → Import) : les lignes seront gardées et pointables.</div>'}`}
 function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Mode d\u2019emploi</div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>La routine mensuelle</div><div class="card-b" style="font-size:13px;line-height:1.6">
 <div style="margin-bottom:10px"><b>Au fil du mois — Garde, 30 s.</b><br>Saisir uniquement les écarts au planning : heure en plus, congé, absence, jour non utilisé, récupération. Les jours normaux ne demandent rien.</div>
@@ -2393,69 +2396,127 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 return}
 if(SUB==='config'){rConfig(el);setTimeout(rBackups,50);return}}
 
-function rFiscal(el){
-const fp=DB.fp;
-const perA=perAutoSum();const perT=perA+(fp.perExcep||0);
-const perR=Math.max(0,fp.perObj-perT);const perP=fp.perObj>0?Math.min(100,Math.round(perT/fp.perObj*100)):0;
-const dn=DB.fiscal.filter(f=>f.s==='fait').length,ec=DB.fiscal.filter(f=>f.s==='en_cours').length;
-el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button>
-<div class="pagetitle">Fiscal & PER</div>
+/* ================= FISCAL v2 ================= */
+function defFisc(){return{per:{},pasPeriodes:[{from:'2025-09',taux:6.6}],pasManuel:{},perReelDepuis:'2026-10',netImposable:{},garderie:{mensuel:40,moisDe:9,moisA:6,extras:[]},bareme:{tranches:[[11497,0],[29315,0.11],[83823,0.30],[180294,0.41],[1e12,0.45]],plafondQF:1791,abattement:0.10},parts:3,conjointRevenu:{},enfants:[{n:'Hedi',ne:'2021-01-11'},{n:'Zayn',ne:'2025-12-01'}],plan:[]}}
+function ensureFisc(){if(DB.rules)DB.rules.forEach(r=>{if(r.pattern==='ORADEA'&&r.sub==='PER')r.sub='Oradea · PER ou AV'});if(!DB.fp)DB.fp={};const d=defFisc();if(!DB.fp.fisc)DB.fp.fisc=d;const F=DB.fp.fisc;Object.keys(d).forEach(k=>{if(F[k]==null)F[k]=d[k]});
+if(!F.per[2026]){F.per[2026]={engagement:3000,pas:6.6,note:'IPS §10 — PER gelé à l\u2019engagement 2026 tant que Luxembourg n\u2019est pas tranché'};if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-02',champ:'fisc.per.2026',old:String(DB.fp.perObj||'—')+' / PAS '+String(DB.fp.pas||'—'),new:'engagement 3 000 € · PAS 6,6 %',motif:'alignement sur l\u2019IPS v1.6 §10 et le taux individualisé déclaré'})}
+if(!F.plan.length)F.plan=[
+{id:'hs',l:'Contrôler les heures supplémentaires exonérées sur la déclaration pré-remplie',g:'variable',q:'déclaration (avril-juin)',done:false},
+{id:'per',l:'Verser le solde PER avant le 31/12 (engagement de l\u2019année)',g:'~900 €',q:'décembre',done:false},
+{id:'dons',l:'Rassembler les reçus fiscaux des dons',g:'66 % des dons',q:'déclaration',done:false},
+{id:'frais',l:'Comparer frais réels et abattement de 10 % (trajets, télétravail)',g:'à chiffrer',q:'déclaration',done:false},
+{id:'maman',l:'Qualifier l\u2019aide à un ascendant comme pension alimentaire (conditions strictes, preuves)',g:'à qualifier',q:'déclaration',done:false},
+{id:'avance',l:'Vérifier l\u2019avance de crédits d\u2019impôt de mi-janvier (60 % des crédits N-1)',g:'trésorerie',q:'janvier',done:false},
+{id:'pas',l:'Saisir le PAS payé de janvier à mars (bulletins), puis vérifier le taux appliqué à chaque changement',g:'trésorerie',q:'maintenant, puis septembre',done:false}]}
+function ageAt(ne,y){const d=new Date(ne);const j1=new Date(y,0,1);let a=j1.getFullYear()-d.getFullYear();if(j1<new Date(j1.getFullYear(),d.getMonth(),d.getDate()))a--;return a}
+function perEng(y){const F=DB.fp.fisc;return F.per[y]||null}
+function perRealYear(y){const F=DB.fp.fisc;const since=F.perReelDepuis||'2026-10';let tot=0,nLines=0,dur=0,rel=0;for(let m=1;m<=12;m++){const k=ym(y,m);const b=gBM(y,m);const im=gIM(y,m);
+if(k>=since&&b&&b.imp&&b.imp.lines&&b.imp.lines.length){const L=b.imp.lines.filter(l=>l.t==='invest'&&l.dest==='PER');const v=L.reduce((a,l)=>a-l.v,0);tot+=v;rel+=v;nLines+=L.length}
+else if(im){const v=im.contribs.filter(c=>isPER(c.l)).reduce((a,c)=>a+c.v,0);tot+=v;dur+=v}}return{tot:Math.round(tot*100)/100,src:rel>0?(dur>0?'mixte':'relevé'):'prévisionnel',nLines,dur:Math.round(dur),rel:Math.round(rel)}}
+function perPending(){let n=0;sBM().forEach(b=>{if(b.imp&&b.imp.lines)b.imp.lines.forEach(l=>{if(l.t==='invest'&&!l.dest&&/oradea/i.test(l.l))n++})});return n}
+function linesSum(y,pred){let t=0;for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.lines)b.imp.lines.forEach(l=>{if(pred(l,m))t+=-l.v})}return Math.round(t*100)/100}
+function hasLines(y,m){const b=gBM(y,m);return!!(b&&b.imp&&b.imp.lines&&b.imp.lines.length)}
+function fiscYear(y){ensureFisc();const F=DB.fp.fisc;const now=new Date();const cy=now.getFullYear();const monthsKnown=[];for(let m=1;m<=12;m++)if(hasLines(y,m)||(gBM(y,m)&&gBM(y,m).cl))monthsKnown.push(m);
+// 1. crédit emploi à domicile (module Garde)
+const dom=ciYear(y);
+// 2. crèche : dépense au relevé, nette du CMG crèche (hypothèse de projection), plafond 3 500 € par enfant de moins de 6 ans
+const creche=linesSum(y,(l)=>/cr[eè]che/i.test(l.s)||/cr[eè]che/i.test(l.l));const crecheMonths=[];for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.lines&&b.imp.lines.some(l=>/cr[eè]che/i.test(l.s)||/cr[eè]che/i.test(l.l)))crecheMonths.push(m)}
+const cmgC=((DB.params.proj||{}).aides||[]).find(a=>/cr[eè]che/i.test(a.l));let cmgCreche=0;crecheMonths.forEach(m=>{const k=ym(y,m);if(cmgC&&(!cmgC.from||cmgC.from<=k)&&(!cmgC.to||cmgC.to>=k))cmgCreche+=+cmgC.v||0});
+const zayn=F.enfants.find(e=>/zayn/i.test(e.n));const zaynOk=zayn?ageAt(zayn.ne,y)<6:true;const crecheNet=Math.max(0,creche-cmgCreche);const crecheBase=zaynOk?Math.min(crecheNet,3500):0;const crecheCI=Math.round(crecheBase*0.5);
+// 3. garderie école Hedi (saisie) — même condition d'âge
+const hedi=F.enfants.find(e=>/hedi/i.test(e.n));const hediOk=hedi?ageAt(hedi.ne,y)<6:false;const G=F.garderie;let gard=0;for(let m=1;m<=12;m++){const inYear=(G.moisDe<=G.moisA)?(m>=G.moisDe&&m<=G.moisA):(m>=G.moisDe||m<=G.moisA);if(inYear)gard+=+G.mensuel||0}gard+=(G.extras||[]).filter(e=>+e.y===y).reduce((a,e)=>a+(+e.v||0),0);
+const gardBase=hediOk?Math.min(gard,3500):0;const gardCI=Math.round(gardBase*0.5);
+// 4. dons (relevé)
+const dons=linesSum(y,(l)=>/^don/i.test(l.s)||/\bdon\b/i.test(l.l));const donsRed=Math.round(dons*0.66);
+// 5. PER (déduction)
+const per=perRealYear(y);const eng=perEng(y)||{engagement:0,pas:0};
+// 6. impôt estimé
+const netImp=F.netImposable[y]!=null?+F.netImposable[y]:Math.round(((DB.params.proj||{}).salaire||6200)*12*1.035);
+const conj=F.conjointRevenu[y]!=null?+F.conjointRevenu[y]:0;const brut=netImp+conj;const abat=Math.min(Math.max(brut*F.bareme.abattement,0),14426);const rni=Math.max(0,brut-abat-per.tot);
+const ir=(R,parts)=>{const q=R/parts;let t=0,prev=0;for(const [lim,tx] of F.bareme.tranches){if(q>prev)t+=(Math.min(q,lim)-prev)*tx;prev=lim;if(q<=lim)break}return t*parts};
+const parts=F.parts||3;const irFull=ir(rni,parts),ir2=ir(rni,2);const halfParts=(parts-2)*2;const avantage=Math.min(ir2-irFull,halfParts*(F.bareme.plafondQF||1791));const irBrut=Math.round(Math.max(0,ir2-avantage));
+const credits=Math.round((dom.ci||0)+crecheCI+gardCI);const reductions=donsRed;const irNet=Math.max(0,irBrut-reductions);const solde=irNet-credits;
+const pasAt=k=>{let t=0;(F.pasPeriodes||[]).filter(p=>p.from&&p.from<=k).sort((a,b)=>a.from<b.from?-1:1).forEach(p=>{t=+p.taux||0});return t};
+let pasRel=0,pasMois=[];for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){const t=pasAt(ym(y,m))/100;const v=Math.round(b.imp.t.salaire*t/(1-t));pasRel+=v;pasMois.push(m)}}
+const pasMan=+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasRel);const reste=Math.round(solde-pasPaye);
+return{y,monthsKnown,pasMan,pasRel,pasMois,dom,creche:{brut:creche,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
+function fscSet(path,val){withMotif('fs-motif',motif=>{const F=DB.fp.fisc;const seg=path.split('.');let o=F;for(let i=0;i<seg.length-1;i++){if(o[seg[i]]==null)o[seg[i]]={};o=o[seg[i]]}const old=o[seg[seg.length-1]];o[seg[seg.length-1]]=val;jrnl('fisc.'+path,old==null?null:String(old),String(val),motif);rMore()})}
+function fscPlanToggle(id){const a=DB.fp.fisc.plan.find(x=>x.id===id);if(!a)return;a.done=!a.done;a.date=a.done?new Date().toISOString().slice(0,10):null;save();rMore()}
+function fscPlanAdd(){const l=(document.getElementById('fs-pl')||{}).value||'';if(!l.trim())return;DB.fp.fisc.plan.push({id:'u'+Date.now(),l:l.trim(),g:'',q:'',done:false});save();rMore()}
+function fscPlanDel(id){DB.fp.fisc.plan=DB.fp.fisc.plan.filter(x=>x.id!==id);save();rMore()}
+function fscPerSet(y){withMotif('fs-motif',motif=>{const F=DB.fp.fisc;const e=F.per[y]||{engagement:0,pas:0};const v=+((document.getElementById('fs-eng-'+y)||{}).value||0),p=+((document.getElementById('fs-pas-'+y)||{}).value||0);const old=e.engagement+' / '+e.pas;F.per[y]={engagement:v,pas:p,note:e.note||''};jrnl('fisc.per.'+y,old,v+' / '+p,motif);rMore()})}
+let FSY=null;
+function rFiscal(el){ensureFisc();const n=new Date();if(!FSY)FSY=n.getFullYear();const y=FSY;const X=fiscYear(y);const F=DB.fp.fisc;const pend=perPending();const nxt=y+1;const engN=perEng(nxt);
+const line=(l,v,c,sm)=>'<div class="row rb" style="padding:4px 0;border-bottom:1px solid var(--line2);font-size:12.5px"><span>'+l+(sm?'<div style="font-size:10px;color:var(--td)">'+sm+'</div>':'')+'</span><b class="mono" style="color:'+(c||'var(--t)')+'">'+v+'</b></div>';
+el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button><div class="pagetitle">Fiscal</div>
+<div class="segtabs" style="margin-bottom:12px"><button class="${y===n.getFullYear()?'on':''}" onclick="FSY=${n.getFullYear()};rMore()">${n.getFullYear()}</button><button class="${y===n.getFullYear()+1?'on':''}" onclick="FSY=${n.getFullYear()+1};rMore()">${n.getFullYear()+1}</button></div>
+<input class="inp sm" id="fs-motif" placeholder="Motif pour une série de modifications (optionnel)" style="margin-bottom:10px">
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Objectif PER<span class="aux mono" style="color:${perR>0?'var(--gold)':'var(--up)'}">${perR>0?f$(perR)+' € restants':'✓ atteint'}</span></div>
-<div class="card-b">
-<div class="gauge-track"><div class="gauge-fill ${perP>=100?'ok':''}" style="width:${perP}%"></div></div>
-<div class="row rb" style="margin:8px 0 12px;font-size:12px;color:var(--tm)"><span class="mono">${f$(perT)} €</span><span>${perP}%</span><span class="mono">${f$(fp.perObj)} €</span></div>
-<div class="grid2">
-<div><div class="lbl">Objectif annuel (€)</div><input class="inp sm mono" type="number" inputmode="decimal" value="${fp.perObj}" onchange="DB.fp.perObj=+this.value||0;save();rMore()"></div>
-<div><div class="lbl">Taux PAS (%)</div><input class="inp sm mono" type="number" step="0.1" inputmode="decimal" value="${fp.pas}" onchange="DB.fp.pas=+this.value||0;save()"></div>
-</div>
-<div class="lbl" style="margin-top:11px">Compter les versements depuis</div>
-<div class="row">
-<select class="inp sm" style="width:auto" onchange="DB.fp.perStartM=+this.value;save();rMore()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<option value="'+m+'"'+(m===fp.perStartM?' selected':'')+'>'+MS[m]+'</option>').join('')}</select>
-<select class="inp sm" style="width:auto" onchange="DB.fp.perStartY=+this.value;save();rMore()">${YRS.map(y=>'<option'+(y===fp.perStartY?' selected':'')+'>'+y+'</option>').join('')}</select>
-</div>
-<div class="hr"></div>
-<div class="row rb" style="font-size:13px"><span style="color:var(--tm)">Auto · Σ versements «PER» (Invest)</span><b class="mono" style="color:var(--violet)">${f$(perA)} €</b></div>
-<div class="row" style="margin-top:9px"><span class="lbl" style="margin:0;flex:1">Versement exceptionnel (€)</span><input class="inp sm mono" type="number" inputmode="decimal" style="width:110px" value="${fp.perExcep||''}" onchange="DB.fp.perExcep=+this.value||0;save();rMore()"></div>
-<div class="row rb" style="font-size:14px;margin-top:11px;font-weight:600"><span>Total versé</span><b class="mono" style="color:var(--gold)">${f$(perT)} €</b></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — estimation en continu<span class="aux mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'remboursement ~'+fE(-X.reste):'complément ~'+fE(X.reste)}</span></div><div class="card-b">
+${line('Revenu net imposable (toi)',fE(X.netImp),null,'estimation · modifiable ci-dessous')}
+${line('Revenu conjoint',fE(X.conj))}
+${line('Abattement 10 %','− '+fE(X.abat))}
+${line('PER déduit','− '+fE(X.per.tot),null,X.per.src==='mixte'?'en dur jusqu\u2019à '+F.perReelDepuis+' ('+fE(X.per.dur)+'), relevés ensuite ('+fE(X.per.rel)+')':X.per.src==='relevé'?'d\u2019après les relevés':'montants en dur (Invest → versements)')}
+${line('Revenu net imposable du foyer',fE(X.rni),'var(--t)')}
+${line('Impôt brut ('+(F.parts)+' parts)',fE(X.irBrut),null,'barème '+y+' estimé · quotient familial plafonné à '+fE(F.bareme.plafondQF)+' par demi-part')}
+${line('Réductions (dons 66 %)','− '+fE(X.reductions))}
+${line('Crédits d\u2019impôt','− '+fE(X.credits),'var(--up)','emploi à domicile '+fE(X.dom.ci||0)+' · crèche '+fE(X.creche.ci)+' · garderie '+fE(X.gard.ci))}
+${line('Prélèvement à la source déjà payé','− '+fE(X.pasPaye),null,(X.pasMan?'saisi '+fE(X.pasMan)+' (avant relevés) + ':'')+'déduit des salaires importés '+fE(X.pasRel)+(X.pasMois.length?' ('+X.pasMois.map(m=>MS[m]).join(', ')+')':''))}
+<div class="row rb" style="padding:8px 0 2px;font-size:13.5px"><b>Solde probable (été ${y+1})</b><b class="mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste)+' remboursés':'− '+fE(X.reste)+' à payer'}</b></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">Estimation, pas un calcul d\u2019impôt officiel : barème et plafonds de l\u2019année précédente, abattement forfaitaire, pas de décote ni de contribution exceptionnelle. L\u2019avance de mi-janvier (60 % des crédits de l\u2019année précédente) est une avance de trésorerie, pas un revenu.</div>
 </div></div>
 
-${(()=>{const yy=DB.fp.ciY||new Date().getFullYear();const c=ciYear(yy);const pct=(DB.fp.ciOther||[]).length;
-return `<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Crédit d'impôt ${yy}<span class="aux mono" style="color:var(--up)">${f$(Math.round(c.total))} €</span></div>
-<div class="card-b">
-<div class="row" style="margin-bottom:10px;gap:6px"><span style="font-size:11.5px;color:var(--tm)">Année</span><select class="inp sm" style="width:auto" onchange="DB.fp.ciY=+this.value;save();rMore()">${YRS.map(y=>'<option'+(y===yy?' selected':'')+'>'+y+'</option>').join('')}</select></div>
-<div class="cost-line"><span>Dépenses engagées à date<small>net versé + cotisations + transport − CMG</small></span><b>${f$(Math.round(c.engaged))} €</b></div>
-<div class="cost-line"><span>Projection sur l'année<small>${c.capped?'⚠ dépasse le plafond de '+f$(DB.garde.p.ciCap)+' €':'sous le plafond de '+f$(DB.garde.p.ciCap)+' €'}</small></span><b style="color:var(--tm)">${f$(Math.round(c.base))} €</b></div>
-<div class="cost-line"><span>Crédit acquis à ce jour<small>${DB.garde.p.ciPct} % des dépenses engagées</small></span><b style="color:var(--up)">${f$(Math.round(c.ciEngaged))} €</b></div>
-<div class="cost-line"><span>Crédit projeté fin ${yy}<small>plafond ${f$(c.ciMax)} €</small></span><b style="color:var(--up)">${f$(Math.round(c.ci))} €</b></div>
-${(DB.fp.ciOther||[]).filter(o=>+o.y===yy).map((o,i)=>'<div class="cost-line"><span>'+o.l+'<small>saisi manuellement</small></span><b style="color:var(--up)">'+f$(o.v)+' €<span class="xdel" style="font-size:13px" onclick="DB.fp.ciOther.splice(DB.fp.ciOther.indexOf(DB.fp.ciOther.filter(x=>+x.y==='+yy+')['+i+']),1);save();rMore()">×</span></b></div>').join('')}
-<div class="cost-line tot"><span>Total attendu<small>versé l'été ${yy+1} après déclaration au printemps</small></span><b style="color:var(--gold);font-size:17px">${f$(Math.round(c.total))} €</b></div>
-<div class="gauge-track" style="margin-top:10px"><div class="gauge-fill ok" style="width:${c.ci>0?Math.min(100,Math.round(c.ciEngaged/Math.max(c.ci,1)*100)):0}%"></div></div>
-<div class="row rb" style="margin-top:6px;font-size:11px;color:var(--td)"><span>${c.months.filter(x=>x.past).length} mois engagés sur ${c.months.length}</span><span>${c.ci>0?Math.round(c.ciEngaged/c.ci*100):0} % acquis</span></div>
-<div class="row" style="margin-top:11px"><input class="inp sm" id="cio-l" placeholder="Autre crédit (crèche…)"><input class="inp sm mono" id="cio-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('cio-l').value.trim();if(!l)return;DB.fp.ciOther.push({l,v:+document.getElementById('cio-v').value||0,y:${yy}});save();rMore()">+</button></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:9px">Base : salaires nets + cotisations effectivement versées + frais de transport, <b>moins le CMG perçu</b>. Plafond ${f$(DB.garde.p.ciCap)} € de dépenses (12 000 € + 1 500 €/enfant). Versement : déclaration au printemps ${yy+1}, solde l'été ${yy+1} ; à partir de janvier ${yy+2}, acompte de 60 % puis régularisation. Attention au plafond global des niches fiscales de 10 000 €/an, partagé avec vos autres réductions.</div>
-</div></div>`})()}
-
-<div class="statrow">
-<div class="stat"><div class="sl">Fait</div><div class="sv mono" style="color:var(--up)">${dn}</div></div>
-<div class="stat"><div class="sl">En cours</div><div class="sv mono" style="color:var(--gold)">${ec}</div></div>
-<div class="stat"><div class="sl">À faire</div><div class="sv mono">${DB.fiscal.length-dn-ec}</div></div>
-</div>
-
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Actions</div><div class="card-b">
-${DB.fiscal.map(f=>'<div class="list-item" style="align-items:flex-start"><div style="flex:1"><div style="font-size:14px;font-weight:500;'+(f.s==='fait'?'color:var(--td);text-decoration:line-through':'')+'">'+f.l+'</div><div style="font-size:11px;color:var(--tm);margin-top:1px">'+(f.n||'')+'</div><div class="row" style="gap:5px;margin-top:4px"><span class="chip" style="font-size:9.5px">'+f.c+'</span><span class="chip" style="font-size:9.5px">'+f.d+'</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="chip '+(f.s==='fait'?'tag-up':f.s==='en_cours'?'tag-gold':'')+'" style="cursor:pointer" onclick="var x=DB.fiscal.find(a=>a.id==='+f.id+');x.s=cyc(x.s);save();rMore()">'+(f.s==='fait'?'Fait':f.s==='en_cours'?'En cours':'À faire')+'</span><span style="cursor:pointer;color:var(--dn);font-size:10.5px" onclick="DB.fiscal=DB.fiscal.filter(a=>a.id!=='+f.id+');save();rMore()">suppr.</span></div></div>').join('')||'<div class="empty">Aucune action</div>'}
-<div class="hr"></div>
-<input class="inp sm" id="nf-l" placeholder="Nouvelle action" style="margin-bottom:7px">
-<div class="row" style="margin-bottom:7px"><input class="inp sm" id="nf-d" placeholder="Échéance"><input class="inp sm" id="nf-c" placeholder="Catégorie"></div>
-<input class="inp sm" id="nf-n" placeholder="Note" style="margin-bottom:9px">
-<button class="btn btn-gold sm wide" onclick="var l=document.getElementById('nf-l').value.trim();if(!l)return;DB.fiscal.push({id:Date.now(),l,s:'a_faire',d:document.getElementById('nf-d').value.trim()||'?',c:document.getElementById('nf-c').value.trim()||'Divers',n:document.getElementById('nf-n').value.trim()});save();rMore()">+ Ajouter</button>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Crédits et réductions ${y} — détail</div><div class="card-b">
+<div class="eyebrow" style="margin-bottom:4px">Emploi à domicile · Saadia</div>
+${line('Dépenses nettes d\u2019aides',fE(X.dom.base||0),null,'module Garde · plafond '+fE(X.dom.ciMax*2||15000))}
+${line('Crédit 50 %',fE(X.dom.ci||0),'var(--up)')}
+<div class="eyebrow" style="margin:10px 0 4px">Garde hors domicile · Zayn (crèche)${X.creche.ok?'':' — non éligible (6 ans ou plus)'}</div>
+${line('Crèche au relevé',fE(X.creche.brut),null,X.creche.months.length+' mois avec relevé')}
+${line('CMG crèche (hypothèse de projection)','− '+fE(X.creche.cmg))}
+${line('Base retenue',fE(X.creche.base),null,'plafond 3 500 € par enfant')}
+${line('Crédit 50 %',fE(X.creche.ci),'var(--up)')}
+<div class="eyebrow" style="margin:10px 0 4px">Garde hors domicile · Hedi (garderie école)${X.gard.ok?' — '+X.gard.age+' ans au 1ᵉʳ janvier, éligible':' — '+X.gard.age+' ans au 1ᵉʳ janvier, non éligible'}</div>
+<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"><span>Estimation mensuelle</span><input class="inp sm mono" type="number" style="width:80px" value="${F.garderie.mensuel}" onchange="fscSet('garderie.mensuel',+this.value||0)"><span>€ de</span><select class="inp sm" style="width:auto" onchange="fscSet('garderie.moisDe',+this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(k=>'<option value="'+k+'"'+(F.garderie.moisDe===k?' selected':'')+'>'+MS[k]+'</option>').join('')}</select><span>à</span><select class="inp sm" style="width:auto" onchange="fscSet('garderie.moisA',+this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(k=>'<option value="'+k+'"'+(F.garderie.moisA===k?' selected':'')+'>'+MS[k]+'</option>').join('')}</select></div>
+${(F.garderie.extras||[]).map((e,gi)=>({e,gi})).filter(x=>+x.e.y===y).map(x=>'<div class="row rb" style="font-size:12px;padding:3px 0"><span>'+esc(x.e.l)+'</span><span class="mono">'+fE(x.e.v)+' <span class="xdel" onclick="DB.fp.fisc.garderie.extras.splice('+x.gi+',1);save();rMore()">×</span></span></div>').join('')}
+<div class="row" style="gap:6px;margin-top:6px"><input class="inp sm" id="fs-gx-l" placeholder="Vacances scolaires, centre de loisirs…" style="flex:1"><input class="inp sm mono" id="fs-gx-v" type="number" placeholder="€" style="width:80px"><button class="btn btn-ghost sm" onclick="const l=document.getElementById('fs-gx-l').value.trim(),v=+document.getElementById('fs-gx-v').value;if(!l||!v)return;DB.fp.fisc.garderie.extras.push({l,v,y:${y}});save();rMore()">+</button></div>
+${line('Crédit 50 %',fE(X.gard.ci),'var(--up)','sur '+fE(X.gard.brut)+' · plafond 3 500 €')}
+<div class="eyebrow" style="margin:10px 0 4px">Dons</div>
+${line('Dons au relevé',fE(X.dons.brut),null,'lignes classées « Don »')}
+${line('Réduction 66 %',fE(X.dons.red),'var(--up)')}
+<div class="eyebrow" style="margin:10px 0 4px">Heures supplémentaires</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt dans la limite d\u2019un plafond annuel, déjà retirées du revenu imposable par Alpha sur la déclaration pré-remplie. Rien à saisir ici ; à contrôler au moment de la déclaration (ligne « heures supplémentaires exonérées »).</div>
 </div></div>
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Dépenses déductibles</div><div class="card-b">
-${DB.deductibles.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px">'+esc(d.l)+'</span><span class="mono" style="color:var(--up);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="DB.deductibles.splice('+i+',1);save();rMore()">×</span></div>').join('')||'<div class="empty">Aucune</div>'}
-<div class="row" style="margin-top:9px"><input class="inp sm" id="dd-l" placeholder="Libellé"><input class="inp sm mono" id="dd-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('dd-l').value;var v=+document.getElementById('dd-v').value;if(!l||!v)return;DB.deductibles.push({l,v,cat:'Divers'});save();rMore()">+</button></div>
-</div></div>`}
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Engagement PER${pend?'<span class="aux chip tag-dn" style="font-size:10px">'+pend+' prélèvement'+(pend>1?'s':'')+' Oradea à attribuer</span>':''}</div><div class="card-b">
+${[y,nxt].map(yy=>{const e=perEng(yy);const r=yy===y?X.per:perRealYear(yy);return'<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><div class="row rb"><b>'+yy+'</b>'+(e?'<span class="mono">'+fE(r.tot)+' <span style="color:var(--td)">/ '+fE(e.engagement)+'</span></span>':'<span class="chip tag-gold">à définir</span>')+'</div>'+
+(e?'<div class="gauge-track" style="margin-top:6px"><div class="gauge-fill '+(r.tot>=e.engagement?'ok':'')+'" style="width:'+Math.min(100,Math.round(e.engagement?r.tot/e.engagement*100:0))+'%"></div></div>':'')+
+'<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;font-size:11.5px"><span>Engagement</span><input class="inp sm mono" id="fs-eng-'+yy+'" type="number" style="width:90px" value="'+(e?e.engagement:(perEng(yy-1)||{}).engagement||3000)+'"><span>€ · PAS</span><input class="inp sm mono" id="fs-pas-'+yy+'" type="number" step="0.1" style="width:70px" value="'+(e?e.pas:(perEng(yy-1)||{}).pas||6.6)+'"><span>%</span><button class="btn btn-ghost xs" onclick="fscPerSet('+yy+')">'+(e?'Modifier':'Définir')+'</button></div>'+
+(e&&e.note?'<div style="font-size:10.5px;color:var(--gold);margin-top:5px">'+esc(e.note)+'</div>':'')+'</div>'}).join('')}
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">Versé au réel = prélèvements Oradea attribués « PER » dans Projection → Pointer des lignes. Tant que des prélèvements Oradea ne sont pas attribués, le réel est incomplet. Rappel IPS §10 : PER gelé à l\u2019engagement 2026 tant que l\u2019objectif Luxembourg n\u2019est pas tranché — la mise à jour de l\u2019IPS accompagne tout changement.</div>
+</div></div>
 
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Calendrier fiscal</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
+${[['Mi-janvier','Avance de 60 % des crédits d\u2019impôt de l\u2019année précédente'],['Avril → juin','Déclaration des revenus — contrôler le pré-rempli (heures sup, PER), saisir garde, dons'],['Juillet → septembre','Solde : remboursement ou complément'],['Septembre','Nouveau taux de PAS appliqué'],['Décembre','Dernier versement PER déductible · définir l\u2019engagement de l\u2019année suivante · mettre à jour l\u2019IPS'],['À tout moment','Moduler le PAS sur impots.gouv après un changement significatif']].map(x=>'<div class="row rb" style="padding:4px 0;border-bottom:1px solid var(--line2)"><span style="color:var(--gold);font-weight:600;min-width:120px">'+x[0]+'</span><span style="flex:1;text-align:right">'+x[1]+'</span></div>').join('')}
+</div></div>
+
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--up)"></span>Plan d\u2019actions<span class="aux">${F.plan.filter(a=>a.done).length} / ${F.plan.length}</span></div><div class="card-b">
+${F.plan.map(a=>'<div class="row rb" style="padding:6px 0;border-bottom:1px solid var(--line2);gap:8px"><input type="checkbox" '+(a.done?'checked':'')+' style="accent-color:var(--gold);width:16px;height:16px;flex:none" onchange="fscPlanToggle(\''+a.id+'\')"><span style="flex:1;font-size:12.5px;'+(a.done?'color:var(--td);text-decoration:line-through':'')+'">'+esc(a.l)+'<div style="font-size:10px;color:var(--td)">'+(a.g?'gain : '+esc(a.g)+' · ':'')+esc(a.q||'')+(a.date?' · fait le '+a.date.split('-').reverse().join('/'):'')+'</div></span><span class="xdel" onclick="fscPlanDel(\''+a.id+'\')">×</span></div>').join('')}
+<div class="row" style="gap:6px;margin-top:8px"><input class="inp sm" id="fs-pl" placeholder="Nouvelle action" style="flex:1"><button class="btn btn-ghost sm" onclick="fscPlanAdd()">+</button></div>
+</div></div>
+
+<details class="card" style="padding:0"><summary class="card-h" style="cursor:pointer;list-style:none"><span class="dot" style="background:var(--td)"></span>Hypothèses de calcul</summary><div class="card-b">
+<div class="prm"><label>Revenu net imposable ${y} (toi)<small>€ · cumul « net imposable » du bulletin de décembre</small></label><input class="inp sm mono" type="number" value="${X.netImp}" onchange="fscSet('netImposable.${y}',+this.value||0)"></div>
+<div class="prm"><label>Revenu imposable conjoint ${y}<small>€</small></label><input class="inp sm mono" type="number" value="${X.conj}" onchange="fscSet('conjointRevenu.${y}',+this.value||0)"></div>
+<div class="prm"><label>PAS payé avant les relevés ${y}<small>€ · cumul « impôt prélevé » des bulletins jusqu\u2019à mars</small></label><input class="inp sm mono" type="number" value="${F.pasManuel[y]||''}" placeholder="0" onchange="fscSet('pasManuel.${y}',+this.value||0)"></div>
+<div class="eyebrow" style="margin:8px 0 4px">Taux de PAS par période</div>
+${(F.pasPeriodes||[]).map((pp,i)=>'<div class="row" style="gap:6px;align-items:center;font-size:12px;margin-bottom:4px"><span>à partir de</span><input class="inp sm mono" style="width:86px" value="'+esc(pp.from)+'" placeholder="AAAA-MM" onchange="fscSet(\'pasPeriodes.'+i+'.from\',this.value)"><input class="inp sm mono" type="number" step="0.1" style="width:70px" value="'+pp.taux+'" onchange="fscSet(\'pasPeriodes.'+i+'.taux\',+this.value||0)"><span>%</span>'+(i>0?'<span class="xdel" onclick="DB.fp.fisc.pasPeriodes.splice('+i+',1);save();rMore()">×</span>':'')+'</div>').join('')}
+<button class="btn btn-ghost xs" style="margin-bottom:8px" onclick="DB.fp.fisc.pasPeriodes.push({from:'',taux:(DB.fp.fisc.pasPeriodes.slice(-1)[0]||{}).taux||0});save();rMore()">+ Nouveau taux</button>
+<div class="prm"><label>PER au réel à partir de<small>AAAA-MM · avant : montants en dur d\u2019Invest → versements</small></label><input class="inp sm mono" style="width:90px" value="${F.perReelDepuis}" onchange="fscSet('perReelDepuis',this.value)"></div>
+<div class="prm"><label>Parts fiscales</label><input class="inp sm mono" type="number" step="0.5" value="${F.parts}" onchange="fscSet('parts',+this.value||3)"></div>
+<div class="prm"><label>Plafond du quotient familial<small>€ par demi-part</small></label><input class="inp sm mono" type="number" value="${F.bareme.plafondQF}" onchange="fscSet('bareme.plafondQF',+this.value||0)"></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:6px">Tranches du barème : ${F.bareme.tranches.slice(0,-1).map(t=>fE(t[0])+' → '+Math.round(t[1]*100)+' %').join(' · ')}. Les tranches se mettent à jour chaque année (loi de finances) ; tant qu\u2019elles ne sont pas revalorisées, l\u2019impôt estimé est légèrement surévalué.</div>
+<div style="font-size:10.5px;color:var(--td);margin-top:6px">Enfants : ${F.enfants.map(e=>e.n+' (né le '+e.ne.split('-').reverse().join('/')+')').join(' · ')}.</div>
+</div></details>`}
 function rAnalyses(el){
 el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</button>
 <div class="pagetitle">Analyses</div>
