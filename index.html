@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v74';const VTAG='point d\'étape : fixes ligne par ligne';
+const VERSION='v75';const VTAG='poches vacances sur l\'accueil';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -552,9 +552,9 @@ return'<div class="stat"><div class="sl">Δ Compte</div><div class="sv mono" sty
 </div>
 
 ${rTodo()}
-${(()=>{const n=new Date();return midCard(n.getFullYear(),n.getMonth()+1)})()}
 ${rVirement()}
 ${rProjHome()}
+${rPochesHome()}
 ${(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
 return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?'régime : '+mr.regime.label:'')+'</span></div><div class="card-b">'+
 '<div class="row rb" style="margin-bottom:8px"><span style="font-size:13px">Variables réelles</span><b class="mono" style="font-size:18px;color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+fS(mr.variables)+'</b></div>'+
@@ -2161,6 +2161,14 @@ return{known:true,payDate:pd,ccBefore:b.imp.ccBeforePay,condOk:b.imp.ccBeforePay
 function virementActive(){const B=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B.length?B[B.length-1]:null;if(!L||!L.cash)return{active:false};const liv=(+L.cash.la||0)+(+L.cash.ldds||0);const c=DB.params.cibleprecaution||0;
 if(liv>=c)DB.params.precOk=true;else if(liv<c*0.9)DB.params.precOk=false;return{active:!DB.params.precOk&&c>0,liv,cible:c,ref:L}}
 function virementSet(k,st,motif){const old=DB.virement[k]||'planifie';DB.virement[k]=st;if(DB.params.journal)DB.params.journal.push({date:new Date().toISOString().slice(0,10),champ:'virement.'+k,old,new:st,motif:motif||(st==='reporte'?'condition non remplie':'')});save();RA()}
+function rPochesHome(){ensureProj();const n=new Date();const cur=n.getFullYear()*12+n.getMonth()+1;
+const A=((DB.params.proj||{}).depPonctuels||[]).filter(p=>+p.v>0&&p.an).map(p=>{const at=(+p.an)*12+(+p.mois);const sp=pocheSpent(p.id);return{p,at,sp,dist:at-cur}}).filter(x=>(x.dist>=0&&x.dist<=3)||(x.sp.lines.length>0&&x.dist>=-1)).sort((a,b)=>a.at-b.at);
+if(!A.length)return'';
+return'<div class="card" style="cursor:pointer" onclick="PG=\'more\';SUB=\'proj\';go(\'more\');SUB=\'proj\';rMore()"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Poches vacances<span class="aux" style="font-size:10px;color:var(--td)">›</span></div><div class="card-b">'+
+A.map(x=>{const pct=x.p.v>0?x.sp.spent/x.p.v:0;const over=pct>1;const col=over?'var(--dn)':pct>0.8?'var(--gold)':'var(--up)';
+return'<div style="padding:6px 0"><div class="row rb"><b style="font-size:13px">'+esc(pocheLabel(x.p))+'</b><span class="mono" style="font-size:12.5px;color:'+col+'">'+fE(x.sp.spent)+' <span style="color:var(--td)">/ '+fE(x.p.v)+'</span></span></div>'+
+'<div class="gauge-track" style="margin-top:5px"><div class="gauge-fill '+(over?'bad':'ok')+'" style="width:'+Math.min(100,Math.round(pct*100))+'%"></div></div>'+
+'<div class="row rb" style="font-size:10.5px;color:var(--td);margin-top:3px"><span>'+(x.dist>0?'dans '+x.dist+' mois':x.dist===0?'ce mois-ci':'terminée le mois dernier')+' · '+x.sp.lines.length+' ligne'+(x.sp.lines.length>1?'s':'')+'</span><span style="color:'+col+'">'+(over?'dépassé de '+fE(x.sp.spent-x.p.v):'reste '+fE(x.p.v-x.sp.spent))+'</span></div></div>'}).join('')+'</div></div>'}
 function rVirement(){const A=virementActive();if(!A.active)return'';const n=new Date();const cy=n.getFullYear(),cm=n.getMonth()+1;const k=ym(cy,cm);const V=DB.params.virementPrecaution||0;const st=DB.virement[k]||'planifie';
 const pv=pM(cy,cm);const ck=virementCheck(pv.y,pv.m);const kp=ym(pv.y,pv.m);const stp=DB.virement[kp]||'planifie';
 let reports=0;for(let i=0;i<6;i++){const d=i===0?{y:cy,m:cm}:(()=>{let yy=cy,mm=cm-i;while(mm<1){mm+=12;yy--}return{y:yy,m:mm}})();if(DB.virement[ym(d.y,d.m)]==='reporte')reports++}
