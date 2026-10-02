@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v78';const VTAG='rapprochement des fixes ligne à ligne · liens 🔗';
+const VERSION='v79';const VTAG='compensation automatique des heures';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1062,7 +1062,7 @@ const after=!!ct&&(y*12+m)>(ctY*12+ctM);
 const partialIn=!!cf&&y===cfY&&m===cfM&&cfD>1;
 const partialOut=!!ct&&y===ctY&&m===ctM&&ctD<nd;
 const partial=partialIn||partialOut;
-const Z0={base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,sick:0,sickH:0,sickEur:0,zeroDays:0,owedH:0,owedDays:0,recupH:0,unusedH:0,recupAbsH:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null,planChanged:false};
+const Z0={base:0,baseHs:0,baseHp:0,wk:{s:0,p:0},planH:0,hS:0,hP:0,h:0,days:0,cp:0,abs:0,absH:0,absEur:0,sick:0,sickH:0,sickEur:0,zeroDays:0,owedH:0,owedDays:0,recupH:0,unusedH:0,recupAbsH:0,extraRawH:0,carry:0,extraH:0,extraEur:0,reclassEur:0,holMaj:0,holWorked:0,holOff:0,holOffEur:0,holOffH:0,hsH:0,hsEur:0,compH:0,compEur:0,payReal:0,net:0,paidH:0,partial:false,before:!!before,after:!!after,from:null,to:null,planChanged:false};
 if(before||after)return Z0;
 const plEnd=planFor(gKey(y,m,nd));const wk=plEnd?planWeekly(plEnd):{s:0,p:0};
 let baseHs=0,baseHp=0,planChanged=false,firstPlan=null;
@@ -1083,8 +1083,7 @@ if(i.real){const pT=i.prev.s+i.prev.p,rT=i.real.s+i.real.p;
 const pP=payOf(i.prev,g),rP=payOf(i.real,g);
 if(rT<pT-0.001){const gH=Math.round((pT-rT)*100)/100;const gap=i.real.gap||'unused';if(gap==='unused'){owedH+=gH;unusedH+=gH}else if(gap==='recup'){owedH+=gH;recupAbsH+=gH}else if(gap==='abs'){absH+=gH;absEur+=Math.max(0,pP-rP)}else if(gap==='paye'){}partialH=(partialH||0)+gH}
 let dH=Math.max(0,rT-pT),dP=Math.max(0,rP-pP);
-const rt=rT>0?rP/rT:0;const rc=Math.min(i.real.r||0,dH);recupH+=rc;dH-=rc;dP=Math.max(0,dP-rc*rt);
-const hE=Math.min(dP,dH*rt);
+const rt=rT>0?rP/rT:0;const hE=Math.min(dP,dH*rt);
 extraH+=dH;extraEur+=hE;reclassEur+=dP-hE}
 if(i.hol&&t>0){holWorked++;holMaj+=payOf(i.eff,g)*(i.mai1?g.fer.majMai:g.fer.majOrd)/100}}
 const base=baseHs*g.rate+baseHp*g.rateShared;
@@ -1099,10 +1098,13 @@ compH+=comp;compEur+=(c1*(g.hc.maj1||0)/100+c2*(g.hc.maj2||0)/100)*rr}
 const hs=Math.max(0,tot-g.hs.seuil);if(hs>0){const h1=Math.min(hs,g.hs.h1),h2=hs-h1;hsH+=hs;hsEur+=(h1*g.hs.maj1/100+h2*g.hs.maj2/100)*rr}}}
 mon.setDate(mon.getDate()+7)}
 let net,paidH;
+// compensation automatique : les heures en plus du mois soldent d'abord les heures manquées (reportées + du mois)
+const extraRawH=extraH,extraRawEur=extraEur;const carry=partial?0:ledgerCarry(y,m);const avail=carry+owedH;
+if(!partial&&extraRawH>0&&avail>0){recupH=Math.min(avail,extraRawH);extraH=Math.round((extraRawH-recupH)*100)/100;extraEur=extraRawH>0?extraRawEur*(extraH/extraRawH):0}
 if(partial){net=payReal+holMaj+hsEur+compEur;paidH=hS+hP;extraH=0;extraEur=0;reclassEur=0}
 else if(g.mode==='mensualise'){net=base+extraEur+reclassEur+holMaj+hsEur+compEur-absEur;paidH=baseHs+baseHp-absH+extraH}
 else{net=hS*g.rate+hP*g.rateShared+cp*g.cpHours*g.rate+(g.holOffPaid===false?0:holOffEur)+holMaj+hsEur+compEur;paidH=hS+hP+cp*g.cpHours+(g.holOffPaid===false?0:holOffH)}
-return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,sick,sickH,sickEur,zeroDays,owedH,owedDays,recupH,unusedH,recupAbsH,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,planChanged,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
+return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round((hS+hP)*100)/100,days,cp,abs,absH,absEur,sick,sickH,sickEur,zeroDays,owedH,owedDays,recupH,unusedH,recupAbsH,extraRawH,carry,extraH,extraEur,reclassEur,holMaj,holWorked,holOff,holOffEur,holOffH,hsH,hsEur,compH,compEur,payReal,partial,partialIn,partialOut,before:false,after:false,from:partialIn?cf:null,to:partialOut?ct:null,planChanged,net:Math.max(0,net),paidH:Math.max(0,paidH)}}
 
 function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
 function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padStart(2,'0');
@@ -1230,9 +1232,9 @@ const caf=(()=>{const net=r.cmgRem-r.cotRest;if(net<=0)return null;let i=y*12+m+
 return{paid:!!t.paid||!!(pay&&!pay.approx),paidSrc:pay&&!pay.approx?'relevé':(t.paid?'manuel':null),paidAmt:pay?pay.amt:null,paidApprox:!!(pay&&pay.approx),decl:!!t.decl,declSrc:t.decl?'manuel':null,caf:!!t.caf||!!caf,cafSrc:caf?'relevé':(t.caf?'manuel':null),fiche:!!t.fiche}}
 function gardeTrackSet(y,m,f,v){const g=DB.garde;if(!g.track)g.track={};const k=ym(y,m);g.track[k]=g.track[k]||{};g.track[k][f]=v;save();rGarde()}
 function isPP(y,m){const f=DB.garde.ppFrom||'';return !!f&&ym(y,m)>=f}
-function hoursLedger(y,m){const g=DB.garde;const cf=g.contractFrom||'2026-09-01';const lo=+cf.slice(0,4)*12+ +cf.slice(5,7);const cur=y*12+m;let bal=0;
-for(let i=lo;i<cur;i++){const yy=Math.floor((i-1)/12),mm=i-yy*12;const r=gardeMonth(yy,mm);bal+=r.owedH-r.recupH}
-const r=gardeMonth(y,m);return{start:Math.round(bal*100)/100,owed:r.owedH,unused:r.unusedH,recupAbs:r.recupAbsH,done:r.recupH,end:Math.round((bal+r.owedH-r.recupH)*100)/100}}
+function ledgerCarry(y,m){const g=DB.garde;const cf=g.contractFrom||'2026-09-01';const lo=+cf.slice(0,4)*12+ +cf.slice(5,7);const cur=y*12+m;let bal=0;
+for(let i=lo;i<cur;i++){const yy=Math.floor((i-1)/12),mm=i-yy*12;const r=gardeMonth(yy,mm);bal+=r.owedH-r.recupH}return Math.max(0,Math.round(bal*100)/100)}
+function hoursLedger(y,m){const r=gardeMonth(y,m);const bal=r.carry||0;return{start:bal,owed:r.owedH,unused:r.unusedH,recupAbs:r.recupAbsH,done:r.recupH,extraRaw:r.extraRawH||0,extraPaid:r.extraH||0,end:Math.max(0,Math.round((bal+r.owedH-r.recupH)*100)/100)}}
 function gardeRealDebit(y,m){const s=nM(y,m);const b=gBM(s.y,s.m);if(!b||!b.imp||!b.imp.done)return null;const f=b.imp.bySub.fixe||{};
 const k=Object.keys(f).find(x=>/pajemploi|nounou/i.test(x));return k!=null?f[k]:null}
 function gardeSrc(y,m){let r={y,m};for(let i=0;i<(DB.garde.lag||0);i++)r=pM(r.y,r.m);return r}
@@ -1281,9 +1283,8 @@ panel=`<div class="cal-panel">
 <div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.sick?'<span class="chip" style="color:var(--violet)">Absence salariée</span>':''}${i.recup?'<span class="chip tag-gold">À récupérer par elle · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${i.unused?'<span class="chip tag-gold">Non utilisé par nous · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${!i.planned?'<span class="chip">Jour non travaillé au planning</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
 <div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(g.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
 <div><div class="lbl">Partagé (h) · ${f$(g.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
-<div style="margin-top:8px"><div class="lbl">dont récupération (h) <span class="hint">heures du compteur, non payées en complémentaires</span></div><input class="inp sm mono" id="g-r" type="number" step="0.5" inputmode="decimal" value="${cur.r||''}" placeholder="0" style="text-align:center"></div>
 ${i.planned?`<div style="margin-top:8px"><div class="lbl">Si moins d\u2019heures que prévu (${fh(i.prev.s+i.prev.p)} h), pourquoi ?</div><select class="inp sm" id="g-gap"><option value="unused"${(cur.gap||'unused')==='unused'?' selected':''}>Pas besoin de nous — heures à replacer (compteur)</option><option value="recup"${cur.gap==='recup'?' selected':''}>Empêchement de sa part — à récupérer (compteur)</option><option value="abs"${cur.gap==='abs'?' selected':''}>Empêchement de sa part — non rémunéré (retenue)</option><option value="paye"${cur.gap==='paye'?' selected':''}>Payé, sans suivi</option></select></div>`:''}
-<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value,+document.getElementById('g-r').value,(document.getElementById('g-gap')||{}).value)">Enregistrer</button>
+<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value,0,(document.getElementById('g-gap')||{}).value)">Enregistrer</button>
 ${i.planned?`<select class="inp sm" style="width:auto" onchange="gMarkSel(this.value)"><option value="">Jour non travaillé…</option><option value="leave"${i.cp?' selected':''}>Congé payé</option><option value="abs"${i.abs?' selected':''}>Absence non rémunérée</option><option value="recup"${i.recup?' selected':''}>Absence à récupérer (elle)</option><option value="unused"${i.unused?' selected':''}>Non utilisé (nous) — à récupérer</option><option value="sick"${i.sick?' selected':''}>Absence salariée (maladie)</option></select>`:''}
 ${(i.real||i.cp||i.abs||i.sick||i.recup||i.unused)?'<button class="btn btn-ghost sm" style="color:var(--dn)" onclick="gClear()">Revenir au planning</button>':''}</div>
 ${i.status==='zero'?'<div class="al ala" style="margin-top:10px">0 h saisie sur un jour prévu au planning. En mensualisé, elle reste payée. S\u2019il s\u2019agit d\u2019un congé, d\u2019une absence ou d\u2019un arrêt, utilisez les boutons ci-dessus.</div>':''}
@@ -1328,13 +1329,13 @@ row('Déclaration Pajemploi validée',st.decl,st.declSrc,'decl','à cocher aprè
 row('CMG net reçu de la CAF',st.caf,st.cafSrc,'caf','attendu dans le relevé du mois suivant')+
 row('Fiche de paie envoyée',st.fiche,st.fiche?'manuel':null,'fiche','bouton Fiche mensuelle en haut')+
 '<div style="font-size:10px;color:var(--td);margin-top:7px">Coché automatiquement quand la ligne est reconnue dans un relevé importé ; sinon à cocher à la main. Le mois est soldé quand salaire, déclaration et fiche sont verts — la CAF arrive le mois suivant, c\u2019est un suivi, pas une condition.</div></div></div>'})()}
-${(()=>{const L=hoursLedger(gY,gM);if(!L.start&&!L.owed&&!L.done)return'';return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Compteur d\u2019heures · '+ML[gM]+'<span class="aux mono" style="color:'+(L.end>0?'var(--gold)':L.end<0?'var(--dn)':'var(--up)')+'">'+(L.end>0?'+':'')+fh(L.end)+' h</span></div><div class="card-b">'+
+${(()=>{const L=hoursLedger(gY,gM);if(!L.start&&!L.owed&&!L.done&&!L.extraRaw)return'';return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Compteur d\u2019heures · '+ML[gM]+'<span class="aux mono" style="color:'+(L.end>0?'var(--gold)':L.end<0?'var(--dn)':'var(--up)')+'">'+(L.end>0?'+':'')+fh(L.end)+' h</span></div><div class="card-b">'+
 '<div class="cost-line"><span>Solde reporté</span><b class="mono">'+(L.start>0?'+':'')+fh(L.start)+' h</b></div>'+
 (L.unused?'<div class="cost-line"><span>Non utilisées par nous<small>payées, à replacer d\u2019un commun accord</small></span><b class="mono">+ '+fh(L.unused)+' h</b></div>':'')+
 (L.recupAbs?'<div class="cost-line"><span>Absences à récupérer par elle<small>payées, à rattraper sous deux mois, sinon absence non rémunérée</small></span><b class="mono">+ '+fh(L.recupAbs)+' h</b></div>':'')+
-(L.done?'<div class="cost-line"><span>Récupérées ce mois<small>heures au-delà du planning, non payées en complémentaires</small></span><b class="mono" style="color:var(--up)">− '+fh(L.done)+' h</b></div>':'')+
+(L.extraRaw?'<div class="cost-line"><span>Heures en plus ce mois<small>'+(L.done?fh(L.done)+' h compensent des heures manquées (non payées) · ':'')+fh(L.extraPaid)+' h payées en complémentaires</small></span><b class="mono" style="color:var(--up)">'+(L.done?'− '+fh(L.done)+' h':'0 h')+'</b></div>':'')+
 '<div class="cost-line tot"><span>Solde<small>'+(L.end>0?'heures payées non travaillées, à replacer':L.end<0?'heures travaillées non payées — à régulariser en complémentaires':'à jour')+'</small></span><b class="mono" style="color:'+(L.end>0?'var(--gold)':L.end<0?'var(--dn)':'var(--up)')+'">'+(L.end>0?'+':'')+fh(L.end)+' h</b></div>'+
-'<div style="font-size:10.5px;color:var(--td);margin-top:8px">Quand c\u2019est vous qui n\u2019utilisez pas ses heures, la mensualisation les lui garantit : la récupération est un arrangement à sa main, jamais une dette. Quand c\u2019est elle qui s\u2019absente : congé payé, absence non rémunérée, ou récupération dans un délai court.</div></div></div>'})()}
+'<div style="font-size:10.5px;color:var(--td);margin-top:8px">Compensation automatique : les heures en plus du mois (jours prévus ou non) soldent d\u2019abord les heures manquées, reportées ou du mois ; l\u2019excédent est payé en complémentaires, le reliquat passe au mois suivant. Quand c\u2019est vous qui n\u2019utilisez pas ses heures, la récupération reste un arrangement à sa main, jamais une dette.</div></div></div>'})()}
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
 ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" style="margin:0 0 10px">📌 ${r.partialIn?'Mois d\u2019embauche':'Mois de fin de contrat'} : salaire calculé sur les heures réelles du ${r.from?kDate(r.from).toLocaleDateString('fr-FR'):'1'+'/'+String(gM).padStart(2,'0')} au ${r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(gM).padStart(2,'0')}, pas sur la mensualisation.</div></div>
@@ -1546,6 +1547,7 @@ if(r.partial&&r.partialIn){
 }else if(mens){
  intro='Votre salaire est identique chaque mois : '+fh(hebdo)+' h par semaine lissées sur l\u2019année, congés payés et jours fériés compris.';
  calc.push({l:'Salaire mensuel convenu',v:fEur(r.base),note:fh(wk.s)+' h en solo × '+fEur(g.rate)+(wk.p?' + '+fh(wk.p)+' h en garde partagée × '+fEur(g.rateShared):'')+' = '+fEur(wk.s*g.rate+wk.p*g.rateShared)+' par semaine × 52 ÷ 12'});
+ if(r.recupH>0)calc.push({l:'Heures en plus compensant des heures manquées : '+fH(r.recupH),v:'0,00 €',note:'non payées en plus : elles soldent des heures déjà payées dans le salaire mensuel'});
  if(r.extraEur>0)calc.push({l:'Heures en plus : '+fH(r.extraH),v:'+ '+fEur(r.extraEur)});
  if(r.reclassEur>0)calc.push({l:'Heures prévues en garde partagée effectuées seule',v:'+ '+fEur(r.reclassEur),note:'payées '+fEur(g.rate)+' au lieu de '+fEur(g.rateShared)});
  if(r.absEur>0)calc.push({l:'Absences non rémunérées : '+fH(r.absH),v:'\u2212 '+fEur(r.absEur)});
@@ -2310,8 +2312,8 @@ const s9=gardeMonth(2026,9);ok('Septembre au réel = 23,08 h · 276,96 €',Math
 // 3. reclassement solo/partagé : 2,5 h solo un lundi prévu 0,5+2 → +3,50 €, 0 h complémentaire
 g.hours['2026-10-05']={s:2.5,p:0};GM_CACHE={};const o2=gardeMonth(2026,10);ok('Lundi solo → ajustement +3,50 €, 0 h compl.',Math.abs(o2.reclassEur-3.5)<0.01&&o2.extraH===0,fE(o2.reclassEur)+' · '+o2.extraH+' h');
 // 4. récupération : samedi 5 h en récup ne paie rien de plus
-delete g.hours['2026-10-05'];g.hours['2026-10-17']={s:5,p:0,r:5};g.unused['2026-10-05']=1;g.recup['2026-10-09']=1;GM_CACHE={};const o3=gardeMonth(2026,10);const L=hoursLedger(2026,10);
-ok('Compteur d\u2019heures : +2,5 +2,5 −5 = 0, salaire inchangé',L.end===0&&Math.abs(o3.net-374.83)<0.01,'solde '+L.end+' h · '+fE(o3.net));
+delete g.hours['2026-10-05'];g.hours['2026-10-17']={s:5,p:0};g.unused['2026-10-05']=1;g.recup['2026-10-09']=1;GM_CACHE={};const o3=gardeMonth(2026,10);const L=hoursLedger(2026,10);
+ok('Compteur d\u2019heures : +2,5 +2,5, samedi 5 h → compensé, salaire inchangé',L.end===0&&Math.abs(o3.net-374.83)<0.01,'solde '+L.end+' h · '+fE(o3.net));
 delete g.hours['2026-10-17'];delete g.unused['2026-10-05'];delete g.recup['2026-10-09'];
 // 5. congés : semaine = 6 j ouvrables ; férié non décompté
 ['2026-11-09','2026-11-11','2026-11-13'].forEach(k=>g.leave[k]=1);GM_CACHE={};ok('CP : semaine du 11 nov = 5 j (férié exclu)',cpLedger(2026,11).taken===5,cpLedger(2026,11).taken+' j');
@@ -2335,6 +2337,10 @@ ensureProj();const pj=projRev(2026,10);ok('Projection : revenus d\u2019octobre >
 // 11. fin de contrat
 g.contractTo='2027-06-30';GM_CACHE={};const st=soldeTout();ok('Solde de tout compte calculé (CP + préavis + indemnité)',!!st&&st.total>0,st?fE(st.total):'—');g.contractTo='';
 // 12. formatage : aucun k€
+// compensation automatique : 1 h manquée le 14, 1,5 h en plus les 19-20-21, un mardi 27 non prévu à 3 h, le 28 non utilisé (2,5 h)
+g.hours['2026-10-14']={s:1.5,p:0};g.hours['2026-10-19']={s:0.5,p:2,r:0};g.hours['2026-10-19']={s:1,p:2};g.hours['2026-10-21']={s:3,p:0};g.hours['2026-10-23']={s:3,p:0};g.hours['2026-10-27']={s:3,p:0};g.unused['2026-10-28']=1;GM_CACHE={};
+const oc=gardeMonth(2026,10);const Lc=hoursLedger(2026,10);ok('Compensation auto : 3,5 h manquées vs 4,5 h en plus → 1 h payée, compteur 0',Math.abs(oc.extraH-1)<0.01&&Lc.end===0&&Math.abs(oc.net-386.83)<0.6,fh(oc.extraH)+' h payées · compteur '+Lc.end+' · net '+fE(oc.net));
+['2026-10-14','2026-10-19','2026-10-21','2026-10-23','2026-10-27'].forEach(k=>delete g.hours[k]);delete g.unused['2026-10-28'];GM_CACHE={};
 g.hours['2026-10-05']={s:0.5,p:0.5};GM_CACHE={};const L2=hoursLedger(2026,10);ok('Jour partiel (1 h sur 2,5) : 1,5 h au compteur, salaire inchangé',L2.end===1.5&&Math.abs(gardeMonth(2026,10).net-374.83)<0.01,'compteur '+L2.end+' h');g.hours['2026-10-05']={s:0.5,p:0.5,gap:'abs'};GM_CACHE={};const o5=gardeMonth(2026,10);ok('Jour partiel non rémunéré : retenue 1,5 h × 10,25 = 15,38 €',Math.abs(o5.absEur-15.375)<0.01,o5.absEur.toFixed(2)+' €');delete g.hours['2026-10-05'];GM_CACHE={};
 ok('Format euros : 12 345 €',fE(12345)==='12\u202f345 €'||fE(12345)==='12 345 €',fE(12345));
 }catch(e){results.push({n:'Exception pendant les tests',ok:false,d:String(e.message||e).slice(0,120)})}
