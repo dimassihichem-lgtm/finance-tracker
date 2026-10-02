@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v82';const VTAG='impôt : réalisé + projeté fin d\'année';
+const VERSION='v83';const VTAG='bulletins de paie · barème LF 2026 · HS 7 500';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -2397,8 +2397,10 @@ return}
 if(SUB==='config'){rConfig(el);setTimeout(rBackups,50);return}}
 
 /* ================= FISCAL v2 ================= */
-function defFisc(){return{per:{},pasPeriodes:[{from:'2025-09',taux:6.6}],pasManuel:{},perReelDepuis:'2026-10',netImposable:{},garderie:{mensuel:40,moisDe:9,moisA:6,extras:[]},bareme:{tranches:[[11497,0],[29315,0.11],[83823,0.30],[180294,0.41],[1e12,0.45]],plafondQF:1791,abattement:0.10},parts:3,conjointRevenu:{},enfants:[{n:'Hedi',ne:'2021-01-11'},{n:'Zayn',ne:'2025-12-01'}],plan:[]}}
+function defFisc(){return{per:{},pasPeriodes:[{from:'2025-09',taux:6.6}],pasManuel:{},perReelDepuis:'2026-10',netImposable:{},garderie:{mensuel:40,moisDe:9,moisA:6,extras:[]},bareme:{tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500},bulletins:{},parts:3,conjointRevenu:{},enfants:[{n:'Hedi',ne:'2021-01-11'},{n:'Zayn',ne:'2025-12-01'}],plan:[]}}
 function ensureFisc(){if(DB.rules)DB.rules.forEach(r=>{if(r.pattern==='ORADEA'&&r.sub==='PER')r.sub='Oradea · PER ou AV'});if(!DB.fp)DB.fp={};const d=defFisc();if(!DB.fp.fisc)DB.fp.fisc=d;const F=DB.fp.fisc;Object.keys(d).forEach(k=>{if(F[k]==null)F[k]=d[k]});
+if(!F.baremeLF2026){F.bareme={tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500};F.baremeLF2026=true}
+if(!F.bulletins||!Object.keys(F.bulletins).length){F.bulletins={'2026-01':{ni:5465.41,pas:666.78,taux:12.2,hs:864.98,net:5269.47},'2026-02':{ni:5465.41,pas:486.42,taux:8.9,hs:864.98,net:5477.83},'2026-03':{ni:5465.41,pas:486.42,taux:8.9,hs:864.98,net:5449.83},'2026-04':{ni:6251.34,pas:556.37,taux:8.9,hs:847.84,net:6181.98},'2026-05':{ni:6279.42,pas:558.87,taux:8.9,hs:818.91,net:6135.48},'2026-06':{ni:6881.84,pas:454.20,taux:6.6,hs:971.89,net:6955.29},'2026-07':{ni:7788.90,pas:514.07,taux:6.6,hs:971.89,net:7768.83},'2026-08':{ni:6130.93,pas:404.64,taux:6.6,hs:971.89,net:6365.71},'2026-09':{ni:6780.18,pas:447.49,taux:6.6,hs:322.64,net:6234.86}};if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-02',champ:'fisc.bulletins',old:null,new:'janvier → septembre 2026 (base PAS, PAS, HS exonérées, net)',motif:'saisie depuis les bulletins de paie Alpha transmis le 02/10/2026'})}
 if(!F.per[2026]){F.per[2026]={engagement:3000,pas:6.6,note:'IPS §10 — PER gelé à l\u2019engagement 2026 tant que Luxembourg n\u2019est pas tranché'};if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-02',champ:'fisc.per.2026',old:String(DB.fp.perObj||'—')+' / PAS '+String(DB.fp.pas||'—'),new:'engagement 3 000 € · PAS 6,6 %',motif:'alignement sur l\u2019IPS v1.6 §10 et le taux individualisé déclaré'})}
 if(!F.plan.length)F.plan=[
 {id:'hs',l:'Contrôler les heures supplémentaires exonérées sur la déclaration pré-remplie',g:'variable',q:'déclaration (avril-juin)',done:false},
@@ -2434,15 +2436,19 @@ const isDon=l=>/^don/i.test(l.s)||/\bdon\b/i.test(l.l);let dons=0,donsProj=0,don
 // 5. PER (déduction)
 const per=perRealYear(y);const eng=perEng(y)||{engagement:0,pas:0};
 // 6. impôt estimé
-const netImp=F.netImposable[y]!=null?+F.netImposable[y]:Math.round(((DB.params.proj||{}).salaire||6200)*12*1.035);
+const B=F.bulletins||{};let niBul=0,hsCum=0,bulMois=[],lastB=null;for(let m=1;m<=12;m++){const b=B[ym(y,m)];if(b){niBul+=+b.ni||0;hsCum+=+b.hs||0;bulMois.push(m);lastB=b}}
+const hsCap=F.bareme.hsPlafond||7500;const niProjM=lastB?(+lastB.ni+(hsCum>=hsCap-1?+lastB.hs:0)):Math.round(((DB.params.proj||{}).salaire||6200)*1.035);
+let niProj=0,niProjMois=[];for(let m=1;m<=12;m++){if(!B[ym(y,m)]){niProj+=niProjM;niProjMois.push(m)}}
+const netImp=F.netImposable[y]!=null?+F.netImposable[y]:Math.round(bulMois.length?niBul+niProj:niProjM*12);
 const conj=F.conjointRevenu[y]!=null?+F.conjointRevenu[y]:0;const brut=netImp+conj;const abat=Math.min(Math.max(brut*F.bareme.abattement,0),14426);const rni=Math.max(0,brut-abat-per.tot);
 const ir=(R,parts)=>{const q=R/parts;let t=0,prev=0;for(const [lim,tx] of F.bareme.tranches){if(q>prev)t+=(Math.min(q,lim)-prev)*tx;prev=lim;if(q<=lim)break}return t*parts};
-const parts=F.parts||3;const irFull=ir(rni,parts),ir2=ir(rni,2);const halfParts=(parts-2)*2;const avantage=Math.min(ir2-irFull,halfParts*(F.bareme.plafondQF||1791));const irBrut=Math.round(Math.max(0,ir2-avantage));
+const parts=F.parts||3;const irFull=ir(rni,parts),ir2=ir(rni,2);const halfParts=(parts-2)*2;const avantage=Math.min(ir2-irFull,halfParts*(F.bareme.plafondQF||1807));let irBrut=Math.max(0,ir2-avantage);const decote=(irBrut<(F.bareme.decoteSeuil||0))?Math.max(0,(F.bareme.decoteBase||0)-(F.bareme.decoteTaux||0)*irBrut):0;irBrut=Math.round(Math.max(0,irBrut-decote));
 const credits=Math.round((dom.ci||0)+crecheCI+gardCI);const reductions=donsRed;const irNet=Math.max(0,irBrut-reductions);const solde=irNet-credits;
 const pasAt=k=>{let t=0;(F.pasPeriodes||[]).filter(p=>p.from&&p.from<=k).sort((a,b)=>a.from<b.from?-1:1).forEach(p=>{t=+p.taux||0});return t};
-let pasRel=0,pasProj=0,pasMois=[],pasProjMois=[];for(let m=1;m<=12;m++){const b=gBM(y,m);const k=ym(y,m);const t=pasAt(k)/100;if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK){const sal=typeof salaireAt==='function'?salaireAt(k):((DB.params.proj||{}).salaire||0);pasProj+=Math.round(sal*t/(1-t));pasProjMois.push(m)}}
-const pasMan=+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasRel+pasProj);const reste=Math.round(solde-pasPaye);
-return{y,monthsKnown,pasMan,pasRel,pasProj,pasMois,pasProjMois,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
+let pasBul=0,pasRel=0,pasProj=0,pasMois=[],pasProjMois=[];for(let m=1;m<=12;m++){const k=ym(y,m);const bb=B[k];const b=gBM(y,m);const t=pasAt(k)/100;
+if(bb){pasBul+=+bb.pas||0}else if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK||bulMois.length){pasProj+=Math.round(niProjM*t);pasProjMois.push(m)}}
+const pasMan=bulMois.length?0:+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasBul+pasRel+pasProj);const reste=Math.round(solde-pasPaye);
+return{y,monthsKnown,pasMan,pasBul,pasRel,pasProj,pasMois,pasProjMois,bulMois,niBul,niProj,niProjM,niProjMois,hsCum,hsCap,decote,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
 function fscSet(path,val){withMotif('fs-motif',motif=>{const F=DB.fp.fisc;const seg=path.split('.');let o=F;for(let i=0;i<seg.length-1;i++){if(o[seg[i]]==null)o[seg[i]]={};o=o[seg[i]]}const old=o[seg[seg.length-1]];o[seg[seg.length-1]]=val;jrnl('fisc.'+path,old==null?null:String(old),String(val),motif);rMore()})}
 function fscPlanToggle(id){const a=DB.fp.fisc.plan.find(x=>x.id===id);if(!a)return;a.done=!a.done;a.date=a.done?new Date().toISOString().slice(0,10):null;save();rMore()}
 function fscPlanAdd(){const l=(document.getElementById('fs-pl')||{}).value||'';if(!l.trim())return;DB.fp.fisc.plan.push({id:'u'+Date.now(),l:l.trim(),g:'',q:'',done:false});save();rMore()}
@@ -2456,15 +2462,15 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 <input class="inp sm" id="fs-motif" placeholder="Motif pour une série de modifications (optionnel)" style="margin-bottom:10px">
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — projection fin d\u2019année<span class="aux mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'remboursement ~'+fE(-X.reste):'complément ~'+fE(X.reste)}</span></div><div class="card-b">
-${line('Revenu net imposable (toi)',fE(X.netImp),null,'estimation · modifiable ci-dessous')}
+${line('Revenu imposable (toi)',fE(X.netImp),null,X.bulMois.length?'bulletins '+MS[X.bulMois[0]]+'→'+MS[X.bulMois.slice(-1)[0]]+' '+fE(X.niBul)+(X.niProj?' + projeté '+fE(X.niProj)+' ('+X.niProjMois.map(m=>MS[m]).join(', ')+' à '+fE(X.niProjM)+'/mois'+(X.hsCum>=X.hsCap-1?', HS exonérées épuisées':'')+')':''):'estimation · saisis les bulletins ci-dessous')}
 ${line('Revenu conjoint',fE(X.conj))}
 ${line('Abattement 10 %','− '+fE(X.abat))}
 ${line('PER déduit','− '+fE(X.per.tot),null,(X.per.src==='mixte'?'en dur jusqu\u2019à '+F.perReelDepuis+' ('+fE(X.per.dur)+'), relevés ensuite ('+fE(X.per.rel)+')':X.per.src==='relevé'?'d\u2019après les relevés':'montants en dur (Invest → versements)')+(X.per.proj?' · '+fE(X.per.proj)+' projetés sur les mois à venir (dernier versement connu)':''))}
 ${line('Revenu net imposable du foyer',fE(X.rni),'var(--t)')}
-${line('Impôt brut ('+(F.parts)+' parts)',fE(X.irBrut),null,'barème '+y+' estimé · quotient familial plafonné à '+fE(F.bareme.plafondQF)+' par demi-part')}
+${line('Impôt brut ('+(F.parts)+' parts)',fE(X.irBrut),null,(F.bareme.source||'barème')+' · QF plafonné à '+fE(F.bareme.plafondQF)+' par demi-part'+(X.decote?' · décote '+fE(X.decote):''))}
 ${line('Réductions (dons 66 %)','− '+fE(X.reductions))}
 ${line('Crédits d\u2019impôt','− '+fE(X.credits),'var(--up)','emploi à domicile '+fE(X.dom.ci||0)+' · crèche '+fE(X.creche.ci)+(X.creche.proj?' (dont projeté)':'')+' · garderie '+fE(X.gard.ci))}
-${line('Prélèvement à la source sur l\u2019année','− '+fE(X.pasPaye),null,(X.pasMan?'saisi '+fE(X.pasMan)+' + ':'')+'relevés '+fE(X.pasRel)+(X.pasMois.length?' ('+MS[X.pasMois[0]]+'→'+MS[X.pasMois.slice(-1)[0]]+')':'')+(X.pasProj?' + projeté '+fE(X.pasProj)+' ('+X.pasProjMois.map(m=>MS[m]).join(', ')+')':''))}
+${line('Prélèvement à la source sur l\u2019année','− '+fE(X.pasPaye),null,(X.pasBul?'bulletins '+fE(X.pasBul):'')+(X.pasMan?' saisi '+fE(X.pasMan):'')+(X.pasRel?' + relevés '+fE(X.pasRel):'')+(X.pasProj?' + projeté '+fE(X.pasProj)+' ('+X.pasProjMois.map(m=>MS[m]).join(', ')+')':''))}
 <div class="row rb" style="padding:8px 0 2px;font-size:13.5px"><b>Solde probable (été ${y+1})</b><b class="mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste)+' remboursés':'− '+fE(X.reste)+' à payer'}</b></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:8px">Projection : réalisé d\u2019après les relevés + mois restants d\u2019après le budget et les hypothèses de projection. Pas un calcul officiel : barème et plafonds de l\u2019année précédente, abattement forfaitaire, ni décote ni contribution exceptionnelle. L\u2019avance de mi-janvier (60 % des crédits N-1) est une avance de trésorerie, pas un revenu.</div>
 </div></div>
@@ -2487,7 +2493,7 @@ ${line('Crédit 50 %',fE(X.gard.ci),'var(--up)','sur '+fE(X.gard.brut)+' · plaf
 ${line('Dons',fE(X.dons.brut+X.dons.proj),null,'relevé '+fE(X.dons.brut)+(X.dons.proj?' + projeté '+fE(X.dons.proj):''))}
 ${line('Réduction 66 %',fE(X.dons.red),'var(--up)')}
 <div class="eyebrow" style="margin:10px 0 4px">Heures supplémentaires</div>
-<div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt dans la limite d\u2019un plafond annuel, déjà retirées du revenu imposable par Alpha sur la déclaration pré-remplie. Rien à saisir ici ; à contrôler au moment de la déclaration (ligne « heures supplémentaires exonérées »).</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt jusqu\u2019à ${fE(X.hsCap)} par an. Cumul ${y} d\u2019après les bulletins : <b>${fE(X.hsCum)}</b>${X.hsCum>=X.hsCap-1?' — plafond atteint en '+ML[X.bulMois.slice(-1)[0]]+', les heures sup des mois suivants sont imposables (déjà pris en compte dans la projection).':'.'} Déjà retirées du revenu imposable par Alpha ; à contrôler sur la déclaration pré-remplie.</div>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Engagement PER${pend?'<span class="aux chip tag-dn" style="font-size:10px">'+pend+' prélèvement'+(pend>1?'s':'')+' Oradea à attribuer</span>':''}</div><div class="card-b">
@@ -2507,8 +2513,13 @@ ${F.plan.map(a=>'<div class="row rb" style="padding:6px 0;border-bottom:1px soli
 <div class="row" style="gap:6px;margin-top:8px"><input class="inp sm" id="fs-pl" placeholder="Nouvelle action" style="flex:1"><button class="btn btn-ghost sm" onclick="fscPlanAdd()">+</button></div>
 </div></div>
 
+<details class="card" style="padding:0"><summary class="card-h" style="cursor:pointer;list-style:none"><span class="dot" style="background:var(--cyan)"></span>Bulletins de paie ${y}<span class="aux">${X.bulMois.length} / 12</span></summary><div class="card-b" style="overflow-x:auto">
+<div style="font-size:10.5px;color:var(--td);margin-bottom:6px">Base PAS (= revenu imposable du mois, IJSS comprises) · PAS prélevé · HS exonérées (montant net fiscal) · net payé. Lignes « Impôt sur le revenu prélevé à la source » et « Exonération sur HC/HS/RTT » du bulletin.</div>
+<table style="font-size:11.5px"><thead><tr><th>Mois</th><th>Base PAS</th><th>Taux</th><th>PAS</th><th>HS exo.</th><th>Net payé</th></tr></thead><tbody>
+${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{const k=ym(y,m);const b=F.bulletins[k]||{};const inp=(f,w)=>'<input class="inp sm mono" style="width:'+w+'px;padding:4px" value="'+(b[f]!=null?b[f]:'')+'" onchange="(DB.fp.fisc.bulletins[\''+k+'\']=DB.fp.fisc.bulletins[\''+k+'\']||{})[\''+f+'\']=+this.value||0;save();rMore()">';return'<tr><td style="font-weight:600">'+MS[m]+'</td><td>'+inp('ni',80)+'</td><td>'+inp('taux',52)+'</td><td>'+inp('pas',66)+'</td><td>'+inp('hs',66)+'</td><td>'+inp('net',80)+'</td></tr>'}).join('')}
+</tbody></table></div></details>
 <details class="card" style="padding:0"><summary class="card-h" style="cursor:pointer;list-style:none"><span class="dot" style="background:var(--td)"></span>Hypothèses de calcul</summary><div class="card-b">
-<div class="prm"><label>Revenu net imposable ${y} (toi)<small>€ · cumul « net imposable » du bulletin de décembre</small></label><input class="inp sm mono" type="number" value="${X.netImp}" onchange="fscSet('netImposable.${y}',+this.value||0)"></div>
+<div class="prm"><label>Forcer le revenu imposable ${y}<small>€ · optionnel — sinon bulletins + projection</small></label><input class="inp sm mono" type="number" value="${F.netImposable[y]!=null?F.netImposable[y]:''}" placeholder="${X.netImp}" onchange="fscSet('netImposable.${y}',+this.value||0)"></div>
 <div class="prm"><label>Revenu imposable conjoint ${y}<small>€</small></label><input class="inp sm mono" type="number" value="${X.conj}" onchange="fscSet('conjointRevenu.${y}',+this.value||0)"></div>
 <div class="prm"><label>PAS payé avant les relevés ${y}<small>€ · cumul « impôt prélevé » des bulletins jusqu\u2019à mars</small></label><input class="inp sm mono" type="number" value="${F.pasManuel[y]||''}" placeholder="0" onchange="fscSet('pasManuel.${y}',+this.value||0)"></div>
 <div class="eyebrow" style="margin:8px 0 4px">Taux de PAS par période</div>
@@ -2517,7 +2528,7 @@ ${(F.pasPeriodes||[]).map((pp,i)=>'<div class="row" style="gap:6px;align-items:c
 <div class="prm"><label>PER au réel à partir de<small>AAAA-MM · avant : montants en dur d\u2019Invest → versements</small></label><input class="inp sm mono" style="width:90px" value="${F.perReelDepuis}" onchange="fscSet('perReelDepuis',this.value)"></div>
 <div class="prm"><label>Parts fiscales</label><input class="inp sm mono" type="number" step="0.5" value="${F.parts}" onchange="fscSet('parts',+this.value||3)"></div>
 <div class="prm"><label>Plafond du quotient familial<small>€ par demi-part</small></label><input class="inp sm mono" type="number" value="${F.bareme.plafondQF}" onchange="fscSet('bareme.plafondQF',+this.value||0)"></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:6px">Tranches du barème : ${F.bareme.tranches.slice(0,-1).map(t=>fE(t[0])+' → '+Math.round(t[1]*100)+' %').join(' · ')}. Les tranches se mettent à jour chaque année (loi de finances) ; tant qu\u2019elles ne sont pas revalorisées, l\u2019impôt estimé est légèrement surévalué.</div>
+<div style="font-size:10.5px;color:var(--td);margin-top:6px">${esc(F.bareme.source||'')}. Tranches : ${F.bareme.tranches.slice(0,-1).map(t=>fE(t[0])+' → '+Math.round(t[1]*100)+' %').join(' · ')} · 45 % au-delà. Décote couple : ${fE(F.bareme.decoteBase)} − ${Math.round(F.bareme.decoteTaux*10000)/100} % × impôt, si impôt < ${fE(F.bareme.decoteSeuil)}. Quand la LF 2027 sera promulguée (février 2027), relever les seuils ici.</div>
 <div style="font-size:10.5px;color:var(--td);margin-top:6px">Enfants : ${F.enfants.map(e=>e.n+' (né le '+e.ne.split('-').reverse().join('/')+')').join(' · ')}.</div>
 </div></details>`}
 function rAnalyses(el){
