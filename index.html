@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v73';const VTAG='jour partiel · point d\'étape en cours de mois';
+const VERSION='v74';const VTAG='point d\'étape : fixes ligne par ligne';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1907,6 +1907,21 @@ if(b.cl){let h='';if(mr.warn.length)h+='<div class="al" style="margin-bottom:10p
 if(mr.info.length)h+='<div class="al alb" style="margin-bottom:10px">Mois clos · '+mr.info.join(' · ')+'<br><span style="font-size:10.5px;color:var(--td)">Information, rien à corriger.</span></div>';return h}
 if(mr.complete)return'<div class="al alg" style="margin-bottom:10px">✓ '+ML[m]+' est complet — prêt à clôturer.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+(mr.info.length?'<br>ℹ '+mr.info.join(' · '):'')+'</div>';
 return'<div class="al ala" style="margin-bottom:10px"><b>'+ML[m]+' '+y+' — manque :</b> '+mr.missing.join(' · ')+'.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+' <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="PG=\'more\';SUB=\'import\';go(\'more\');SUB=\'import\';rMore()">Importer →</span></div>'}
+const FX_SYN={loyer:['loyer','logement'],credit:['credit','pret','auto'],nounou:['nounou','garde','pajemploi','ourhou'],ecole:['ecole','scolarite','cantine','education'],creche:['creche'],electricite:['energie','electricite','edf'],gaz:['energie','gaz'],energie:['energie','electricite'],internet:['telecom','internet','box'],tel:['telecom','mobile'],telephone:['telecom','mobile'],assurance:['assurance'],auto:['auto'],mutuelle:['mutuelle','sante'],natation:['sport'],foot:['sport'],sport:['sport'],abonnement:['abonnement','streaming','cloud'],cotisation:['cotisation','pajemploi'],claude:['cloud','logiciels'],chatgpt:['cloud','logiciels'],google:['cloud','logiciels'],icloud:['cloud'],apple:['cloud','logiciels','streaming'],coud:['cloud'],cloud:['cloud','logiciels'],youtube:['streaming','cloud','logiciels'],disney:['streaming'],netflix:['streaming'],spotify:['streaming'],deezer:['streaming'],canal:['streaming'],whoop:['sport','abonnement'],conservatoire:['loisirs','musique','education','ecole'],premieum:['streaming'],premium:['streaming']};
+function fxTok(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['net','sep','oct','nov','dec','jan','fev','mar','avr','mai','jun','jul','aou','les','des','du'].includes(w))}
+function fxMatch(y,m){const P=prevuFixeLines(y,m).map(x=>Object.assign({},x));const b=gBM(y,m);const R=Object.entries(((b&&b.imp&&b.imp.bySub)||{}).fixe||{}).map(([k,v])=>({l:k,v:Math.abs(v)}));
+const pairs=[];P.forEach((p,i)=>{const pt=fxTok(p.l);const syn=new Set(pt.flatMap(t=>[t].concat(FX_SYN[t]||[])));R.forEach((r,j)=>{const rt=fxTok(r.l);const tok=rt.filter(t=>syn.has(t)).length;const d=p.v?Math.abs(r.v-p.v)/p.v:1;const am=d<=0.05?2:d<=0.25?1:0;const sc=Math.min(tok,2)*2+am;if(tok>0||am===2)pairs.push({i,j,sc,tok})})});
+pairs.sort((a,b)=>b.sc-a.sc);const ui=new Set(),uj=new Set();const rem=R.map(r=>r.v);const lastOf={};
+// 1) appariements forts un-pour-un ; 2) une catégorie du relevé peut couvrir plusieurs lignes du budget tant qu'il reste de quoi
+pairs.forEach(x=>{if(ui.has(x.i))return;if(x.tok===0&&x.sc<2)return;const p=P[x.i];if(rem[x.j]<=0.01)return;if(uj.has(x.j)&&rem[x.j]<0.5*p.v)return;
+const take=Math.min(p.v,rem[x.j]);ui.add(x.i);uj.add(x.j);p.real=take;p.rl=R[x.j].l;p.j=x.j;rem[x.j]-=take;lastOf[x.j]=x.i});
+// le surplus d'une catégorie revient à sa dernière ligne (les dépassements restent visibles)
+Object.keys(lastOf).forEach(j=>{if(rem[j]>0.01){P[lastOf[j]].real+=rem[j];rem[j]=0}});
+// date attendue : même poste dans un relevé antérieur
+const prevL=[];for(let k=1;k<=3;k++){const d=new Date(y,m-1-k,1);const pb=gBM(d.getFullYear(),d.getMonth()+1);if(pb&&pb.imp&&pb.imp.lines)pb.imp.lines.filter(l=>l.t==='fixe').forEach(l=>prevL.push(l))}
+P.forEach(p=>{if(p.real!=null)return;const syn=new Set(fxTok(p.l).flatMap(t=>[t].concat(FX_SYN[t]||[])));const h=prevL.find(l=>fxTok(l.s+' '+l.l).some(t=>syn.has(t)));if(h)p.day=+h.d.slice(8,10)});
+const extra=R.filter((r,j)=>!uj.has(j));return{lines:P,extra}}
+
 function midMonth(y,m){const b=gBM(y,m);if(!b||!b.imp||!b.imp.done||b.cashFin!=null||b.cl)return null;const imp=b.imp;
 const lastD=(imp.lines&&imp.lines.length?imp.lines.map(l=>l.d).sort().pop():(imp.ccEndDate||null));if(!lastD)return null;
 const dim=new Date(y,m,0).getDate();const day=Math.min(dim,+lastD.slice(8,10));const frac=day/dim;
@@ -1915,18 +1930,38 @@ const pace=day>0?varNow/day*dim:0;const varProrata=varPrev*frac;
 // fixes prévus : déjà passés ou à venir
 const P=prevuFixeLines(y,m);const seen=Object.keys((imp.bySub||{}).fixe||{}).map(x=>x.toLowerCase());
 const fixRest=Math.max(0,pv.fixe-fixNow);
-return{day,dim,frac,lastD,varNow,varPrev,varProrata,pace,fixNow,fixPrev:pv.fixe,fixRest,finEstimee:fixNow+fixRest+pace,prevuTotal:pv.total,resteVar:varPrev-varNow,joursRest:dim-day}}
+const FM=fxMatch(y,m);const passed=FM.lines.filter(l=>l.real!=null),todo=FM.lines.filter(l=>l.real==null);
+const fxPassedPrev=passed.reduce((a,l)=>a+l.v,0),fxPassedReal=passed.reduce((a,l)=>a+l.real,0),fxTodo=todo.reduce((a,l)=>a+l.v,0),fxExtra=FM.extra.reduce((a,l)=>a+l.v,0);
+const fixEst=fxPassedReal+fxTodo+fxExtra;
+return{day,dim,frac,lastD,varNow,varPrev,varProrata,pace,fixNow,fixPrev:pv.fixe,fixRest,prevuTotal:pv.total,resteVar:varPrev-varNow,joursRest:dim-day,
+fx:{passed,todo,extra:FM.extra,passedPrev:fxPassedPrev,passedReal:fxPassedReal,todoSum:fxTodo,extraSum:fxExtra,est:fixEst,ecartPasses:fxPassedReal-fxPassedPrev},finEstimee:fixEst+Math.max(M_PACE_FLOOR(varNow,pace),0)}}
+function M_PACE_FLOOR(now,pace){return Math.max(now,pace)}
 function midCard(y,m){const M=midMonth(y,m);if(!M)return'';const ok=M.varNow<=M.varProrata;const col=ok?'var(--up)':'var(--dn)';const pct=M.varPrev>0?M.varNow/M.varPrev:0;
 return'<div class="card" style="border-color:rgba(110,168,254,.4)"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Point d\u2019étape au '+M.lastD.slice(8)+'/'+M.lastD.slice(5,7)+'<span class="aux">jour '+M.day+' / '+M.dim+'</span></div><div class="card-b">'+
-'<div class="row rb" style="font-size:13px"><span>Variables dépensées</span><b class="mono" style="color:'+col+'">'+fE(M.varNow)+' <span style="color:var(--td);font-weight:400">/ '+fE(M.varPrev)+'</span></b></div>'+
+'<div class="eyebrow" style="margin-bottom:6px">Variables · au rythme</div><div class="row rb" style="font-size:13px"><span>Variables dépensées</span><b class="mono" style="color:'+col+'">'+fE(M.varNow)+' <span style="color:var(--td);font-weight:400">/ '+fE(M.varPrev)+'</span></b></div>'+
 '<div class="gauge-track" style="margin-top:7px;position:relative"><div class="gauge-fill '+(ok?'ok':'bad')+'" style="width:'+Math.min(100,Math.round(pct*100))+'%"></div><div style="position:absolute;left:'+Math.round(M.frac*100)+'%;top:-3px;width:2px;height:calc(100% + 6px);background:var(--gold)" title="rythme prévu à date"></div></div>'+
 '<div class="row rb" style="font-size:10.5px;color:var(--td);margin-top:3px"><span>trait doré = rythme prévu au jour '+M.day+' ('+fE(M.varProrata)+')</span><span style="color:'+col+'">'+(ok?'en avance de '+fE(M.varProrata-M.varNow):'en retard de '+fE(M.varNow-M.varProrata))+'</span></div>'+
 '<div class="hr" style="margin:10px 0"></div>'+
 '<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Reste pour les variables</span><b class="mono" style="color:'+(M.resteVar>=0?'var(--up)':'var(--dn)')+'">'+fE(M.resteVar)+'</b></div>'+
 (M.joursRest>0&&M.resteVar>0?'<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>soit par jour restant ('+M.joursRest+' j)</span><b class="mono">'+fE(M.resteVar/M.joursRest)+'</b></div>':'')+
 '<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Variables en fin de mois à ce rythme</span><b class="mono" style="color:'+(M.pace<=M.varPrev?'var(--up)':'var(--dn)')+'">'+fE(M.pace)+'</b></div>'+
-'<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Fixes passés / prévus</span><b class="mono">'+fE(M.fixNow)+' <span style="color:var(--td);font-weight:400">/ '+fE(M.fixPrev)+'</span></b></div>'+
-'<div style="font-size:10.5px;color:var(--td);margin-top:8px">Import partiel, mois non clos. Ré-importe quand tu veux (le relevé remplace le précédent, classements et pointages conservés) ; en fin de mois, saisis les soldes et clôture. Les fixes restants à passer : '+fE(M.fixRest)+'.</div></div></div>'}
+(()=>{const F=M.fx;const n=F.passed.length+F.todo.length;const pct=M.fixPrev>0?(F.passedReal+F.extraSum)/M.fixPrev:0;const over=F.est>M.fixPrev+1;const col=over?'var(--dn)':'var(--up)';
+return'<div class="hr" style="margin:12px 0"></div><div class="eyebrow" style="margin-bottom:6px">Fixes · ligne par ligne</div>'+
+'<div class="row rb" style="font-size:13px"><span>Fixes passés</span><b class="mono">'+fE(F.passedReal+F.extraSum)+' <span style="color:var(--td);font-weight:400">/ '+fE(M.fixPrev)+'</span></b></div>'+
+'<div class="gauge-track" style="margin-top:7px"><div class="gauge-fill '+(over?'bad':'ok')+'" style="width:'+Math.min(100,Math.round(pct*100))+'%"></div></div>'+
+'<div class="row rb" style="font-size:10.5px;color:var(--td);margin-top:3px"><span>'+F.passed.length+' ligne'+(F.passed.length>1?'s':'')+' passée'+(F.passed.length>1?'s':'')+' sur '+n+'</span><span>'+F.todo.length+' à venir</span></div>'+
+'<div class="row rb" style="font-size:12.5px;padding:3px 0;margin-top:6px"><span>Écart sur les lignes passées</span><b class="mono" style="color:'+(F.ecartPasses>1?'var(--dn)':F.ecartPasses<-1?'var(--up)':'var(--tm)')+'">'+(F.ecartPasses>=0?'+':'')+fE(F.ecartPasses)+'</b></div>'+
+'<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Restent à passer</span><b class="mono">'+fE(F.todoSum)+'</b></div>'+
+(F.extraSum?'<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Imprévus (au relevé, pas au budget)</span><b class="mono" style="color:var(--dn)">'+fE(F.extraSum)+'</b></div>':'')+
+'<div class="row rb" style="font-size:12.5px;padding:3px 0"><span>Fixes estimés en fin de mois</span><b class="mono" style="color:'+col+'">'+fE(F.est)+'</b></div>'+
+'<details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Détail des fixes</summary><div style="margin-top:6px">'+
+F.passed.map(l=>'<div class="row rb" style="font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line2)"><span><span style="color:var(--up)">✓</span> '+esc(l.l)+(l.rl&&fxTok(l.rl).join()!==fxTok(l.l).join()?' <span style="color:var(--td);font-size:10px">('+esc(l.rl)+')</span>':'')+'</span><span class="mono">'+fE(l.real)+(Math.abs(l.real-l.v)>1?' <span style="color:'+(l.real>l.v?'var(--dn)':'var(--up)')+';font-size:10.5px">'+(l.real>l.v?'+':'')+fE(l.real-l.v)+'</span>':'')+'</span></div>').join('')+
+F.todo.map(l=>{const late=l.day&&l.day<M.day-2;return'<div class="row rb" style="font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line2);color:var(--tm)"><span>○ '+esc(l.l)+(l.day?' <span style="color:'+(late?'var(--gold)':'var(--td)')+';font-size:10px">'+(late?'attendu vers le '+l.day+', pas encore vu':'vers le '+l.day)+'</span>':'')+'</span><span class="mono">'+fE(l.v)+'</span></div>'}).join('')+
+F.extra.map(l=>'<div class="row rb" style="font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line2)"><span><span style="color:var(--dn)">!</span> '+esc(l.l)+' <span style="color:var(--td);font-size:10px">imprévu</span></span><span class="mono" style="color:var(--dn)">'+fE(l.v)+'</span></div>').join('')+
+'<div style="font-size:10px;color:var(--td);margin-top:5px">Rapprochement automatique budget ↔ relevé par libellé et montant. Un fixe « imprévu » qui correspond en fait à une ligne du budget : renomme la ligne du budget pour qu\u2019ils se reconnaissent.</div></div></details>'})()+
+'<div class="hr" style="margin:12px 0"></div>'+
+(()=>{const est=M.fx.est+Math.max(M.varNow,M.pace);const d=est-M.prevuTotal;return'<div class="row rb" style="font-size:13px"><b>Consommation estimée en fin de mois</b><b class="mono" style="color:'+(d>0?'var(--dn)':'var(--up)')+'">'+fE(est)+'</b></div><div class="row rb" style="font-size:11px;color:var(--td);margin-top:2px"><span>prévu '+fE(M.prevuTotal)+'</span><span style="color:'+(d>0?'var(--dn)':'var(--up)')+'">'+(d>0?'dépassement probable de '+fE(d):'marge probable de '+fE(-d))+'</span></div>'})()+
+'<div style="font-size:10.5px;color:var(--td);margin-top:8px">Import partiel, mois non clos. Ré-importe quand tu veux : le relevé remplace le précédent, classements et pointages conservés. En fin de mois, saisis les soldes et clôture.</div></div></div>'}
 function reelCard(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);const P=DB.params;
 const row=(l,p,r,e,cls)=>'<tr class="'+(cls||'')+'"><td>'+l+'</td><td class="mono" style="text-align:right;color:var(--td)">'+(p==null?'—':fS(p))+'</td><td class="mono" style="text-align:right">'+(r==null?'—':fS(r))+'</td><td class="mono" style="text-align:right;color:'+(e==null?'var(--td)':e>0?'var(--dn)':'var(--up)')+'">'+(e==null?'—':(e>0?'+':'')+fS(e))+'</td></tr>';
 const varPrev=mr.prevu.variable,varReel=mr.variables;const cible=P.cibleVariables;const m3=variablesMoy3(y,m);
