@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v86';const VTAG='PER : réel strict dès octobre';
+const VERSION='v87';const VTAG='impôt : à date vs fin d\'année';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -2456,7 +2456,14 @@ const pasAt=k=>{let t=0;(F.pasPeriodes||[]).filter(p=>p.from&&p.from<=k).sort((a
 let pasBul=0,pasRel=0,pasProj=0,pasMois=[],pasProjMois=[];for(let m=1;m<=12;m++){const k=ym(y,m);const bb=B[k];const b=gBM(y,m);const t=pasAt(k)/100;
 if(bb){pasBul+=+bb.pas||0}else if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK||bulMois.length){pasProj+=Math.round(niProjM*t);pasProjMois.push(m)}}
 const pasMan=bulMois.length?0:+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasBul+pasRel+pasProj);const reste=Math.round(solde-pasPaye);
-return{y,monthsKnown,pasMan,pasBul,pasRel,pasProj,pasMois,pasProjMois,bulMois,niBul,niProj,niProjM,niProjMois,hsCum,hsCap,decote,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
+// ---- colonne « à date » : réel encaissé / versé / payé
+let niRel=0;for(let m=1;m<=12;m++){const k=ym(y,m);const b=gBM(y,m);if(!B[k]&&b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){const t=pasAt(k)/100;niRel+=Math.round(b.imp.t.salaire/(1-t))}}
+const niDate=Math.round(niBul+niRel);const share=netImp>0?Math.min(1,niDate/netImp):0;
+const crecheNetReal=Math.max(0,creche-crecheMonths.reduce((a,m)=>{const k=ym(y,m);return a+((cmgC&&(!cmgC.from||cmgC.from<=k)&&(!cmgC.to||cmgC.to>=k))?(+cmgC.v||0):0)},0));const crecheCIDate=zaynOk?Math.round(Math.min(crecheNetReal,3500)*0.5):0;
+const creditsDate=Math.round((dom.ciEngaged||0)+crecheCIDate+gardCI*share);const redDate=Math.round(dons*0.66);
+const irDate=Math.round(irNet*share);const pasDate=Math.round(pasBul+pasRel+(bulMois.length?0:pasMan));const resteDate=irDate-creditsDate-pasDate;
+const aDate={ni:niDate,share,per:per.aDate,ir:irDate,red:redDate,credits:creditsDate,creditsDetail:{dom:Math.round(dom.ciEngaged||0),creche:crecheCIDate,gard:Math.round(gardCI*share)},pas:pasDate,reste:resteDate};
+return{y,aDate,monthsKnown,pasMan,pasBul,pasRel,pasProj,pasMois,pasProjMois,bulMois,niBul,niProj,niProjM,niProjMois,hsCum,hsCap,decote,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
 function fscSet(path,val){withMotif('fs-motif',motif=>{const F=DB.fp.fisc;const seg=path.split('.');let o=F;for(let i=0;i<seg.length-1;i++){if(o[seg[i]]==null)o[seg[i]]={};o=o[seg[i]]}const old=o[seg[seg.length-1]];o[seg[seg.length-1]]=val;jrnl('fisc.'+path,old==null?null:String(old),String(val),motif);rMore()})}
 function fscPlanToggle(id){const a=DB.fp.fisc.plan.find(x=>x.id===id);if(!a)return;a.done=!a.done;a.date=a.done?new Date().toISOString().slice(0,10):null;save();rMore()}
 function fscPlanAdd(){const l=(document.getElementById('fs-pl')||{}).value||'';if(!l.trim())return;DB.fp.fisc.plan.push({id:'u'+Date.now(),l:l.trim(),g:'',q:'',done:false});save();rMore()}
@@ -2469,7 +2476,12 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 <div class="segtabs" style="margin-bottom:12px"><button class="${y===n.getFullYear()?'on':''}" onclick="FSY=${n.getFullYear()};rMore()">${n.getFullYear()}</button><button class="${y===n.getFullYear()+1?'on':''}" onclick="FSY=${n.getFullYear()+1};rMore()">${n.getFullYear()+1}</button></div>
 <input class="inp sm" id="fs-motif" placeholder="Motif pour une série de modifications (optionnel)" style="margin-bottom:10px">
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — projection fin d\u2019année<span class="aux mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'remboursement ~'+fE(-X.reste):'complément ~'+fE(X.reste)}</span></div><div class="card-b">
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — où j\u2019en suis</div><div class="card-b">
+<table style="font-size:12.5px;margin-bottom:10px"><thead><tr><th style="text-align:left"></th><th style="text-align:right">À date</th><th style="text-align:right">Fin d\u2019année</th></tr></thead><tbody>
+${[['Revenu imposable encaissé',X.aDate.ni,X.netImp],['PER versé',X.aDate.per,X.per.tot],['Impôt dû (après réductions)',X.aDate.ir,X.irNet],['Crédits acquis',X.aDate.credits,X.credits],['PAS payé',X.aDate.pas,X.pasPaye]].map(r=>'<tr><td>'+r[0]+'</td><td class="mono" style="text-align:right">'+fE(r[1])+'</td><td class="mono" style="text-align:right;color:var(--td)">'+fE(r[2])+'</td></tr>').join('')}
+<tr style="border-top:2px solid var(--line2);font-weight:700"><td>Le fisc me doit</td><td class="mono" style="text-align:right;color:${X.aDate.reste<=0?'var(--up)':'var(--dn)'}">${X.aDate.reste<=0?'+ '+fE(-X.aDate.reste):'− '+fE(X.aDate.reste)}</td><td class="mono" style="text-align:right;color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste):'− '+fE(X.reste)}</td></tr></tbody></table>
+<div style="font-size:10.5px;color:var(--td);margin-bottom:10px">À date : revenus des bulletins et relevés, PER vu au relevé, crédits sur les dépenses déjà engagées (emploi à domicile, crèche, dons) et garderie au prorata, PAS réellement prélevé. L\u2019impôt dû à date est la part de l\u2019impôt annuel projeté correspondant au revenu déjà encaissé (${Math.round(X.aDate.share*100)} %) — le barème est annuel, il ne se calcule pas mois par mois. Versement attendu : été ${y+1}, avance de 60 % mi-janvier.</div>
+<div class="eyebrow" style="margin-bottom:4px">Détail de la projection fin d\u2019année</div>
 ${line('Revenu imposable (toi)',fE(X.netImp),null,X.bulMois.length?'bulletins '+MS[X.bulMois[0]]+'→'+MS[X.bulMois.slice(-1)[0]]+' '+fE(X.niBul)+(X.niProj?' + projeté '+fE(X.niProj)+' ('+X.niProjMois.map(m=>MS[m]).join(', ')+' à '+fE(X.niProjM)+'/mois'+(X.hsCum>=X.hsCap-1?', HS exonérées épuisées':'')+')':''):'estimation · saisis les bulletins ci-dessous')}
 ${X.hsCum?line('dont heures supplémentaires exonérées','− '+fE(Math.min(X.hsCum,X.hsCap)),'var(--up)','déjà retirées par Alpha · impôt évité ≈ '+fE(Math.round(Math.min(X.hsCum,X.hsCap)*0.30))+' à la tranche de 30 %'):''}
 ${line('Revenu conjoint',fE(X.conj))}
@@ -2480,7 +2492,7 @@ ${line('Impôt brut ('+(F.parts)+' parts)',fE(X.irBrut),null,(F.bareme.source||'
 ${line('Réductions (dons 66 %)','− '+fE(X.reductions))}
 ${line('Crédits d\u2019impôt','− '+fE(X.credits),'var(--up)','emploi à domicile '+fE(X.dom.ci||0)+' · crèche '+fE(X.creche.ci)+(X.creche.proj?' (dont projeté)':'')+' · garderie '+fE(X.gard.ci))}
 ${line('Prélèvement à la source sur l\u2019année','− '+fE(X.pasPaye),null,(X.pasBul?'bulletins '+fE(X.pasBul):'')+(X.pasMan?' saisi '+fE(X.pasMan):'')+(X.pasRel?' + relevés '+fE(X.pasRel):'')+(X.pasProj?' + projeté '+fE(X.pasProj)+' ('+X.pasProjMois.map(m=>MS[m]).join(', ')+')':''))}
-<div class="row rb" style="padding:8px 0 2px;font-size:13.5px"><b>Solde probable (été ${y+1})</b><b class="mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste)+' remboursés':'− '+fE(X.reste)+' à payer'}</b></div>
+<div class="row rb" style="padding:8px 0 2px;font-size:13.5px"><b>Solde probable fin d\u2019année (été ${y+1})</b><b class="mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste)+' remboursés':'− '+fE(X.reste)+' à payer'}</b></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:8px">Projection : réalisé d\u2019après les relevés + mois restants d\u2019après le budget et les hypothèses de projection. Pas un calcul officiel : barème et plafonds de l\u2019année précédente, abattement forfaitaire, ni décote ni contribution exceptionnelle. L\u2019avance de mi-janvier (60 % des crédits N-1) est une avance de trésorerie, pas un revenu.</div>
 </div></div>
 
