@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v76';const VTAG='règle CMG versé par l\'URSSAF';
+const VERSION='v77';const VTAG='règle URSSAF sur libellé tronqué';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1653,7 +1653,7 @@ regimes:[{from:'2026-04',label:'pré-crèche',motif:'calibration initiale'},{fro
 journal:[{date:'2026-09-29',champ:'cibleVariables',old:null,new:2500,motif:'aspirationnel, non calibré — révision revue IPS janvier 2027'},{date:'2026-09-29',champ:'ancres',old:null,new:'v1',motif:'calibration initiale — révision revue IPS janvier 2027 sur 4 mois post-crèche'}]}}
 function seedRules(){const R=[];let n=0;const add=(prio,pattern,type,sub,x)=>R.push(Object.assign({id:'s'+(++n),pattern,type,sub:sub||'',priority:prio,source:'seed',active:true,createdAt:'2026-09-29'},x||{}));
 add(10,'ALPHA FINANCIAL MARKETS','salaire','',{amountCond:{op:'>',v:3000}});add(11,'ALPHA FINANCIAL MARKETS','entree','Remboursement frais',{amountCond:{op:'<=',v:3000}});
-add(20,'SEPA CAF','entree','CAF',{sign:'credit'});add(21,'VERSEMENT PAJE','entree','CAF',{sign:'credit'});add(21,'PAJEAP','entree','CAF',{sign:'credit'});add(19,'RBT RETRAIT','entree','Remboursement frais',{sign:'credit'});add(20,'CPAM','entree','Santé');add(20,'HENNER','entree','Santé',{sign:'credit'});add(20,'DGFIP','entree','Impôts',{sign:'credit'});add(20,'AVOIR','entree','Avoir');
+add(20,'SEPA CAF','entree','CAF',{sign:'credit'});add(21,'VERSEMENT PAJE','entree','CAF',{sign:'credit'});add(21,'PAJEAP','entree','CAF',{sign:'credit'});add(21,'UNION POUR LE RECOUVREMENT','entree','CAF',{sign:'credit'});add(19,'RBT RETRAIT','entree','Remboursement frais',{sign:'credit'});add(20,'CPAM','entree','Santé');add(20,'HENNER','entree','Santé',{sign:'credit'});add(20,'DGFIP','entree','Impôts',{sign:'credit'});add(20,'AVOIR','entree','Avoir');
 add(30,'VIREMENT DEPUIS LIVRET','interneLivret');add(30,'DEPUIS LDDS','interneLivret');add(30,'LIVRET A','interneLivret');add(30,'LIVRET DEVELOPPEMENT','interneLivret');
 add(30,'VIREMENT DEPUIS BOURSOBANK','interneLivret','Livret A');
 add(25,'VIREMENT DE SALMA','entree','Virement conjoint reçu',{sign:'credit'});add(24,'NOTAIRES','entree','Remboursement frais',{sign:'credit'});add(26,'VIR INST','entree','Autre entrée',{sign:'credit'});
