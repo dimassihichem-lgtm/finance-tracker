@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v81';const VTAG='PAS par période · PER en dur puis réel';
+const VERSION='v82';const VTAG='impôt : réalisé + projeté fin d\'année';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -2410,9 +2410,9 @@ if(!F.plan.length)F.plan=[
 {id:'pas',l:'Saisir le PAS payé de janvier à mars (bulletins), puis vérifier le taux appliqué à chaque changement',g:'trésorerie',q:'maintenant, puis septembre',done:false}]}
 function ageAt(ne,y){const d=new Date(ne);const j1=new Date(y,0,1);let a=j1.getFullYear()-d.getFullYear();if(j1<new Date(j1.getFullYear(),d.getMonth(),d.getDate()))a--;return a}
 function perEng(y){const F=DB.fp.fisc;return F.per[y]||null}
-function perRealYear(y){const F=DB.fp.fisc;const since=F.perReelDepuis||'2026-10';let tot=0,nLines=0,dur=0,rel=0;for(let m=1;m<=12;m++){const k=ym(y,m);const b=gBM(y,m);const im=gIM(y,m);
+function perRealYear(y){const F=DB.fp.fisc;const since=F.perReelDepuis||'2026-10';let tot=0,nLines=0,dur=0,rel=0,lastPER=0,proj=0;for(let m=1;m<=12;m++){const k=ym(y,m);const b=gBM(y,m);const im=gIM(y,m);
 if(k>=since&&b&&b.imp&&b.imp.lines&&b.imp.lines.length){const L=b.imp.lines.filter(l=>l.t==='invest'&&l.dest==='PER');const v=L.reduce((a,l)=>a-l.v,0);tot+=v;rel+=v;nLines+=L.length}
-else if(im){const v=im.contribs.filter(c=>isPER(c.l)).reduce((a,c)=>a+c.v,0);tot+=v;dur+=v}}return{tot:Math.round(tot*100)/100,src:rel>0?(dur>0?'mixte':'relevé'):'prévisionnel',nLines,dur:Math.round(dur),rel:Math.round(rel)}}
+else if(im){const v=im.contribs.filter(c=>isPER(c.l)).reduce((a,c)=>a+c.v,0);tot+=v;dur+=v;lastPER=v}else if(lastPER>0&&k>ym(new Date().getFullYear(),new Date().getMonth()+1)){tot+=lastPER;proj+=lastPER}}return{tot:Math.round(tot*100)/100,src:rel>0?(dur>0?'mixte':'relevé'):'prévisionnel',nLines,dur:Math.round(dur),rel:Math.round(rel),proj:Math.round(proj)}}
 function perPending(){let n=0;sBM().forEach(b=>{if(b.imp&&b.imp.lines)b.imp.lines.forEach(l=>{if(l.t==='invest'&&!l.dest&&/oradea/i.test(l.l))n++})});return n}
 function linesSum(y,pred){let t=0;for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.lines)b.imp.lines.forEach(l=>{if(pred(l,m))t+=-l.v})}return Math.round(t*100)/100}
 function hasLines(y,m){const b=gBM(y,m);return!!(b&&b.imp&&b.imp.lines&&b.imp.lines.length)}
@@ -2420,14 +2420,17 @@ function fiscYear(y){ensureFisc();const F=DB.fp.fisc;const now=new Date();const 
 // 1. crédit emploi à domicile (module Garde)
 const dom=ciYear(y);
 // 2. crèche : dépense au relevé, nette du CMG crèche (hypothèse de projection), plafond 3 500 € par enfant de moins de 6 ans
-const creche=linesSum(y,(l)=>/cr[eè]che/i.test(l.s)||/cr[eè]che/i.test(l.l));const crecheMonths=[];for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.lines&&b.imp.lines.some(l=>/cr[eè]che/i.test(l.s)||/cr[eè]che/i.test(l.l)))crecheMonths.push(m)}
-const cmgC=((DB.params.proj||{}).aides||[]).find(a=>/cr[eè]che/i.test(a.l));let cmgCreche=0;crecheMonths.forEach(m=>{const k=ym(y,m);if(cmgC&&(!cmgC.from||cmgC.from<=k)&&(!cmgC.to||cmgC.to>=k))cmgCreche+=+cmgC.v||0});
-const zayn=F.enfants.find(e=>/zayn/i.test(e.n));const zaynOk=zayn?ageAt(zayn.ne,y)<6:true;const crecheNet=Math.max(0,creche-cmgCreche);const crecheBase=zaynOk?Math.min(crecheNet,3500):0;const crecheCI=Math.round(crecheBase*0.5);
+const nowK=ym(now.getFullYear(),now.getMonth()+1);const isCr=l=>/cr[eè]che/i.test(l.s)||/cr[eè]che/i.test(l.l);
+let creche=0,crecheProj=0;const crecheMonths=[],crecheProjMonths=[];for(let m=1;m<=12;m++){const b=gBM(y,m);const k=ym(y,m);
+if(b&&b.imp&&b.imp.lines&&b.imp.lines.some(isCr)){creche+=b.imp.lines.filter(isCr).reduce((a,l)=>a-l.v,0);crecheMonths.push(m)}
+else if(k>=nowK){const src=b||sBM().filter(x=>x.ch.length).slice(-1)[0];const c=src&&src.ch.find(x=>/cr[eè]che/i.test(x.l)&&x.v);if(c){crecheProj+=c.v;crecheProjMonths.push(m)}}}
+const cmgC=((DB.params.proj||{}).aides||[]).find(a=>/cr[eè]che/i.test(a.l));let cmgCreche=0;crecheMonths.concat(crecheProjMonths).forEach(m=>{const k=ym(y,m);if(cmgC&&(!cmgC.from||cmgC.from<=k)&&(!cmgC.to||cmgC.to>=k))cmgCreche+=+cmgC.v||0});
+const zayn=F.enfants.find(e=>/zayn/i.test(e.n));const zaynOk=zayn?ageAt(zayn.ne,y)<6:true;const crecheTot=creche+crecheProj;const crecheNet=Math.max(0,crecheTot-cmgCreche);const crecheBase=zaynOk?Math.min(crecheNet,3500):0;const crecheCI=Math.round(crecheBase*0.5);
 // 3. garderie école Hedi (saisie) — même condition d'âge
 const hedi=F.enfants.find(e=>/hedi/i.test(e.n));const hediOk=hedi?ageAt(hedi.ne,y)<6:false;const G=F.garderie;let gard=0;for(let m=1;m<=12;m++){const inYear=(G.moisDe<=G.moisA)?(m>=G.moisDe&&m<=G.moisA):(m>=G.moisDe||m<=G.moisA);if(inYear)gard+=+G.mensuel||0}gard+=(G.extras||[]).filter(e=>+e.y===y).reduce((a,e)=>a+(+e.v||0),0);
 const gardBase=hediOk?Math.min(gard,3500):0;const gardCI=Math.round(gardBase*0.5);
 // 4. dons (relevé)
-const dons=linesSum(y,(l)=>/^don/i.test(l.s)||/\bdon\b/i.test(l.l));const donsRed=Math.round(dons*0.66);
+const isDon=l=>/^don/i.test(l.s)||/\bdon\b/i.test(l.l);let dons=0,donsProj=0,donsN=0;for(let m=1;m<=12;m++){const b=gBM(y,m);const k=ym(y,m);if(b&&b.imp&&b.imp.lines&&b.imp.lines.length){dons+=b.imp.lines.filter(isDon).reduce((a,l)=>a-l.v,0);donsN++}else if(k>=nowK){const src=b||sBM().filter(x=>x.ch.length).slice(-1)[0];const c=src&&src.ch.find(x=>/^don/i.test(x.l)&&x.v);if(c)donsProj+=c.v;else if(donsN)donsProj+=dons/donsN}}const donsRed=Math.round((dons+donsProj)*0.66);
 // 5. PER (déduction)
 const per=perRealYear(y);const eng=perEng(y)||{engagement:0,pas:0};
 // 6. impôt estimé
@@ -2437,9 +2440,9 @@ const ir=(R,parts)=>{const q=R/parts;let t=0,prev=0;for(const [lim,tx] of F.bare
 const parts=F.parts||3;const irFull=ir(rni,parts),ir2=ir(rni,2);const halfParts=(parts-2)*2;const avantage=Math.min(ir2-irFull,halfParts*(F.bareme.plafondQF||1791));const irBrut=Math.round(Math.max(0,ir2-avantage));
 const credits=Math.round((dom.ci||0)+crecheCI+gardCI);const reductions=donsRed;const irNet=Math.max(0,irBrut-reductions);const solde=irNet-credits;
 const pasAt=k=>{let t=0;(F.pasPeriodes||[]).filter(p=>p.from&&p.from<=k).sort((a,b)=>a.from<b.from?-1:1).forEach(p=>{t=+p.taux||0});return t};
-let pasRel=0,pasMois=[];for(let m=1;m<=12;m++){const b=gBM(y,m);if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){const t=pasAt(ym(y,m))/100;const v=Math.round(b.imp.t.salaire*t/(1-t));pasRel+=v;pasMois.push(m)}}
-const pasMan=+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasRel);const reste=Math.round(solde-pasPaye);
-return{y,monthsKnown,pasMan,pasRel,pasMois,dom,creche:{brut:creche,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
+let pasRel=0,pasProj=0,pasMois=[],pasProjMois=[];for(let m=1;m<=12;m++){const b=gBM(y,m);const k=ym(y,m);const t=pasAt(k)/100;if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK){const sal=typeof salaireAt==='function'?salaireAt(k):((DB.params.proj||{}).salaire||0);pasProj+=Math.round(sal*t/(1-t));pasProjMois.push(m)}}
+const pasMan=+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasRel+pasProj);const reste=Math.round(solde-pasPaye);
+return{y,monthsKnown,pasMan,pasRel,pasProj,pasMois,pasProjMois,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:zaynOk,months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:hediOk,age:hedi?ageAt(hedi.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
 function fscSet(path,val){withMotif('fs-motif',motif=>{const F=DB.fp.fisc;const seg=path.split('.');let o=F;for(let i=0;i<seg.length-1;i++){if(o[seg[i]]==null)o[seg[i]]={};o=o[seg[i]]}const old=o[seg[seg.length-1]];o[seg[seg.length-1]]=val;jrnl('fisc.'+path,old==null?null:String(old),String(val),motif);rMore()})}
 function fscPlanToggle(id){const a=DB.fp.fisc.plan.find(x=>x.id===id);if(!a)return;a.done=!a.done;a.date=a.done?new Date().toISOString().slice(0,10):null;save();rMore()}
 function fscPlanAdd(){const l=(document.getElementById('fs-pl')||{}).value||'';if(!l.trim())return;DB.fp.fisc.plan.push({id:'u'+Date.now(),l:l.trim(),g:'',q:'',done:false});save();rMore()}
@@ -2452,18 +2455,18 @@ el.innerHTML=`<button class="backlink" onclick="SUB='hub';rMore()">‹ Plus</but
 <div class="segtabs" style="margin-bottom:12px"><button class="${y===n.getFullYear()?'on':''}" onclick="FSY=${n.getFullYear()};rMore()">${n.getFullYear()}</button><button class="${y===n.getFullYear()+1?'on':''}" onclick="FSY=${n.getFullYear()+1};rMore()">${n.getFullYear()+1}</button></div>
 <input class="inp sm" id="fs-motif" placeholder="Motif pour une série de modifications (optionnel)" style="margin-bottom:10px">
 
-<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — estimation en continu<span class="aux mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'remboursement ~'+fE(-X.reste):'complément ~'+fE(X.reste)}</span></div><div class="card-b">
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Impôt ${y} — projection fin d\u2019année<span class="aux mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'remboursement ~'+fE(-X.reste):'complément ~'+fE(X.reste)}</span></div><div class="card-b">
 ${line('Revenu net imposable (toi)',fE(X.netImp),null,'estimation · modifiable ci-dessous')}
 ${line('Revenu conjoint',fE(X.conj))}
 ${line('Abattement 10 %','− '+fE(X.abat))}
-${line('PER déduit','− '+fE(X.per.tot),null,X.per.src==='mixte'?'en dur jusqu\u2019à '+F.perReelDepuis+' ('+fE(X.per.dur)+'), relevés ensuite ('+fE(X.per.rel)+')':X.per.src==='relevé'?'d\u2019après les relevés':'montants en dur (Invest → versements)')}
+${line('PER déduit','− '+fE(X.per.tot),null,(X.per.src==='mixte'?'en dur jusqu\u2019à '+F.perReelDepuis+' ('+fE(X.per.dur)+'), relevés ensuite ('+fE(X.per.rel)+')':X.per.src==='relevé'?'d\u2019après les relevés':'montants en dur (Invest → versements)')+(X.per.proj?' · '+fE(X.per.proj)+' projetés sur les mois à venir (dernier versement connu)':''))}
 ${line('Revenu net imposable du foyer',fE(X.rni),'var(--t)')}
 ${line('Impôt brut ('+(F.parts)+' parts)',fE(X.irBrut),null,'barème '+y+' estimé · quotient familial plafonné à '+fE(F.bareme.plafondQF)+' par demi-part')}
 ${line('Réductions (dons 66 %)','− '+fE(X.reductions))}
-${line('Crédits d\u2019impôt','− '+fE(X.credits),'var(--up)','emploi à domicile '+fE(X.dom.ci||0)+' · crèche '+fE(X.creche.ci)+' · garderie '+fE(X.gard.ci))}
-${line('Prélèvement à la source déjà payé','− '+fE(X.pasPaye),null,(X.pasMan?'saisi '+fE(X.pasMan)+' (avant relevés) + ':'')+'déduit des salaires importés '+fE(X.pasRel)+(X.pasMois.length?' ('+X.pasMois.map(m=>MS[m]).join(', ')+')':''))}
+${line('Crédits d\u2019impôt','− '+fE(X.credits),'var(--up)','emploi à domicile '+fE(X.dom.ci||0)+' · crèche '+fE(X.creche.ci)+(X.creche.proj?' (dont projeté)':'')+' · garderie '+fE(X.gard.ci))}
+${line('Prélèvement à la source sur l\u2019année','− '+fE(X.pasPaye),null,(X.pasMan?'saisi '+fE(X.pasMan)+' + ':'')+'relevés '+fE(X.pasRel)+(X.pasMois.length?' ('+MS[X.pasMois[0]]+'→'+MS[X.pasMois.slice(-1)[0]]+')':'')+(X.pasProj?' + projeté '+fE(X.pasProj)+' ('+X.pasProjMois.map(m=>MS[m]).join(', ')+')':''))}
 <div class="row rb" style="padding:8px 0 2px;font-size:13.5px"><b>Solde probable (été ${y+1})</b><b class="mono" style="color:${X.reste<=0?'var(--up)':'var(--dn)'}">${X.reste<=0?'+ '+fE(-X.reste)+' remboursés':'− '+fE(X.reste)+' à payer'}</b></div>
-<div style="font-size:10.5px;color:var(--td);margin-top:8px">Estimation, pas un calcul d\u2019impôt officiel : barème et plafonds de l\u2019année précédente, abattement forfaitaire, pas de décote ni de contribution exceptionnelle. L\u2019avance de mi-janvier (60 % des crédits de l\u2019année précédente) est une avance de trésorerie, pas un revenu.</div>
+<div style="font-size:10.5px;color:var(--td);margin-top:8px">Projection : réalisé d\u2019après les relevés + mois restants d\u2019après le budget et les hypothèses de projection. Pas un calcul officiel : barème et plafonds de l\u2019année précédente, abattement forfaitaire, ni décote ni contribution exceptionnelle. L\u2019avance de mi-janvier (60 % des crédits N-1) est une avance de trésorerie, pas un revenu.</div>
 </div></div>
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Crédits et réductions ${y} — détail</div><div class="card-b">
@@ -2471,7 +2474,7 @@ ${line('Prélèvement à la source déjà payé','− '+fE(X.pasPaye),null,(X.pa
 ${line('Dépenses nettes d\u2019aides',fE(X.dom.base||0),null,'module Garde · plafond '+fE(X.dom.ciMax*2||15000))}
 ${line('Crédit 50 %',fE(X.dom.ci||0),'var(--up)')}
 <div class="eyebrow" style="margin:10px 0 4px">Garde hors domicile · Zayn (crèche)${X.creche.ok?'':' — non éligible (6 ans ou plus)'}</div>
-${line('Crèche au relevé',fE(X.creche.brut),null,X.creche.months.length+' mois avec relevé')}
+${line('Crèche',fE(X.creche.brut+X.creche.proj),null,'relevé '+fE(X.creche.brut)+' ('+X.creche.months.length+' mois)'+(X.creche.proj?' + projeté '+fE(X.creche.proj)+' ('+X.creche.projMonths.map(m=>MS[m]).join(', ')+', ligne budget crèche)':''))}
 ${line('CMG crèche (hypothèse de projection)','− '+fE(X.creche.cmg))}
 ${line('Base retenue',fE(X.creche.base),null,'plafond 3 500 € par enfant')}
 ${line('Crédit 50 %',fE(X.creche.ci),'var(--up)')}
@@ -2481,7 +2484,7 @@ ${(F.garderie.extras||[]).map((e,gi)=>({e,gi})).filter(x=>+x.e.y===y).map(x=>'<d
 <div class="row" style="gap:6px;margin-top:6px"><input class="inp sm" id="fs-gx-l" placeholder="Vacances scolaires, centre de loisirs…" style="flex:1"><input class="inp sm mono" id="fs-gx-v" type="number" placeholder="€" style="width:80px"><button class="btn btn-ghost sm" onclick="const l=document.getElementById('fs-gx-l').value.trim(),v=+document.getElementById('fs-gx-v').value;if(!l||!v)return;DB.fp.fisc.garderie.extras.push({l,v,y:${y}});save();rMore()">+</button></div>
 ${line('Crédit 50 %',fE(X.gard.ci),'var(--up)','sur '+fE(X.gard.brut)+' · plafond 3 500 €')}
 <div class="eyebrow" style="margin:10px 0 4px">Dons</div>
-${line('Dons au relevé',fE(X.dons.brut),null,'lignes classées « Don »')}
+${line('Dons',fE(X.dons.brut+X.dons.proj),null,'relevé '+fE(X.dons.brut)+(X.dons.proj?' + projeté '+fE(X.dons.proj):''))}
 ${line('Réduction 66 %',fE(X.dons.red),'var(--up)')}
 <div class="eyebrow" style="margin:10px 0 4px">Heures supplémentaires</div>
 <div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt dans la limite d\u2019un plafond annuel, déjà retirées du revenu imposable par Alpha sur la déclaration pré-remplie. Rien à saisir ici ; à contrôler au moment de la déclaration (ligne « heures supplémentaires exonérées »).</div>
