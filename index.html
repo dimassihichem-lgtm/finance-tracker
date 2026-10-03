@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v104';const VTAG='verdict accueil · hausse salaire · avance fiscale N-2';
+const VERSION='v105';const VTAG='accueil v103 + carte « Sur la bonne voie ? »';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -556,16 +556,19 @@ return'<span class="chip '+(d>=0?'tag-up':'tag-dn')+'" title="patrimoine aujourd
   <div class="spark"><canvas id="ch-spark"></canvas></div>
 </div>
 
-${(()=>{const mr=last&&isV2(last.y,last.m)?monthReal(last.y,last.m):null;if(!mr||mr.reelConso==null)return'';const rev=mr.salaire+mr.autres;const tx=rev>0?Math.round(mr.epargne/rev*100):null;const P=DB.params;
-return'<div class="statrow"><div class="stat"><div class="sl">Taux d\u2019épargne '+MS[last.m]+'</div><div class="sv mono" style="color:'+(tx>=10?'var(--up)':tx>=0?'var(--gold)':'var(--dn)')+'">'+(tx!=null?tx+' %':'—')+'</div><div class="sf">'+fE(mr.epargne)+' sur '+fE(rev)+'</div></div>'+
-'<div class="stat"><div class="sl">Consommation</div><div class="sv mono" style="color:'+(mr.reelConso<=mr.prevu.total?'var(--up)':'var(--dn)')+'">'+fk(mr.reelConso)+'</div><div class="sf">prévu '+fE(mr.prevu.total)+'</div></div>'+
-'<div class="stat"><div class="sl">Foyer</div><div class="sv mono" style="color:'+(mr.foyerNet<=(P.cibleFoyer||0)?'var(--up)':'var(--dn)')+'">'+fk(mr.foyerNet||0)+'</div><div class="sf">cible '+fE(P.cibleFoyer||0)+'</div></div></div>'})()}
+<div class="statrow">
+  <div class="stat"><div class="sl">Variation patrimoine</div><div class="sv mono" style="color:${gain>=0?'var(--up)':'var(--dn)'}">${gain>=0?'+':''}${fk(gain)}</div><div class="sf">vs mois précédent, marché inclus</div></div>
+  ${(()=>{const mr=last&&isV2(last.y,last.m)?monthReal(last.y,last.m):null;if(mr&&mr.reelConso!=null){const rev=mr.salaire+mr.autres;const tx=rev>0?Math.round(mr.epargne/rev*100):null;return'<div class="stat"><div class="sl">Épargne '+MS[last.m]+'</div><div class="sv mono" style="color:'+(mr.epargne>=0?'var(--up)':'var(--dn)')+'">'+(mr.epargne>=0?'+':'')+fk(mr.epargne)+'</div><div class="sf">Δ cash + investi</div></div><div class="stat"><div class="sl">Taux d\u2019épargne</div><div class="sv mono" style="color:var(--blue)">'+(tx!=null?tx+' %':'—')+'</div><div class="sf">sur '+fE(rev)+' de revenus</div></div>'}
+return'<div class="stat"><div class="sl">Δ Compte</div><div class="sv mono" style="color:'+(dC>=0?'var(--up)':'var(--dn)')+'">'+(dC>=0?'+':'')+fE(kE(dC))+'</div><div class="sf">Avant sal.</div></div>'})()}
+  ${(last&&isV2(last.y,last.m)&&monthReal(last.y,last.m)&&monthReal(last.y,last.m).reelConso!=null)?'':`<div class="stat"><div class="sl">Épargné</div><div class="sv mono" style="color:var(--blue)">${totRev>0?txE+'%':'—'}</div><div class="sf">${totRev>0?f$(Math.round(ep))+' € / '+f$(Math.round(totRev))+' €'+(revs?' (dont aides)':''):'Salaire manquant'}</div></div>`}
+</div>
 
 ${rVerdict()}
 ${rTodo()}
 ${rVirement()}
+${rProjHome()}
 ${rPochesHome()}
-${false&&(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
+${(()=>{const B2=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);const L=B2.length?B2[B2.length-1]:null;if(!L)return'';const mr=monthReal(L.y,L.m);if(!mr||mr.reelConso==null)return'';const P=DB.params;const m3=variablesMoy3(L.y,L.m);
 return'<div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>Réel · '+MS[L.m]+' '+L.y+'<span class="aux" style="font-size:10.5px;color:var(--td)">'+(mr.regime?'régime : '+mr.regime.label:'')+'</span></div><div class="card-b">'+
 '<div class="row rb" style="margin-bottom:8px"><span style="font-size:13px">Variables réelles</span><b class="mono" style="font-size:18px;color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+fS(mr.variables)+'</b></div>'+
 '<div class="row rb" style="font-size:11.5px;color:var(--tm)"><span>fixes '+fS(mr.fixes)+' · variables '+fS(mr.variables)+'</span><span>cible '+f$(P.cibleVariables)+' € · <b style="color:'+(mr.variables<=P.cibleVariables?'var(--up)':'var(--dn)')+'">'+(mr.variables>P.cibleVariables?'+':'')+Math.round((mr.variables/P.cibleVariables-1)*100)+' %</b></span></div>'+
