@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v97';const VTAG='correctif cloud : écritures en JSON (tableaux imbriqués)';
+const VERSION='v99';const VTAG='panneau transit';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -988,7 +988,7 @@ ${cm.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="fl
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Autres supports</div>
 <div class="card-b"><div class="chartbox s"><canvas id="ch-ot"></canvas></div></div></div>
 
-<button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="var d=gOIM(iY,iM);d.cl=!d.cl;save();rInvest()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[iM]}</button>`;
+<button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="closeMonth(iY,iM);rInvest()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[iM]}</button>`;
 setTimeout(rIC,60)}
 function rIC(){const raw=sIM().filter(d=>(d.y*12+d.m)>=(iCf.fy*12+iCf.fm)&&(d.y*12+d.m)<=(iCf.ty*12+iCf.tm)&&supT(d)>0);if(!raw.length)return;
 const names=[...new Set(raw.flatMap(m=>m.supports.map(s=>s.n)))];const labels=raw.map(d=>mLbl(d.y,d.m));
@@ -1862,7 +1862,20 @@ function transitSums(b){const L=(b&&b.imp&&b.imp.lines)||[];let out=0,inn=0,outC
 function transitCandidates(b,l){const k0=lineKey(l);const out=[];sBM().forEach(x=>{if(!x.imp||!x.imp.lines)return;if(Math.abs((x.y*12+x.m)-(b.y*12+b.m))>6)return;x.imp.lines.forEach((m,i)=>{if(lineKey(m)===k0||m.transit)return;if(['salaire','interneLivret','invest'].includes(m.t))return;if(Math.sign(m.v)===Math.sign(l.v))return;const d=Math.abs(Math.abs(m.v)-Math.abs(l.v));if(d>Math.max(150,Math.abs(l.v)*0.1))return;out.push({y:x.y,m:x.m,i,l:m,d})})});return out.sort((a,b)=>a.d-b.d)}
 function transitSet(y,m,i,ref,motif){const b=gBM(y,m);const l=b&&b.imp&&b.imp.lines&&b.imp.lines[i];if(!l)return;l.transit=true;if(ref){l.transitRef=lineKey(ref.l);ref.l.transit=true;ref.l.transitRef=lineKey(l)}if(motif)l.transitMotif=motif;save();rMore()}
 function transitClear(y,m,i){const b=gBM(y,m);const l=b&&b.imp&&b.imp.lines&&b.imp.lines[i];if(!l)return;const ref=l.transitRef;delete l.transit;delete l.transitRef;delete l.transitMotif;if(ref)sBM().forEach(x=>{(x.imp&&x.imp.lines||[]).forEach(m=>{if(lineKey(m)===ref){delete m.transit;delete m.transitRef}})});save();rMore()}
-function transitAsk(y,m,i){const b=gBM(y,m);const l=b.imp.lines[i];const C=transitCandidates(b,l);let msg='Transit : cet argent n\u2019a pas été consommé, il a transité.\n\n';C.forEach((c,k)=>{msg+=(k+1)+') '+c.l.d.slice(8)+'/'+c.l.d.slice(5,7)+' '+c.l.l.slice(0,30)+' '+fE(c.l.v)+'\n'});msg+='0) contrepartie hors du compte (motif demandé)';const r=prompt(msg,C.length?'1':'0');if(r===null)return;const n=+r;if(n>0&&C[n-1]){transitSet(y,m,i,C[n-1])}else{const mo=prompt('Motif (ex. : remboursement du prêt d\u2019un ami ayant avancé les frais de notaire)');if(mo===null)return;transitSet(y,m,i,null,mo.trim()||'contrepartie hors périmètre')}}
+let TR_PENDING=null;
+function transitAsk(y,m,i){const b=gBM(y,m);const l=b.imp.lines[i];const C=transitCandidates(b,l);TR_PENDING={y,m,i,C};
+let el=document.getElementById('transit-modal');if(!el){el=document.createElement('div');el.id='transit-modal';document.body.appendChild(el)}
+const sens=l.v<0?'sortie':'entrée';
+el.innerHTML='<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)transitClose()"><div style="background:var(--card);border:1px solid var(--line2);border-radius:18px 18px 0 0;padding:18px 16px 26px;width:100%;max-width:520px;max-height:80vh;overflow:auto">'+
+'<div class="eyebrow" style="margin-bottom:4px">Transit — argent qui n\u2019a pas été consommé</div>'+
+'<div style="font-size:12.5px;margin-bottom:12px"><b>'+esc(l.l.slice(0,40))+'</b> · '+l.d.split('-').reverse().join('/')+' · <b class="mono">'+fE(l.v)+'</b> ('+sens+')</div>'+
+(C.length?'<div class="lbl" style="margin-bottom:6px">1. La contrepartie est sur ton compte :</div>'+C.map((c,k)=>'<button class="btn btn-ghost sm wide" style="margin-bottom:6px;text-align:left;justify-content:flex-start" onclick="transitPick('+k+')">'+c.l.d.split('-').reverse().join('/')+' · '+esc(c.l.l.slice(0,30))+' · <b class="mono">'+fE(c.l.v)+'</b></button>').join('')+'<div class="lbl" style="margin:12px 0 6px">2. Ou elle est hors du compte (prêt d\u2019un proche, compte d\u2019un tiers…) :</div>':'<div class="lbl" style="margin-bottom:6px">Aucune contrepartie trouvée sur le compte. Décris-la en une ligne :</div>')+
+'<input class="inp" id="tr-motif" placeholder="ex. : remboursement du prêt de Gaston (frais de notaire)">'+
+'<div class="row" style="gap:8px;margin-top:12px"><button class="btn btn-ghost sm" style="flex:1" onclick="transitClose()">Annuler</button><button class="btn btn-gold sm" style="flex:1" onclick="transitMotifOk()">Valider avec ce motif</button></div></div></div>';
+setTimeout(()=>{const x=document.getElementById('tr-motif');if(x&&!C.length)x.focus()},50)}
+function transitClose(){TR_PENDING=null;const el=document.getElementById('transit-modal');if(el)el.innerHTML=''}
+function transitPick(k){const P=TR_PENDING;if(!P)return;transitClose();transitSet(P.y,P.m,P.i,P.C[k])}
+function transitMotifOk(){const P=TR_PENDING;if(!P)return;const mo=((document.getElementById('tr-motif')||{}).value||'').trim();if(!mo){alert('Une ligne de motif suffit.');return}transitClose();transitSet(P.y,P.m,P.i,null,mo)}
 function monthReal(y,m){const b=gBM(y,m);if(!b)return null;
 const pv=pM(y,m);const pb=gBM(pv.y,pv.m);const cashDeb=(pb&&pb.cashFin!=null)?pb.cashFin:null;const cashFin=b.cashFin!=null?b.cashFin:null;
 const imp=(b.imp&&b.imp.done)?b.imp:null;const ent=b.entrees||[];
@@ -1925,9 +1938,9 @@ if(!IMP_STATE.months.length){IMP_STATE=null;if(IMP_RETURN&&IMP_RETURN.y===y&&IMP
 function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>importCsvText(e.target.result);r.readAsText(f,'UTF-8')}
 /* ---- clôture v2 ---- */
 function canClose(y,m){if(!isV2(y,m))return{ok:true,missing:[]};const mr=monthReal(y,m);if(!mr)return{ok:false,missing:['mois inexistant']};return{ok:mr.complete,missing:mr.missing}}
-function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){d.cl=false;save();return true}
+function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){d.cl=false;const im=gIM(y,m);if(im)im.cl=false;save();return true}
 if(!c.ok){alert('Impossible de clôturer '+ML[m]+' : '+c.missing.join(', '));return false}
-d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;const nx=nM(y,m);gOBM(nx.y,nx.m);gOIM(nx.y,nx.m);save();backupNow('clôture '+ML[m]+' '+y);return true}
+d.cl=true;d.closedAt=new Date().toISOString().slice(0,10);d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;gOIM(y,m).cl=true;const nx=nM(y,m);gOBM(nx.y,nx.m);gOIM(nx.y,nx.m);save();backupNow('clôture '+ML[m]+' '+y);return true}
 
 /* ---- UI Réel v2 ---- */
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
@@ -2444,6 +2457,7 @@ if(!F.bulletins||!Object.keys(F.bulletins).length){F.bulletins={'2026-01':{ni:54
 if(!F.bulletinsV2){const X2={'2026-01':[7416.67,5978.85],'2026-02':[7416.67,5978.85],'2026-03':[7416.67,5978.85],'2026-04':[7269.65,6724.95],'2026-05':[7021.66,6724.95],'2026-06':[8635.53,7452.09],'2026-07':[10332.69,8325.50],'2026-08':[8333.33,6724.95],'2026-09':[8333.33,6724.95]};Object.keys(X2).forEach(k=>{if(F.bulletins[k]){F.bulletins[k].brut=X2[k][0];F.bulletins[k].netSocial=X2[k][1]}});F.bulletinsV2=true;
 const P=DB.params&&DB.params.proj;if(P){if(!P.salaireEvo)P.salaireEvo=[];if(!P.salaireEvo.some(e=>e.from==='2026-04'))P.salaireEvo.push({from:'2026-04',v:6300});const pv=(P.ponctuels||[]).find(x=>/prime vacances/i.test(x.l));if(pv){pv.v=600;pv.mois=6}if(!(P.ponctuels||[]).some(x=>/exceptionnelle/i.test(x.l)))P.ponctuels.push({l:'Prime exceptionnelle (non garantie)',v:1450,mois:7});
 if(DB.params.journal)DB.params.journal.push({date:'2026-10-02',champ:'proj',old:'prime vacances 1 500 (juin)',new:'salaire net 6 300 dès avril 2026 (promotion Director) · prime vacances 600 net (juin) · prime exceptionnelle 1 450 net (juillet, non garantie)',motif:'bulletins de paie 2026 : brut +12,4 % en avril, prime vacances 908 brut, prime exceptionnelle 1 999 brut'})}}
+if(!DB.params.clSync){(DB.im||[]).forEach(im=>{const b=gBM(im.y,im.m);if(b)im.cl=!!b.cl});DB.params.clSync=true}
 if(!DB.params.add4b){const MAP={'Medecin':['Médecin',null],'Vetement':['Vêtements',null],'Vetement ':['Vêtements',null],'Restau - Divertissement':['Restaurants',null],'Restau - Divertissement ':['Restaurants',null],'Cine':['Sorties',null],'Natation Dido':['Activités enfants','fixe'],'Aide famille':['Aide maman',null],'autre':['Divers',null],'Transport':['Taxi / VTC',null],'Transport / livraison':['Taxi / VTC',null],'Coiffeur':['Bien-être',null],'Timbre Titre de Sejour':['Administratif',null],'Voyages':['Transport',null]};catAdd('Divers','Administratif');
 const FOYER={'Compte joint':1,'Virement conjoint':1,'Virement conjoint reçu':1};
 (DB.rules||[]).forEach(r=>{if(MAP[r.sub]){const [ns,nt]=MAP[r.sub];r.sub=ns;r.grp=grpOf(ns)||r.grp;if(nt)r.type=nt}if(FOYER[r.sub]&&(r.type==='variable'||r.type==='entree'))r.type='transfertFoyer';if(r.sub==='Assurance auto'&&r.type==='variable')r.type='fixe'});
