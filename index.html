@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v96';const VTAG='restauration : cause du refus affichée';
+const VERSION='v97';const VTAG='correctif cloud : écritures en JSON (tableaux imbriqués)';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -410,7 +410,7 @@ function richness(d){if(!d||!d.bm)return 0;const bm=d.bm.reduce((a,b)=>a+(b.cl?2
 let LC_TIMER=null,LC_RETRY=null;
 function loadCloud(){if(fdb){let done=false;if(LC_TIMER)clearTimeout(LC_TIMER);LC_TIMER=setTimeout(()=>{if(!done){sss('offline');if(!LC_RETRY)LC_RETRY=setInterval(()=>{if(CLOUD_READ){clearInterval(LC_RETRY);LC_RETRY=null;return}loadCloud()},30000)}},15000);
 fdb.collection('data').doc(DID).get().then(doc=>{done=true;if(LC_RETRY){clearInterval(LC_RETRY);LC_RETRY=null}CLOUD_READ=true;if(DB._pendingTs){DB._pendingTs=null}
-  if(doc.exists&&doc.data().db){const c=doc.data().db;CLOUD_RICH=richness(c);const rl=richness(DB),rc=CLOUD_RICH;
+  if(doc.exists&&doc.data().db){const c=fromCloud(doc.data().db);CLOUD_RICH=richness(c);const rl=richness(DB),rc=CLOUD_RICH;
     if((c._ts||0)>(DB._ts||0)){
       if(Math.abs(rc-rl)>=1){CLOUD_READ=true;backupNow('cet appareil, avant fusion');const keep=DB;DB=c;backupNow('cloud, avant fusion');DB=keep} // les deux états sont mis à l\u2019abri avant toute décision
       if(rc<rl&&confirm('Attention : le cloud est daté plus récent, mais il contient une base PLUS PAUVRE que celle de cet appareil ('+rc+' contre '+rl+' points de données : mois, imports, soldes, modifications journalisées, paramètres). Garder la version de cet appareil et l\u2019envoyer au cloud ?\n\nOK = garder la version locale (recommandé)\nAnnuler = prendre la version du cloud')){DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c()}
@@ -428,22 +428,24 @@ function undo(){if(!HIST.length){alert('Rien à annuler dans cette session.');re
 function redo(){if(!REDO.length){alert('Rien à rétablir.');return}HIST.push(SNAP_LAST);histApply(REDO.pop())}
 function save(){histPush();GM_CACHE={};if(CLOUD_READ||!fdb)DB._ts=Date.now();else DB._pendingTs=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
 const today=new Date().toISOString().slice(0,10);let last='';try{last=localStorage.getItem('hft7_bkday')||''}catch(e){}if(CLOUD_READ&&last!==today){try{localStorage.setItem('hft7_bkday',today)}catch(e){}setTimeout(()=>backupNow('quotidienne'),4000)}}}
-function s2cNow(cb){const c=JSON.parse(JSON.stringify(DB));if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img=null})})});fdb.collection('data').doc(DID).set({db:c,at:new Date().toISOString()}).then(()=>{sss('ok');if(cb)cb()}).catch(()=>{sss('error');alert('Écriture cloud impossible — la restauration est faite sur cet appareil seulement.');if(cb)cb()})}
+function toCloud(c){return JSON.stringify(c)}
+function fromCloud(x){if(x==null)return null;if(typeof x==='string'){try{return JSON.parse(x)}catch(e){return null}}return x}
+function s2cNow(cb){const c=JSON.parse(JSON.stringify(DB));if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img=null})})});fdb.collection('data').doc(DID).set({db:toCloud(c),fmt:'json1',at:new Date().toISOString()}).then(()=>{sss('ok');if(cb)cb()}).catch(()=>{sss('error');alert('Écriture cloud impossible — la restauration est faite sur cet appareil seulement.');if(cb)cb()})}
 function s2c(){if(!fdb)return;if(!CLOUD_READ){sss('noread');return}const rl=richness(DB);if(CLOUD_RICH&&rl<CLOUD_RICH&&!S2C_FORCE){if(!confirm('La base de cet appareil est plus pauvre que celle du cloud ('+rl+' contre '+CLOUD_RICH+'). Envoyer quand même et écraser le cloud ?')){sss('noread');return}}CLOUD_RICH=rl;sss('saving');const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
-fdb.collection('data').doc(DID).set({db:c,updated:new Date().toISOString()}).then(()=>sss('ok')).catch(e=>sss(/permission|insufficient/i.test(String(e&&(e.message||e.code)))?'denied':'offline'))}
+fdb.collection('data').doc(DID).set({db:toCloud(c),fmt:'json1',updated:new Date().toISOString()}).then(()=>sss('ok')).catch(e=>sss(/permission|insufficient/i.test(String(e&&(e.message||e.code)))?'denied':'offline'))}
 function listenSync(){if(!fdb)return;fdb.collection('data').doc(DID).onSnapshot(doc=>{
-if(!doc.exists||!doc.data().db)return;const c=doc.data().db;
+if(!doc.exists||!doc.data().db)return;const c=fromCloud(doc.data().db);if(!c)return;
 if(c._ts&&c._ts>(DB._ts||0)){DB=c;ensure();localStorage.setItem('hft7',JSON.stringify(DB));migrateGarde();sss('ok');if(typeof RA==='function')RA()}},e=>{})}
-const BK_KEEP=10;
+const BK_KEEP=15;
 function backupNow(reason,cb){if(!fdb){if(cb)cb('local');return}const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 const id=DID+'_bk_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23)+'_'+Math.random().toString(36).slice(2,6);
-fdb.collection('data').doc(id).set({db:c,at:new Date().toISOString(),reason:reason||'manuel',parent:DID}).then(()=>{sss('ok');backupPrune();if(cb)cb('ok')}).catch(e=>{if(cb)cb('error')})}
-function backupList(cb){if(!fdb){cb([]);return}fdb.collection('data').where('parent','==',DID).get().then(q=>{const L=[];q.forEach(d=>{const x=d.data();L.push({id:d.id,at:x.at,reason:x.reason,months:(x.db&&x.db.bm||[]).filter(b=>b.cl).length})});L.sort((a,b)=>a.at<b.at?1:-1);cb(L)}).catch(()=>cb(null))}
+fdb.collection('data').doc(id).set({db:toCloud(c),fmt:'json1',months:(c.bm||[]).filter(b=>b.cl).length,at:new Date().toISOString(),reason:reason||'manuel',parent:DID}).then(()=>{sss('ok');backupPrune();if(cb)cb('ok')}).catch(e=>{if(cb)cb('error')})}
+function backupList(cb){if(!fdb){cb([]);return}fdb.collection('data').where('parent','==',DID).get().then(q=>{const L=[];q.forEach(d=>{const x=d.data();L.push({id:d.id,at:x.at,reason:x.reason,months:x.months!=null?x.months:((fromCloud(x.db)||{}).bm||[]).filter(b=>b.cl).length})});L.sort((a,b)=>a.at<b.at?1:-1);cb(L)}).catch(()=>cb(null))}
 function backupPrune(){backupList(L=>{if(!L)return;L.slice(BK_KEEP).forEach(b=>fdb.collection('data').doc(b.id).delete().catch(()=>{}))})}
 function backupRestore(id,at){const d=new Date(at);const lt=isNaN(d)?at.slice(0,16).replace('T',' '):d.toLocaleDateString('fr-FR')+' '+d.toTimeString().slice(0,5);if(!confirm('Restaurer la sauvegarde du '+lt+' ? La base actuelle sera remplacée (une sauvegarde de sécurité de l\u2019état actuel est prise avant).'))return;
-backupNow('avant restauration',()=>{fdb.collection('data').doc(id).get().then(d=>{if(!d.exists||!d.data().db){alert('Sauvegarde introuvable');return}DB=d.data().db;DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c();setTimeout(()=>location.reload(),800)}).catch(()=>alert('Restauration impossible (accès refusé ?)'))})}
+backupNow('avant restauration',()=>{fdb.collection('data').doc(id).get().then(d=>{if(!d.exists||!d.data().db){alert('Sauvegarde introuvable');return}DB=fromCloud(d.data().db);DB._ts=Date.now();ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}s2c();setTimeout(()=>location.reload(),800)}).catch(()=>alert('Restauration impossible (accès refusé ?)'))})}
 function rBackups(){const el=document.getElementById('bk-list');if(!el)return;el.innerHTML='<div class="empty">Chargement…</div>';
 backupList(L=>{if(L===null){el.innerHTML='<div class="al alr">Impossible de lire les sauvegardes (hors ligne ou accès refusé).</div>';return}
 if(!L.length){el.innerHTML='<div class="empty">Aucune sauvegarde cloud pour l\u2019instant — la première sera prise à la prochaine clôture.</div>';return}
@@ -2382,6 +2384,7 @@ const oc=gardeMonth(2026,10);const Lc=hoursLedger(2026,10);ok('Compensation auto
 g.hours['2026-10-05']={s:0.5,p:0.5};GM_CACHE={};const L2=hoursLedger(2026,10);ok('Jour partiel (1 h sur 2,5) : 1,5 h au compteur, salaire inchangé',L2.end===1.5&&Math.abs(gardeMonth(2026,10).net-374.83)<0.01,'compteur '+L2.end+' h');g.hours['2026-10-05']={s:0.5,p:0.5,gap:'abs'};GM_CACHE={};const o5=gardeMonth(2026,10);ok('Jour partiel non rémunéré : retenue 1,5 h × 10,25 = 15,38 €',Math.abs(o5.absEur-15.375)<0.01,o5.absEur.toFixed(2)+' €');delete g.hours['2026-10-05'];GM_CACHE={};
 {const bT=gOBM(2026,11);const pbT=gOBM(2026,10);pbT.cashFin=10000;bT.cashFin=10000-1650-300-400-5000+5000;bT.imp={done:true,t:{fixe:1650,variable:5300,invest:0,salaire:0,entree:5000,foyerOut:400,foyerIn:0},bySub:{},byGrp:{},entrees:[],unmatched:[],internes:[],lines:[{d:'2026-11-02',l:'LOYER',v:-1650,t:'fixe',s:'Loyer'},{d:'2026-11-05',l:'COURSES',v:-300,t:'variable',s:'Courses'},{d:'2026-11-06',l:'VIR SALMA',v:-400,t:'transfertFoyer',s:'Virement conjoint'},{d:'2026-11-10',l:'NOTAIRE',v:-5000,t:'variable',s:'Services professionnels',transit:true,transitMotif:'test'},{d:'2026-11-20',l:'RETOUR',v:5000,t:'entree',s:'Remboursement frais',transit:true,transitMotif:'test'}],consoCsv:7350};bT.entrees=[{l:'RETOUR',v:5000,cat:'Remboursement frais'}];GM_CACHE={};
 const mt=monthReal(2026,11);ok('Transfert foyer hors variables : variables 300, foyer 400',Math.abs(mt.variables-300)<0.01&&Math.abs(mt.foyerNet-400)<0.01,fE(mt.variables)+' · '+fE(mt.foyerNet));ok('Transit neutralisé : conso 2 350, entrées 0, réconciliation 0',Math.abs(mt.reelConso-2350)<0.01&&Math.abs(mt.autres)<0.01&&Math.abs(mt.recon)<0.01,fE(mt.reelConso)+' · '+fE(mt.autres)+' · '+fE(mt.recon))}
+{const nested=o=>Array.isArray(o)?o.some(x=>Array.isArray(x)||nested(x)):(o&&typeof o==='object'?Object.values(o).some(nested):false);const payload={db:toCloud(saved)};ok('Envoi cloud compatible Firestore (aucun tableau imbriqué)',!nested(payload)&&typeof payload.db==='string'&&!!fromCloud(payload.db).bm,Math.round(payload.db.length/1024)+' Ko')}
 ok('Format euros : 12 345 €',fE(12345)==='12\u202f345 €'||fE(12345)==='12 345 €',fE(12345));
 }catch(e){results.push({n:'Exception pendant les tests',ok:false,d:String(e.message||e).slice(0,120)})}
 finally{DB=saved;GM_CACHE=savedCache}
@@ -2710,10 +2713,10 @@ ${DB.customCharts.map((gc,gi)=>'<div style="background:var(--bg2);border:1px sol
 <button class="btn btn-danger sm wide" onclick="if(confirm('Réinitialiser TOUTES les données ?')&&confirm('Vraiment sûr ? Action irréversible (le cloud sera aussi écrasé).')){DB=defDB();save();location.reload()}">🗑 Réinitialiser</button>
 <button class="btn btn-ghost sm wide" style="margin:8px 0" onclick="document.getElementById('selftest-out').innerHTML=rSelfTest()">▶ Lancer l\u2019autotest</button><div id="selftest-out"></div>
 <div class="eyebrow" style="margin:14px 0 6px">Sauvegardes cloud</div>
-<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les dix dernières sont conservées, en heure locale.</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:8px">Une copie complète de la base est prise à chaque clôture de mois, dans le même projet Firebase. Les quinze dernières sont conservées, en heure locale.</div>
 <div class="row" style="gap:6px;margin-bottom:8px"><button class="btn btn-ghost sm" onclick="backupNow('manuel',s=>{alert(s==='ok'?'Sauvegarde cloud effectuée.':s==='local'?'Pas de cloud sur cet appareil.':'Échec de la sauvegarde.');rBackups()})">Sauvegarder maintenant</button><button class="btn btn-ghost sm" onclick="rBackups()">Rafraîchir la liste</button></div>
 <div id="bk-list"></div>
-<button class="btn btn-ghost sm wide" style="margin:6px 0" onclick="if(confirm('Remplacer la base de cet appareil par celle du cloud ? (une copie de l\u2019état actuel est prise avant)')){CLOUD_READ=true;backupNow('cet appareil, avant remplacement',()=>{fdb.collection('data').doc(DID).get().then(d=>{if(d.exists&&d.data().db){DB=d.data().db;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}location.reload()}else alert('Rien dans le cloud')}).catch(()=>alert('Lecture cloud impossible'))})}">⇩ Prendre la version du cloud</button>
+<button class="btn btn-ghost sm wide" style="margin:6px 0" onclick="if(confirm('Remplacer la base de cet appareil par celle du cloud ? (une copie de l\u2019état actuel est prise avant)')){CLOUD_READ=true;backupNow('cet appareil, avant remplacement',()=>{fdb.collection('data').doc(DID).get().then(d=>{if(d.exists&&d.data().db){DB=fromCloud(d.data().db);ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}location.reload()}else alert('Rien dans le cloud')}).catch(()=>alert('Lecture cloud impossible'))})}">⇩ Prendre la version du cloud</button>
 <div class="eyebrow" style="margin:14px 0 6px">Compte</div>
 <div class="row rb"><span style="font-size:12.5px">${FUSER?esc(FUSER.email||''):'non connecté (mode local)'}</span>${FUSER?'<button class="btn btn-ghost sm" onclick="authLogout()">Se déconnecter</button>':''}</div>
 <div style="font-size:10.5px;color:var(--td);margin-top:9px"><b style="color:var(--gold)">Version ${VERSION}</b> — ${VTAG}<br>PIN : ${DB.pin} · Stockage : hft7 · Firebase : ${fdb?'connecté ☁':'local 📴'}</div>
