@@ -202,17 +202,17 @@ td{padding:7px 4px;border-bottom:1px solid rgba(36,44,66,.45)}
 .segtabs button{flex:1;border:none;background:transparent;color:var(--td);font-family:var(--sans);font-size:13px;font-weight:600;padding:10px 8px;border-radius:10px;cursor:pointer}
 .segtabs button.on{background:var(--gold);color:#14171F;box-shadow:0 2px 8px rgba(229,195,106,.35)}
 /* ===== GARDE / CALENDRIER ===== */
-.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:4px}
 .cal-dow span{text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--td)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal-cell{aspect-ratio:1/1.05;border-radius:11px;border:1px solid var(--line);background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;transition:.12s;position:relative}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;width:100%}
+.cal-cell{aspect-ratio:1/1.05;min-width:0;overflow:hidden;border-radius:11px;border:1px solid var(--line);background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;transition:.12s;position:relative}
 .cal-cell:active{transform:scale(.94)}
 .cal-cell.blank{border-color:transparent;background:transparent;cursor:default}
 .cal-cell .dn{font-size:13px;font-weight:600;color:var(--tm)}
 .cal-cell.we .dn{color:var(--td)}
 .cal-cell.has{background:var(--goldDim);border-color:rgba(229,195,106,.45)}
 .cal-cell.has .dn{color:var(--tx)}
-.cal-cell .hb{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold)}
+.cal-cell .hb{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gold);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.3px}
 .cal-cell.today{box-shadow:0 0 0 2px var(--blue) inset}
 .cal-cell.sel{box-shadow:0 0 0 2px var(--gold) inset;background:var(--card2)}
 .cal-cell.future{opacity:.55}
@@ -302,7 +302,7 @@ body.privacy .hdr .brand::after{content:' · privé';font-size:11px;color:var(--
       <div class="sub" id="hdr-sub"></div>
     </div>
     <div class="sp">
-      <button class="icobtn" id="privbtn" onclick="togPriv()" title="Masquer / afficher les montants">👁</button>
+      <button class="icobtn" id="undobtn" onclick="undo()" title="Annuler la dernière modification" style="opacity:.35">↶</button><button class="icobtn" id="redobtn" onclick="redo()" title="Rétablir" style="opacity:.35">↷</button><button class="icobtn" id="privbtn" onclick="togPriv()" title="Masquer / afficher les montants">👁</button>
       <span class="sync" id="ss">…</span>
       <button class="icobtn" onclick="xport()" title="Exporter une sauvegarde">⤓</button>
       <label class="icobtn" title="Restaurer une sauvegarde" style="cursor:pointer">⤒<input type="file" accept=".json" style="display:none" onchange="imp(event)"></label>
@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v90';const VTAG='à déclarer : cases et montants';
+const VERSION='v91';const VTAG='annuler / rétablir · calendrier';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -404,7 +404,7 @@ function ssClick(){const t=SS_TXT[SS_STATE]||SS_TXT.error;if(SS_STATE==='ok'||SS
 let DB,svT=null;
 function ensure(){GM_CACHE={};if(!DB.fp)DB.fp={pas:7.5,perObj:2400};if(DB.fp.perStartY==null)DB.fp.perStartY=2026;if(DB.fp.perStartM==null)DB.fp.perStartM=1;if(DB.fp.perExcep==null)DB.fp.perExcep=0;if(!DB.fp.ciOther)DB.fp.ciOther=[];if(!DB.fp.ciY)DB.fp.ciY=new Date().getFullYear();
 if(!DB.gn)DB.gn='';if(!DB.kpis)DB.kpis=defKPI();if(!DB.customCharts)DB.customCharts=[];if(!DB.fiscal)DB.fiscal=[];if(!DB.deductibles)DB.deductibles=[];if(!DB.bm)DB.bm=[];if(!DB.im)DB.im=[];DB.bm.forEach(b=>{if(!Array.isArray(b.rev))b.rev=[]});ensureGarde();ensureV2();ensureProj();ensureFisc()}
-function loadLocal(){try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}ensure()}
+function loadLocal(){try{const r=localStorage.getItem('hft7');if(r)DB=JSON.parse(r);else DB=defDB()}catch(e){DB=defDB()}ensure();SNAP_LAST=JSON.stringify(DB)}
 let CLOUD_READ=false,CLOUD_RICH=0,S2C_FORCE=false;
 function richness(d){if(!d||!d.bm)return 0;return d.bm.reduce((a,b)=>a+(b.cl?2:0)+(b.imp&&b.imp.done?2:0)+(b.cashFin!=null?1:0),0)}
 let LC_TIMER=null,LC_RETRY=null;
@@ -419,8 +419,14 @@ fdb.collection('data').doc(DID).get().then(doc=>{done=true;if(LC_RETRY){clearInt
   else if(!doc.exists){DB._ts=Date.now();s2c()}
   postLoad();sss('ok');if(svT){clearTimeout(svT);svT=setTimeout(s2c,500)}}).catch(e=>{done=true;postLoad();const perm=/permission|insufficient/i.test(String(e.message||e.code));sss(perm?'denied':'offline');if(perm)setTimeout(()=>alert('Le cloud refuse l\u2019accès à ce compte Google ('+(FUSER&&FUSER.email||'?')+'). Vérifiez les règles Firestore.'),300)})}else postLoad()}
 let POSTLOADED=false;
-function postLoad(){if(POSTLOADED){if(typeof RA==='function')RA();return}POSTLOADED=true;migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
-function save(){GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
+function postLoad(){SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns();if(POSTLOADED){if(typeof RA==='function')RA();return}POSTLOADED=true;migrateGarde();const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
+const HIST=[],REDO=[],HIST_MAX=6;let SNAP_LAST=null,UNDOING=false;
+function histPush(){if(UNDOING)return;if(SNAP_LAST!=null){HIST.push(SNAP_LAST);if(HIST.length>HIST_MAX)HIST.shift();REDO.length=0}SNAP_LAST=JSON.stringify(DB);histBtns()}
+function histBtns(){const u=document.getElementById('undobtn'),r=document.getElementById('redobtn');if(u){u.style.opacity=HIST.length?1:.35;u.title=HIST.length?'Annuler la dernière modification ('+HIST.length+' disponible'+(HIST.length>1?'s':'')+')':'Rien à annuler'}if(r){r.style.opacity=REDO.length?1:.35;r.title=REDO.length?'Rétablir ('+REDO.length+')':'Rien à rétablir'}}
+function histApply(snap){UNDOING=true;try{DB=JSON.parse(snap);ensure();GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}SNAP_LAST=JSON.stringify(DB);if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}if(typeof RA==='function')RA()}finally{UNDOING=false;histBtns()}}
+function undo(){if(!HIST.length){alert('Rien à annuler dans cette session.');return}REDO.push(SNAP_LAST);histApply(HIST.pop())}
+function redo(){if(!REDO.length){alert('Rien à rétablir.');return}HIST.push(SNAP_LAST);histApply(REDO.pop())}
+function save(){histPush();GM_CACHE={};DB._ts=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
 const today=new Date().toISOString().slice(0,10);let last='';try{last=localStorage.getItem('hft7_bkday')||''}catch(e){}if(CLOUD_READ&&last!==today){try{localStorage.setItem('hft7_bkday',today)}catch(e){}setTimeout(()=>backupNow('quotidienne'),4000)}}}
 function s2cNow(cb){const c=JSON.parse(JSON.stringify(DB));if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img=null})})});fdb.collection('data').doc(DID).set({db:c,at:new Date().toISOString()}).then(()=>{sss('ok');if(cb)cb()}).catch(()=>{sss('error');alert('Écriture cloud impossible — la restauration est faite sur cet appareil seulement.');if(cb)cb()})}
 function s2c(){if(!fdb)return;if(!CLOUD_READ){sss('noread');return}const rl=richness(DB);if(CLOUD_RICH&&rl+2<CLOUD_RICH&&!S2C_FORCE){if(!confirm('La base de cet appareil est plus pauvre que celle du cloud ('+rl+' contre '+CLOUD_RICH+'). Envoyer quand même et écraser le cloud ?')){sss('noread');return}}CLOUD_RICH=rl;sss('saving');const c=JSON.parse(JSON.stringify(DB));
@@ -2225,7 +2231,8 @@ function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rM
 ${[['Budget prévisionnel (fixes / variables, M+n)','Budget'],['Réel du mois, réconciliation, familles','Budget → Réel vs prévu'],['Relire ou corriger une ligne du relevé','Plus → Import → Relecture'],['Règles de classement','Plus → Règles'],['Hypothèses de revenus, cibles, régimes','Projection · Gouvernance'],['Nounou : calendrier, salaire, congés, compteur, fiche','Garde'],['Crédit d\u2019impôt, PER, échéances','Plus → Fiscal'],['Sauvegarde JSON, PIN, réinitialisation','Plus → Configuration']].map(x=>'<div class="row rb" style="padding:5px 0;border-bottom:1px solid var(--line2)"><span>'+x[0]+'</span><span style="color:var(--td);text-align:right;margin-left:10px">'+x[1]+'</span></div>').join('')}</div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>La pastille cloud, en haut</div><div class="card-b" style="font-size:12.5px;line-height:1.55">
 ${[['☁ sync','tout est synchronisé','rien'],['☁ …','lecture du cloud en attente (connexion Google, réseau)','attendre ; au bout de 15 s l\u2019app passe en « hors ligne » et réessaie toutes les 30 s'],['⚠ non lu','une modification locale attend : le cloud n\u2019a pas encore été lu, le verrou protège','toucher pour relire ; la modification part ensuite seule'],['hors ligne','pas de réponse réseau','tes données sont sur l\u2019appareil, elles partiront à la reconnexion'],['⛔ accès refusé','le compte Google connecté n\u2019est pas autorisé par les règles Firestore','vérifier l\u2019adresse dans Configuration → Compte']].map(x=>'<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><div class="row rb"><b style="font-family:var(--mono)">'+x[0]+'</b><span style="color:var(--td);font-size:11px">'+x[2]+'</span></div><div style="font-size:11.5px;color:var(--tm)">'+x[1]+'</div></div>').join('')}
-<div style="font-size:10.5px;color:var(--td);margin-top:7px">Dans tous les cas, ce qui est saisi est enregistré sur l\u2019appareil. Un toucher sur la pastille explique l\u2019état et propose de réessayer.</div></div></div>
+<div style="font-size:10.5px;color:var(--td);margin-top:7px">Dans tous les cas, ce qui est saisi est enregistré sur l\u2019appareil. Un toucher sur la pastille explique l\u2019état et propose de réessayer.</div>
+<div style="font-size:11.5px;color:var(--tm);margin-top:10px"><b>↶ ↷ Annuler / rétablir</b> — les six dernières modifications de la session, dans les deux sens, comme dans un tableur. L\u2019historique s\u2019efface à la fermeture de l\u2019app ; pour remonter plus loin, les sauvegardes cloud (Configuration).</div></div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Automatique ou manuel</div><div class="card-b" style="font-size:12.5px;line-height:1.6">
 <b>Automatique</b> : lignes budget de la nounou, classement du relevé (règles, puis catégories BoursoBank), détection du salaire versé et du CMG reçu, compteurs de congés et d\u2019heures, réconciliation, thermomètres.<br><br>
 <b>Manuel, une fois</b> : hypothèses de revenus, cible variables, régimes, chips F/V et M+n des charges, identité de la fiche.<br><br>
