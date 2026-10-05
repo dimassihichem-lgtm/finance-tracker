@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v106';const VTAG='variables : prévu vs réel par poste';
+const VERSION='v107';const VTAG='variables : liens 🔗 · couleurs au rythme';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1967,7 +1967,7 @@ function fxMatch(y,m){const P=prevuFixeLines(y,m).map(x=>Object.assign({},x,{rea
 let R=(imp&&imp.lines&&imp.lines.length)?imp.lines.filter(l=>l.t==='fixe').map(l=>({l:l.l,s:l.s||'',v:Math.abs(l.v),d:l.d})):Object.entries((imp&&imp.bySub||{}).fixe||{}).map(([k,v])=>({l:k,s:k,v:Math.abs(v)}));
 const used=new Set();
 // 1) liens explicites (mot-clé saisi par l'utilisateur) — prioritaires
-P.forEach(p=>{if(!p.kw)return;const K=p.kw.toUpperCase();R.forEach((r,j)=>{if(!used.has(j)&&(r.l.toUpperCase().includes(K)||r.s.toUpperCase().includes(K))){used.add(j);p.hits.push(r)}})});
+P.forEach(p=>{if(!p.kw)return;const KS=kwList(p.kw);R.forEach((r,j)=>{if(!used.has(j)&&KS.some(K=>r.l.toUpperCase().includes(K)||r.s.toUpperCase().includes(K))){used.add(j);p.hits.push(r)}})});
 // 2) rapprochement automatique : commerçant (fort), catégorie (faible), montant
 const pairs=[];P.forEach((p,i)=>{if(p.kw)return;const syn=new Set(fxTok(p.base||p.l).flatMap(t=>[t].concat(FX_SYN[t]||[])));R.forEach((r,j)=>{if(used.has(j))return;const lt=fxTok(r.l).filter(t=>syn.has(t)).length,st=fxTok(r.s).filter(t=>syn.has(t)).length;const d=p.v?Math.abs(r.v-p.v)/p.v:1;const am=d<=0.05?2:d<=0.25?1:0;const sc=Math.min(lt,2)*3+Math.min(st,1)+am;if(lt>0||(st>0&&am>=1)||(am===2&&st>0))pairs.push({i,j,sc})})});
 pairs.sort((a,b)=>b.sc-a.sc);const ui=new Set();pairs.forEach(x=>{if(used.has(x.j)||ui.has(x.i))return;used.add(x.j);ui.add(x.i);P[x.i].hits.push(R[x.j])});
@@ -1978,24 +1978,34 @@ P.forEach(p=>{if(p.real!=null)return;let h=null;if(p.kw)h=prevL.find(l=>l.l.toUp
 const extra=R.filter((r,j)=>!used.has(j)).map(r=>({l:r.l.replace(/^(CARTE \d\d\/\d\d\/\d\d |PRLV SEPA |VIR SEPA )/,'').slice(0,30)+(r.s?' · '+r.s:''),v:r.v}));
 return{lines:P,extra}}
 function fxLink(base){const cur=(()=>{for(const b of DB.bm){const c=(b.ch||[]).find(x=>x.l===base&&x.match);if(c)return c.match}return''})();
-const kw=prompt('Mot du relevé qui désigne « '+base+' » (ex. ANTHROPIC, ORANGE, APPLE.COM).\nLaisser vide pour revenir au rapprochement automatique.',cur);if(kw===null)return;
+const kw=prompt('Mot(s) du relevé qui désignent « '+base+' », séparés par des virgules (ex. ANTHROPIC, ORANGE, APPLE.COM).\nLaisser vide pour revenir au rapprochement automatique.',cur);if(kw===null)return;
 let n=0;DB.bm.forEach(b=>(b.ch||[]).forEach(c=>{if(c.l===base){if(kw.trim())c.match=kw.trim().toUpperCase();else delete c.match;n++}}));save();rBudget()}
 const VAR_FAM={courses:'Alimentation',alimentation:'Alimentation',sante:'Santé',medecin:'Santé',pharmacie:'Santé',transport:'Transport',carburant:'Transport',essence:'Transport',loisirs:'Loisirs & culture',sorties:'Loisirs & culture',culture:'Loisirs & culture',vacances:'Vacances',voyage:'Vacances',enfants:'Enfants & éducation',maison:'Logement',logement:'Logement',famille:'Famille & transferts',abonnements:'Abonnements & numérique',vetements:'Loisirs & culture'};
+function kwList(x){return String(x||'').split(',').map(k=>k.trim().toUpperCase()).filter(Boolean)}
 function varBreakdown(y,m){const b=gBM(y,m);if(!b||!b.imp)return null;
-const lines=(b.ch||[]).filter(c=>!c.fixe&&c.v).map(c=>({l:c.l,v:+c.v,real:0,subs:{}})).concat((b.ex||[]).filter(x=>x.v).map(x=>({l:x.l+' (exceptionnel)',v:+x.v,real:0,subs:{},ex:true})));
+const lines=(b.ch||[]).map((c,ci)=>({c,ci})).filter(o=>!o.c.fixe&&o.c.v).map(o=>({l:o.c.l,v:+o.c.v,real:0,subs:{},kw:kwList(o.c.match),src:'ch',ci:o.ci})).concat((b.ex||[]).map((x,xi)=>({x,xi})).filter(o=>o.x.v).map(o=>({l:o.x.l+' (exceptionnel)',v:+o.x.v,real:0,subs:{},ex:true,kw:kwList(o.x.match),src:'ex',ci:o.xi})));
 // réel par sous-catégorie, net du transit
 const R=Object.assign({},(b.imp.bySub||{}).variable||{});transitItems(b).forEach(l=>{if(l.t==='variable'&&l.v<0&&R[l.s]!=null){R[l.s]-=transitAmt(l);if(R[l.s]<0.5)delete R[l.s]}});
-const tk=x=>fxTok(x).map(t=>t.length>4?t.replace(/(s|x)$/,''):t);const divers=lines.find(L=>/divers/i.test(L.l));const hors={l:'Hors budget',v:0,real:0,subs:{}};
+// 1) liens explicites : transactions dont le libellé contient un mot-clé de la ligne
+(b.imp.lines||[]).forEach(t=>{if(t.t!=='variable'||t.v>=0)return;const a=t.transit?Math.abs(t.v)-transitAmt(t):Math.abs(t.v);if(a<0.5)return;const U=t.l.toUpperCase();const L=lines.find(L=>L.kw.length&&L.kw.some(k=>U.includes(k)));if(!L)return;
+const lab=t.l.replace(/^(CARTE \d\d\/\d\d\/\d\d |PRLV SEPA |VIR SEPA )/,'').slice(0,26);L.real+=a;L.subs['🔗 '+lab]=(L.subs['🔗 '+lab]||0)+a;if(R[t.s]!=null){R[t.s]-=a;if(R[t.s]<0.5)delete R[t.s]}});
+// 2) le reste par nom, puis par famille, puis Divers
+const tk=x=>fxTok(x).map(t=>t.length>4?t.replace(/(s|x)$/,''):t);const divers=lines.find(L=>/divers/i.test(L.l));const hors={l:'Hors budget',v:0,real:0,subs:{},kw:[]};
 Object.entries(R).forEach(([sub,v])=>{const st=tk(sub);let L=lines.find(L=>!L.ex&&tk(L.l).some(t=>st.includes(t)));
 if(!L){const g=grpOf(sub);L=lines.find(L=>!L.ex&&fxTok(L.l).some(t=>VAR_FAM[t]&&VAR_FAM[t]===g))}
 if(!L)L=divers||hors;L.real+=v;L.subs[sub]=(L.subs[sub]||0)+v});
 const all=lines.concat(hors.real?[hors]:[]);return{lines:all,prevu:all.reduce((a,L)=>a+L.v,0),real:all.reduce((a,L)=>a+L.real,0)}}
+function varLink(y,m,src,ci){const b=gBM(y,m);const o=src==='ex'?(b.ex||[])[ci]:(b.ch||[])[ci];if(!o)return;
+const kw=prompt('Mot(s) du relevé qui désignent « '+o.l+' », séparés par des virgules (ex. : TIMBRES, ANTS, PHOTOMATON).\nLaisser vide pour revenir au rapprochement automatique.',o.match||'');if(kw===null)return;const v=kw.trim().toUpperCase();
+if(src==='ex'){if(v)o.match=v;else delete o.match}else{DB.bm.forEach(bb=>(bb.ch||[]).forEach(c=>{if(c.l===o.l&&!c.fixe){if(v)c.match=v;else delete c.match}}))}save();if(PG==='home')RA();else rBudget()}
 function varBreakdownHtml(y,m,frac){const V=varBreakdown(y,m);if(!V||!V.lines.length)return'';const pct=frac!=null;
-return'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Variables : prévu vs réel <span class="mono" style="color:'+(V.real>V.prevu*(pct?frac:1)?'var(--dn)':'var(--up)')+'">'+fE(V.real)+' / '+fE(V.prevu)+'</span></summary><div style="margin-top:6px">'+
-V.lines.map(L=>{const lim=pct?L.v*frac:L.v;const over=L.real>lim+0.5;const subs=Object.entries(L.subs).sort((a,b)=>b[1]-a[1]);
-return'<details style="border-bottom:1px solid var(--line2);padding:4px 0"><summary style="cursor:pointer;list-style:none"><div class="row rb" style="font-size:12px"><span>'+esc(L.l)+(subs.length?' <span style="color:var(--td);font-size:10px">▸ '+subs.length+'</span>':'')+'</span><span class="mono">'+fE(L.real)+' <span style="color:var(--td)">/ '+fE(L.v)+'</span>'+(L.v||L.real?' <span style="font-size:10.5px;color:'+(over?'var(--dn)':'var(--up)')+'">'+(pct?Math.round(L.v?L.real/L.v*100:100)+' %':(L.real-L.v>0?'+':'')+fE(L.real-L.v))+'</span>':'')+'</span></div></summary>'+
+const col=(real,v)=>{if(!pct)return real>v+0.5?'var(--dn)':'var(--up)';const r=v?real/v:(real>0?9:0);return r<=frac+0.001?'var(--up)':r<=frac+0.10?'var(--gold)':'var(--dn)'};
+return'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Variables : prévu vs réel <span class="mono" style="color:'+col(V.real,V.prevu)+'">'+fE(V.real)+' / '+fE(V.prevu)+'</span></summary><div style="margin-top:6px">'+
+V.lines.map(L=>{const subs=Object.entries(L.subs).sort((a,b)=>b[1]-a[1]);const c=col(L.real,L.v);
+return'<details style="border-bottom:1px solid var(--line2);padding:4px 0"><summary style="cursor:pointer;list-style:none"><div class="row rb" style="font-size:12px"><span>'+esc(L.l)+(L.src?' <span style="cursor:pointer;opacity:'+(L.kw.length?1:.45)+'" title="lier à des transactions du relevé" onclick="event.preventDefault();event.stopPropagation();varLink('+y+','+m+',\''+L.src+'\','+L.ci+')">🔗</span>':'')+(subs.length?' <span style="color:var(--td);font-size:10px">▸ '+subs.length+'</span>':'')+'</span><span class="mono">'+fE(L.real)+' <span style="color:var(--td)">/ '+fE(L.v)+'</span>'+(L.v||L.real?' <span style="font-size:10.5px;color:'+c+'">'+(pct?Math.round(L.v?L.real/L.v*100:100)+' %':(L.real-L.v>0?'+':'')+fE(L.real-L.v))+'</span>':'')+'</span></div></summary>'+
+(L.kw.length?'<div style="font-size:10px;color:var(--td);padding:1px 0 3px 12px">lié à : '+esc(L.kw.join(', '))+'</div>':'')+
 subs.map(([k,v])=>'<div class="row rb" style="font-size:11px;padding:2px 0 2px 12px;color:var(--tm)"><span>'+esc(k)+'</span><span class="mono">'+fE(v)+'</span></div>').join('')+'</details>'}).join('')+
-'<div style="font-size:10px;color:var(--td);margin-top:5px">'+(pct?'Pourcentage du budget consommé ; rouge au-delà du rythme du mois ('+Math.round(frac*100)+' % écoulé). ':'')+'Chaque sous-catégorie du relevé est rattachée à la ligne du budget dont elle porte le nom, sinon à celle de sa famille, sinon à Divers. Pour un meilleur rapprochement, nomme tes lignes de budget comme les catégories (Courses, Restaurants, Santé, Transport…).</div></div></details>'}
+'<div style="font-size:10px;color:var(--td);margin-top:5px">'+(pct?'Vert jusqu\u2019au rythme du mois ('+Math.round(frac*100)+' % écoulé), doré jusqu\u2019à 10 points au-dessus, rouge au-delà. ':'')+'🔗 : lier une ligne à des transactions précises par un ou plusieurs mots du relevé (TIMBRES, ANTS…) ; ce lien prime sur le rapprochement automatique et vaut pour les mois suivants. Sinon, chaque sous-catégorie va à la ligne du même nom, puis de la même famille, puis à Divers.</div></div></details>'}
 function midMonth(y,m){const b=gBM(y,m);if(!b||!b.imp||!b.imp.done||b.cashFin!=null||b.cl)return null;const imp=b.imp;
 const lastD=(imp.lines&&imp.lines.length?imp.lines.map(l=>l.d).sort().pop():(imp.ccEndDate||null));if(!lastD)return null;
 const dim=new Date(y,m,0).getDate();const day=Math.min(dim,+lastD.slice(8,10));const frac=day/dim;
