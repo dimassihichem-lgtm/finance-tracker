@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v107';const VTAG='variables : liens 🔗 · couleurs au rythme';
+const VERSION='v108';const VTAG='liens variables : mois par mois';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -461,7 +461,7 @@ try{const rl=richness(d);if(!confirm('Restaurer ce fichier ? '+d.bm.length+' moi
 function gBM(y,m){return DB.bm.find(x=>x.y===y&&x.m===m)}
 function gOBM(y,m){let d=gBM(y,m);if(!d){d=defBM(y,m);
 const prev=[...DB.bm].filter(x=>(x.y*12+x.m)<(y*12+m)).sort((a,b)=>(b.y*12+b.m)-(a.y*12+a.m));
-if(prev.length&&prev[0].ch&&prev[0].ch.length)d.ch=JSON.parse(JSON.stringify(prev[0].ch));
+if(prev.length&&prev[0].ch&&prev[0].ch.length){d.ch=JSON.parse(JSON.stringify(prev[0].ch));d.ch.forEach(c=>{if(!c.fixe)delete c.match})}
 if(prev.length&&prev[0].rev&&prev[0].rev.length)d.rev=JSON.parse(JSON.stringify(prev[0].rev.filter(x=>!x.auto)));
 DB.bm.push(d);save();syncMonth(d)}return d}
 function gIM(y,m){return DB.im.find(x=>x.y===y&&x.m===m)}
@@ -1997,7 +1997,7 @@ if(!L)L=divers||hors;L.real+=v;L.subs[sub]=(L.subs[sub]||0)+v});
 const all=lines.concat(hors.real?[hors]:[]);return{lines:all,prevu:all.reduce((a,L)=>a+L.v,0),real:all.reduce((a,L)=>a+L.real,0)}}
 function varLink(y,m,src,ci){const b=gBM(y,m);const o=src==='ex'?(b.ex||[])[ci]:(b.ch||[])[ci];if(!o)return;
 const kw=prompt('Mot(s) du relevé qui désignent « '+o.l+' », séparés par des virgules (ex. : TIMBRES, ANTS, PHOTOMATON).\nLaisser vide pour revenir au rapprochement automatique.',o.match||'');if(kw===null)return;const v=kw.trim().toUpperCase();
-if(src==='ex'){if(v)o.match=v;else delete o.match}else{DB.bm.forEach(bb=>(bb.ch||[]).forEach(c=>{if(c.l===o.l&&!c.fixe){if(v)c.match=v;else delete c.match}}))}save();if(PG==='home')RA();else rBudget()}
+if(v)o.match=v;else delete o.match;save();if(PG==='home')RA();else rBudget()}
 function varBreakdownHtml(y,m,frac){const V=varBreakdown(y,m);if(!V||!V.lines.length)return'';const pct=frac!=null;
 const col=(real,v)=>{if(!pct)return real>v+0.5?'var(--dn)':'var(--up)';const r=v?real/v:(real>0?9:0);return r<=frac+0.001?'var(--up)':r<=frac+0.10?'var(--gold)':'var(--dn)'};
 return'<details style="margin-top:9px"><summary style="font-size:11.5px;color:var(--tm);cursor:pointer">Variables : prévu vs réel <span class="mono" style="color:'+col(V.real,V.prevu)+'">'+fE(V.real)+' / '+fE(V.prevu)+'</span></summary><div style="margin-top:6px">'+
@@ -2005,7 +2005,7 @@ V.lines.map(L=>{const subs=Object.entries(L.subs).sort((a,b)=>b[1]-a[1]);const c
 return'<details style="border-bottom:1px solid var(--line2);padding:4px 0"><summary style="cursor:pointer;list-style:none"><div class="row rb" style="font-size:12px"><span>'+esc(L.l)+(L.src?' <span style="cursor:pointer;opacity:'+(L.kw.length?1:.45)+'" title="lier à des transactions du relevé" onclick="event.preventDefault();event.stopPropagation();varLink('+y+','+m+',\''+L.src+'\','+L.ci+')">🔗</span>':'')+(subs.length?' <span style="color:var(--td);font-size:10px">▸ '+subs.length+'</span>':'')+'</span><span class="mono">'+fE(L.real)+' <span style="color:var(--td)">/ '+fE(L.v)+'</span>'+(L.v||L.real?' <span style="font-size:10.5px;color:'+c+'">'+(pct?Math.round(L.v?L.real/L.v*100:100)+' %':(L.real-L.v>0?'+':'')+fE(L.real-L.v))+'</span>':'')+'</span></div></summary>'+
 (L.kw.length?'<div style="font-size:10px;color:var(--td);padding:1px 0 3px 12px">lié à : '+esc(L.kw.join(', '))+'</div>':'')+
 subs.map(([k,v])=>'<div class="row rb" style="font-size:11px;padding:2px 0 2px 12px;color:var(--tm)"><span>'+esc(k)+'</span><span class="mono">'+fE(v)+'</span></div>').join('')+'</details>'}).join('')+
-'<div style="font-size:10px;color:var(--td);margin-top:5px">'+(pct?'Vert jusqu\u2019au rythme du mois ('+Math.round(frac*100)+' % écoulé), doré jusqu\u2019à 10 points au-dessus, rouge au-delà. ':'')+'🔗 : lier une ligne à des transactions précises par un ou plusieurs mots du relevé (TIMBRES, ANTS…) ; ce lien prime sur le rapprochement automatique et vaut pour les mois suivants. Sinon, chaque sous-catégorie va à la ligne du même nom, puis de la même famille, puis à Divers.</div></div></details>'}
+'<div style="font-size:10px;color:var(--td);margin-top:5px">'+(pct?'Vert jusqu\u2019au rythme du mois ('+Math.round(frac*100)+' % écoulé), doré jusqu\u2019à 10 points au-dessus, rouge au-delà. ':'')+'🔗 : lier une ligne à des transactions précises par un ou plusieurs mots du relevé (TIMBRES, ANTS…) ; ce lien prime sur le rapprochement automatique et ne vaut que pour ce mois. Sinon, chaque sous-catégorie va à la ligne du même nom, puis de la même famille, puis à Divers.</div></div></details>'}
 function midMonth(y,m){const b=gBM(y,m);if(!b||!b.imp||!b.imp.done||b.cashFin!=null||b.cl)return null;const imp=b.imp;
 const lastD=(imp.lines&&imp.lines.length?imp.lines.map(l=>l.d).sort().pop():(imp.ccEndDate||null));if(!lastD)return null;
 const dim=new Date(y,m,0).getDate();const day=Math.min(dim,+lastD.slice(8,10));const frac=day/dim;
@@ -2524,6 +2524,7 @@ const b5=gBM(2026,5);if(b5&&!b5.transitAdj)b5.transitAdj=[{v:1000,t:'entree',s:'
 const b8=gBM(2026,8);if(b8&&!b8.transitAdj)b8.transitAdj=[{v:610,t:'entree',s:'CAF',transitMotif:'PreParE reversée à Salma'},{v:-610,t:'transfertFoyer',s:'Virement conjoint',transitMotif:'PreParE reversée à Salma'}];
 if(DB.params.journal){DB.params.journal.push({date:'2026-10-03',champ:'proj · cibles · budget octobre',old:'salaire 6 300 · autres 90 · crédit d\u2019impôt 1 750 (juil.) · primes 600 / 1 450 · variables 1 158 · cible 2 500 · foyer 400',new:'salaire 6 230 · autres 200 · flux fiscaux sourcés de Fiscal (avance janvier, solde juillet) · primes 700 / 1 500 · variables ~2 000 · cible 2 200 · foyer 200 dès octobre',motif:'recalage sur le réel après pointage (analyse du 03/10)'});DB.params.journal.push({date:'2026-10-03',champ:'transit mai · août',old:null,new:'mai : prêt Gaston +1 000, PreParE 600 ↔ Salma · août : PreParE 610 ↔ Salma',motif:'mois sans lignes conservées — même traitement que juin, juillet, septembre'})}
 DB.params.add5=true}
+if(!DB.params.varLinkMonth){const seen={};sBM().forEach(b=>(b.ch||[]).forEach(c=>{if(c.fixe||!c.match)return;const k=c.l+'|'+c.match;if(seen[k])delete c.match;else seen[k]=1}));DB.params.varLinkMonth=true}
 if(!DB.params.hausse1){const P=DB.params.proj||{};if(!P.hausse)P.hausse={taux:4,mois:4,depuis:2027};if(DB.params.journal)DB.params.journal.push({date:'2026-10-03',champ:'proj.hausse',old:null,new:'+4 % chaque avril, dès 2027',motif:'IPS §2 : +4-5 %/an en moyenne ; paramétrable'});DB.params.hausse1=true}
 if(!DB.params.whoV2){sBM().forEach(b=>(b.imp&&b.imp.lines||[]).forEach(l=>{if(l.who==='Ami / prêt')l.who='Ami · prêt'}));DB.params.whoV2=true}
 if(!DB.params.whoV3){sBM().forEach(b=>{let ch=false;(b.imp&&b.imp.lines||[]).forEach(l=>{if(l.who==='Compte joint'||l.who==='Salma'){l.who='Salma · foyer';if(l.s==='Compte joint'){l.s='Virement conjoint';ch=true}}});if(ch)reagg(b)});DB.params.whoV3=true}
