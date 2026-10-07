@@ -367,7 +367,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v108';const VTAG='liens variables : mois par mois';
+const VERSION='v109';const VTAG='lien variable : retiré de « autre »';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1988,7 +1988,7 @@ const lines=(b.ch||[]).map((c,ci)=>({c,ci})).filter(o=>!o.c.fixe&&o.c.v).map(o=>
 const R=Object.assign({},(b.imp.bySub||{}).variable||{});transitItems(b).forEach(l=>{if(l.t==='variable'&&l.v<0&&R[l.s]!=null){R[l.s]-=transitAmt(l);if(R[l.s]<0.5)delete R[l.s]}});
 // 1) liens explicites : transactions dont le libellé contient un mot-clé de la ligne
 (b.imp.lines||[]).forEach(t=>{if(t.t!=='variable'||t.v>=0)return;const a=t.transit?Math.abs(t.v)-transitAmt(t):Math.abs(t.v);if(a<0.5)return;const U=t.l.toUpperCase();const L=lines.find(L=>L.kw.length&&L.kw.some(k=>U.includes(k)));if(!L)return;
-const lab=t.l.replace(/^(CARTE \d\d\/\d\d\/\d\d |PRLV SEPA |VIR SEPA )/,'').slice(0,26);L.real+=a;L.subs['🔗 '+lab]=(L.subs['🔗 '+lab]||0)+a;if(R[t.s]!=null){R[t.s]-=a;if(R[t.s]<0.5)delete R[t.s]}});
+const lab=t.l.replace(/^(CARTE \d\d\/\d\d\/\d\d |PRLV SEPA |VIR SEPA )/,'').slice(0,26);L.real+=a;L.subs['🔗 '+lab]=(L.subs['🔗 '+lab]||0)+a;const sk=t.s||'autre';if(R[sk]!=null){R[sk]-=a;if(R[sk]<0.5)delete R[sk]}});
 // 2) le reste par nom, puis par famille, puis Divers
 const tk=x=>fxTok(x).map(t=>t.length>4?t.replace(/(s|x)$/,''):t);const divers=lines.find(L=>/divers/i.test(L.l));const hors={l:'Hors budget',v:0,real:0,subs:{},kw:[]};
 Object.entries(R).forEach(([sub,v])=>{const st=tk(sub);let L=lines.find(L=>!L.ex&&tk(L.l).some(t=>st.includes(t)));
