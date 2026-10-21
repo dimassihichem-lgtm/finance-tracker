@@ -368,7 +368,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v112';const VTAG='transit : plusieurs remboursements, tri, recherche';
+const VERSION='v114';const VTAG='taux horaire avec transport dès novembre, historique des taux';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -1020,7 +1020,7 @@ save();const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest(
 function defPlanDays(l){const d={};for(let i=1;i<=7;i++)d[i]={s:0,p:0};(l||[]).forEach((x,i)=>{d[i+1]={s:x[0],p:x[1]}});return d}
 function defGarde(){return{rate:12,rateShared:10.25,mode:'mensualise',hours:{},leave:{},abs:{},sick:{},recup:{},unused:{},endReason:'licenciement',preavisPaid:false,
 plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}],
-contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'auto',share:50,manual:0,ref:{},requireJustif:true,label:'Navigo Mois'},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',cotLine:true,cotLag:2,cmgLine:true,cmgLag:1,crecheMigrated:false,
+contractFrom:'2026-09-11',contractTo:'',nav:{on:true,price:90.80,mode:'auto',share:50,manual:0,ref:{},requireJustif:true,label:'Navigo Mois',rt:4.10,rtPct:50,rtM:{}},startY:2026,startM:10,lag:1,budgetLine:true,budgetMode:'net',cotLine:true,cotLag:2,cmgLine:true,cmgLag:1,crecheMigrated:false,
 cpDays:30,cpWeek:6,cpAcq:2.5,cpHours:2.5,cpStartM:6,ppFrom:'',avanceImmediate:false,cpMode:'ouvres',holOffPaid:true,cmgReal:{},
 id:{sal:'',salRole:'assistante parentale',empl:'',addr:'',horaires:'Lundi, mercredi et vendredi de 16h00 à 18h30'},hs:{seuil:40,h1:8,maj1:25,maj2:50},hc:{maj1:0,maj2:0,part1:10},fer:{majOrd:10,majMai:100},
 p:{txSal:21.88025,txPat:45.654,abatH:1.80,abatPart:100,cmgCotPct:50,cmgCotCap:263,capH:15.18,chr:10.50,effort:0.1032,rev:6666.83,revMin:635,revMax:8500,ciPct:50,ciCap:15000,cmgMode:'calc',cmgFix:0}}}
@@ -1031,7 +1031,7 @@ const oldDef=JSON.stringify([{from:'2026-09-01',d:defPlanDays([[8,0],[8,0],[8,0]
 if(JSON.stringify(g.plans)===oldDef)g.plans=d.plans;
 Object.keys(g.hours).forEach(k=>{if(typeof g.hours[k]==='number')g.hours[k]={s:g.hours[k],p:0}});
 if(!g.contractFrom)g.contractFrom=(g.contractStart||'2026-09')+'-01';delete g.contractStart;
-if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={};if(!g.cmgReal)g.cmgReal={};if(!g.cpMode)g.cpMode='ouvres';
+if(!g.nav)g.nav=d.nav;Object.keys(d.nav).forEach(k=>{if(g.nav[k]==null)g.nav[k]=d.nav[k]});if(!g.nav.ref)g.nav.ref={};if(!g.nav.rtM)g.nav.rtM={};if(g.nav.rt==null)g.nav.rt=4.10;if(g.nav.rtPct==null)g.nav.rtPct=50;if(!g.cmgReal)g.cmgReal={};if(!g.cpMode)g.cpMode='ouvres';
 if(!g.id)g.id=d.id;Object.keys(d.id).forEach(k=>{if(g.id[k]==null)g.id[k]=d.id[k]});
 if(g.cpWeek==null)g.cpWeek=6;
 if(g.cpWeek===6&&g.cpAcq===2.5&&g.cpDays===25)g.cpDays=30;
@@ -1074,7 +1074,8 @@ const payOf=(e,g)=>e.s*g.rate+e.p*g.rateShared;
 // Calcul du mois
 let GM_CACHE={};
 function gardeMonth(y,m){const ck=y*12+m;if(GM_CACHE[ck])return GM_CACHE[ck];const r=gardeMonthCalc(y,m);GM_CACHE[ck]=r;return r}
-function gardeMonthCalc(y,m){const g=DB.garde;const nd=new Date(y,m,0).getDate();
+function gAt(y,m){const g=DB.garde;const k=y+'-'+String(m).padStart(2,'0');const H=(g.rateHist||[]).filter(h=>h.to&&h.to>=k).sort((a,b)=>a.to<b.to?-1:1);if(!H.length)return g;return Object.assign({},g,{rate:+H[0].rate||g.rate,rateShared:+H[0].rateShared||g.rateShared})}
+function gardeMonthCalc(y,m){const g=gAt(y,m);const nd=new Date(y,m,0).getDate();
 const cf=g.contractFrom||'';const cfY=+cf.slice(0,4),cfM=+cf.slice(5,7),cfD=+cf.slice(8,10);
 const before=cf&&(y*12+m)<(cfY*12+cfM);
 const ct=g.contractTo||'';const ctY=+ct.slice(0,4),ctM=+ct.slice(5,7),ctD=+ct.slice(8,10);
@@ -1129,16 +1130,19 @@ return{base,baseHs,baseHp,wk,planH:Math.round(planH*100)/100,hS,hP,h:Math.round(
 function gHours(y,m){const r=gardeMonth(y,m);return{h:r.h,days:r.days,cp:r.cp,cpH:r.cp*(DB.garde.cpHours||0),paid:Math.round(r.paidH*100)/100}}
 function navFor(y,m){const g=DB.garde,n=g.nav||{};const k=y+'-'+String(m).padStart(2,'0');
 if(!n.on)return{amt:0,justif:false,base:'désactivé'};
+if(n.to&&k>n.to)return{amt:0,justif:true,base:'intégrée au taux horaire depuis '+n.to,ended:true};
 const r=gardeMonth(y,m);if(r.before||r.after)return{amt:0,justif:false,base:'hors contrat'};
 const wkH=r.wk.s+r.wk.p;let amt=0,base='';
 let pct=0;
+if(n.mode==='trajet'){const o=(n.rtM||{})[k]||{};const nb=o.n!=null&&o.n!==''?+o.n:r.days;const pr=o.price!=null&&o.price!==''?+o.price:(+n.rt||0);pct=+n.rtPct||0;const adj=+o.adj||0;amt=nb*pr*pct/100+adj;base=nb+' jour'+(nb>1?'s':'')+' × '+pr.toFixed(2).replace('.',',')+' € l\u2019aller-retour × '+fh(pct)+' %'+(adj?' '+(adj>0?'+ ':'− ')+f$(Math.abs(adj))+' € ('+(o.note||'régularisation')+')':'');
+ amt=Math.round(amt*100)/100;return{amt,pending:0,justif:true,req:false,base,pct,price:pr,n:nb,adj,note:o.note||'',trajet:true}}
 if(n.mode==='manual'){amt=+n.manual||0;pct=(+n.price>0)?amt/n.price*100:0;base='montant fixé manuellement'}
 else if(n.mode==='integral'){pct=+n.share||0;amt=(+n.price||0)*pct/100;base='garde partagée (art. 157 CCN) · quote-part '+fh(pct)+' %'}
 else{pct=Math.min(100,50*wkH/17.5);amt=(+n.price||0)*pct/100;base='Code du travail R3261-9 : 50 % × '+fh(wkH)+' h ÷ 17,5 h = '+fh(Math.round(pct*100)/100)+' %'}
 if(r.partial){const nd=new Date(y,m,0).getDate();const d1=r.from?+r.from.slice(8,10):1;const d2=r.to?+r.to.slice(8,10):nd;amt=amt*Math.max(0,(d2-d1+1))/nd;base+=' · prorata du mois'}
 amt=Math.round(amt*100)/100;const justif=!!(n.ref&&n.ref[k]);const due=justif||!n.requireJustif;
 return{amt:due?amt:0,pending:due?0:amt,justif,req:!!n.requireJustif,base,pct:Math.round(pct*100)/100,price:+n.price||0}}
-function gardeCost(y,m){const g=DB.garde,p=g.p;const r=gardeMonth(y,m);const h=r.paidH;const net=r.net;const nv=navFor(y,m);
+function gardeCost(y,m){const g=gAt(y,m),p=g.p;const r=gardeMonth(y,m);const h=r.paidH;const net=r.net;const nv=navFor(y,m);
 const brut=net/(1-p.txSal/100);const cotSal=brut-net;const cotPat=brut*p.txPat/100;
 const cotBrut=cotSal+cotPat;
 const abat=Math.min(p.abatH*((p.abatPart==null?100:p.abatPart)/100)*h,cotPat);const cotTot=cotBrut-abat;
@@ -1290,7 +1294,7 @@ const txt=(e.s?fh(e.s):'')+(e.s&&e.p?'+':'')+(e.p?fh(e.p)+'p':'');return'<span c
 function rGarde(){
 const el=document.getElementById('pg-garde');const n=new Date();
 if(!gY){gY=n.getFullYear();gM=n.getMonth()+1}
-const g=DB.garde;const r=gardeCost(gY,gM);const cs=cpStatus(gY,gM);
+const g=DB.garde;const gr=gAt(gY,gM);const r=gardeCost(gY,gM);const cs=cpStatus(gY,gM);
 const first=new Date(gY,gM-1,1);const off=(first.getDay()+6)%7;const nd=new Date(gY,gM,0).getDate();
 const tk=todayKey();const nx=nM(gY,gM);const mens=g.mode==='mensualise';
 let cells='';for(let i=0;i<off;i++)cells+='<div class="cal-cell blank"></div>';
@@ -1301,8 +1305,8 @@ if(GSEL){const i=dayInfo(GSEL);const dt=kDate(GSEL);const cur=i.real||i.prev;
 panel=`<div class="cal-panel">
 <div class="row rb"><div style="font-weight:600;text-transform:capitalize">${dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div><button class="icobtn" onclick="GSEL=null;rGarde()">✕</button></div>
 <div class="row" style="gap:5px;margin-top:5px;flex-wrap:wrap">${i.hol?'<span class="chip" style="color:var(--blue)">Férié · '+i.hol+(i.mai1?' (+'+g.fer.majMai+' % si travaillé)':' (+'+g.fer.majOrd+' % si travaillé)')+'</span>':''}${i.cp?'<span class="chip tag-up">Congé payé</span>':''}${i.abs?'<span class="chip tag-dn">Absence non rémunérée</span>':''}${i.sick?'<span class="chip" style="color:var(--violet)">Absence salariée</span>':''}${i.recup?'<span class="chip tag-gold">Elle n\u2019a pas pu venir · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${i.unused?'<span class="chip tag-gold">Pas eu besoin d\u2019elle · +'+fh(i.prev.s+i.prev.p)+' h au compteur</span>':''}${!i.planned?'<span class="chip">Jour non travaillé au planning</span>':''}${i.real?'<span class="chip tag-gold">Saisie réelle</span>':'<span class="chip">Planning : '+fh(i.prev.s)+' h solo · '+fh(i.prev.p)+' h partagé</span>'}</div>
-<div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(g.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
-<div><div class="lbl">Partagé (h) · ${f$(g.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
+<div class="grid2" style="margin-top:10px"><div><div class="lbl">Solo (h) · ${f$(gr.rate)} €</div><input class="inp mono" id="g-s" type="number" step="0.5" inputmode="decimal" value="${cur.s||''}" placeholder="0" style="text-align:center;font-size:18px"></div>
+<div><div class="lbl">Partagé (h) · ${f$(gr.rateShared)} €</div><input class="inp mono" id="g-p" type="number" step="0.5" inputmode="decimal" value="${cur.p||''}" placeholder="0" style="text-align:center;font-size:18px"></div></div>
 ${i.planned?`<div style="margin-top:8px"><div class="lbl">Si moins d\u2019heures que prévu (${fh(i.prev.s+i.prev.p)} h), pourquoi ?</div><select class="inp sm" id="g-gap"><option value="unused"${(cur.gap||'unused')==='unused'?' selected':''}>Nous n\u2019avons pas eu besoin d\u2019elle — à replacer (compteur)</option><option value="recup"${cur.gap==='recup'?' selected':''}>Elle n\u2019a pas pu venir — à replacer (compteur)</option><option value="abs"${cur.gap==='abs'?' selected':''}>Elle n\u2019a pas pu venir — non rémunéré (retenue)</option><option value="paye"${cur.gap==='paye'?' selected':''}>Payé, sans suivi</option></select></div>`:''}
 <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap"><button class="btn btn-gold sm" onclick="gSet(+document.getElementById('g-s').value,+document.getElementById('g-p').value,0,(document.getElementById('g-gap')||{}).value)">Enregistrer</button>
 ${i.planned?`<select class="inp sm" style="width:auto" onchange="gMarkSel(this.value)"><option value="">Jour non travaillé…</option><option value="leave"${i.cp?' selected':''}>Congé payé</option><option value="abs"${i.abs?' selected':''}>Absence non rémunérée</option><option value="recup"${i.recup?' selected':''}>Elle n\u2019a pas pu venir — à replacer</option><option value="unused"${i.unused?' selected':''}>Nous n\u2019avons pas eu besoin d\u2019elle — à replacer</option><option value="sick"${i.sick?' selected':''}>Absence salariée (maladie)</option></select>`:''}
@@ -1313,7 +1317,7 @@ const budgetSrc=[];sBM().forEach(b=>{const s=gardeSrc(b.y,b.m);if(s.y===gY&&s.m=
 const p=g.p;const revUsed=Math.min(Math.max(p.rev||0,p.revMin),p.revMax);
 // Planning
 const plans=[...g.plans].sort((a,b)=>a.from<b.from?-1:1);if(GPI<0||GPI>=plans.length)GPI=plans.length-1;const pl=plans[GPI];const plIdx=g.plans.indexOf(pl);const wk=planWeekly(pl);
-const baseNet=(wk.s*g.rate+wk.p*g.rateShared)*52/12;
+const baseNet=(wk.s*gr.rate+wk.p*gr.rateShared)*52/12;
 
 el.innerHTML=`
 <div class="pagetitle">Garde à domicile</div>
@@ -1359,8 +1363,8 @@ ${(()=>{const L=hoursLedger(gY,gM);if(!L.start&&!L.owed&&!L.done&&!L.extraRaw)re
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Salaire ${ML[gM]} · déclaration Pajemploi</div>
 <div class="card-b">
 ${r.partial?`<div class="card-b" style="padding:0 0 10px"><div class="al ala" style="margin:0 0 10px">📌 ${r.partialIn?'Mois d\u2019embauche':'Mois de fin de contrat'} : salaire calculé sur les heures réelles du ${r.from?kDate(r.from).toLocaleDateString('fr-FR'):'1'+'/'+String(gM).padStart(2,'0')} au ${r.to?kDate(r.to).toLocaleDateString('fr-FR'):nd+'/'+String(gM).padStart(2,'0')}, pas sur la mensualisation.</div></div>
-<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(g.rate)} €</small></span><b>${f$(Math.round(r.hS*g.rate*100)/100)} €</b></div>
-<div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(g.rateShared)} €</small></span><b>${f$(Math.round(r.hP*g.rateShared*100)/100)} €</b></div>
+<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(gr.rate)} €</small></span><b>${f$(Math.round(r.hS*gr.rate*100)/100)} €</b></div>
+<div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(gr.rateShared)} €</small></span><b>${f$(Math.round(r.hP*gr.rateShared*100)/100)} €</b></div>
 ${r.compEur>0?'<div class="cost-line"><span>Majoration heures complémentaires<small>'+fh(r.compH)+' h · '+g.hc.maj1+' %</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.compEur*100)/100)+' €</b></div>':''}
 ${r.holWorked>0?'<div class="cost-line"><span>Jours fériés travaillés<small>majoration '+g.fer.majOrd+' % ('+g.fer.majMai+' % le 1er mai)</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.holMaj*100)/100)+' €</b></div>':''}
 ${r.partialIn?'<div class="cost-line"><span>Mensualisation à partir de '+MS[nM(gY,gM).m]+'<small>'+fh(r.wk.s)+' h solo + '+fh(r.wk.p)+' h partagé / semaine × 52 ÷ 12</small></span><b style="color:var(--td)">'+f$(Math.round(r.base))+' €</b></div>':''}`
@@ -1375,16 +1379,16 @@ ${r.sick>0?'<div class="al ala">Absence salariée : '+r.sick+' jour'+(r.sick>1?'
 ${r.zeroDays>0?'<div class="al ala">'+r.zeroDays+' jour'+(r.zeroDays>1?'s':'')+' saisi'+(r.zeroDays>1?'s':'')+' à 0 h sans motif — payé'+(r.zeroDays>1?'s':'')+' normalement. Marquez congé, absence ou arrêt si nécessaire.</div>':''}
 ${r.holOff>0?'<div class="cost-line"><span>Fériés chômés<small>'+r.holOff+' · salaire maintenu, inclus dans la mensualisation</small></span><b style="color:var(--td)">0 €</b></div>':''}
 ${r.cp>0?'<div class="cost-line"><span>Congés payés posés<small>'+r.cp+' j · inclus dans la mensualisation (année complète)</small></span><b style="color:var(--td)">0 €</b></div>':''}`
-:`<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(g.rate)} €</small></span><b>${f$(Math.round(r.hS*g.rate))} €</b></div>
-<div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(g.rateShared)} €</small></span><b>${f$(Math.round(r.hP*g.rateShared))} €</b></div>
-${r.cp>0?'<div class="cost-line"><span>Congés payés<small>'+r.cp+' j marqué'+(r.cp>1?'s':'')+' × '+fh(g.cpHours)+' h</small></span><b>'+f$(Math.round(r.cp*g.cpHours*g.rate*100)/100)+' €</b></div>':''}
+:`<div class="cost-line"><span>Heures solo<small>${fh(r.hS)} h × ${f$(gr.rate)} €</small></span><b>${f$(Math.round(r.hS*gr.rate))} €</b></div>
+<div class="cost-line"><span>Heures partagées<small>${fh(r.hP)} h × ${f$(gr.rateShared)} €</small></span><b>${f$(Math.round(r.hP*gr.rateShared))} €</b></div>
+${r.cp>0?'<div class="cost-line"><span>Congés payés<small>'+r.cp+' j marqué'+(r.cp>1?'s':'')+' × '+fh(g.cpHours)+' h</small></span><b>'+f$(Math.round(r.cp*g.cpHours*gr.rate*100)/100)+' €</b></div>':''}
 ${r.holOff>0?'<div class="cost-line"><span>Jours fériés chômés<small>'+r.holOff+' j · '+fh(r.holOffH)+' h · maintien de salaire</small></span><b>'+(g.holOffPaid===false?'0 €':'+ '+f$(Math.round(r.holOffEur*100)/100)+' €')+'</b></div>':''}
 ${r.holWorked>0?'<div class="cost-line"><span>Majoration fériés travaillés<small>'+r.holWorked+' j</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.holMaj*100)/100)+' €</b></div>':''}
 ${r.hsEur>0?'<div class="cost-line"><span>Majoration heures supplémentaires<small>'+fh(r.hsH)+' h au-delà de '+g.hs.seuil+' h/sem.</small></span><b style="color:var(--gold)">+ '+f$(Math.round(r.hsEur*100)/100)+' €</b></div>':''}`}
 <div class="cost-line"><span>Salaire net<small>${fh(r.paidH)} h à déclarer</small></span><b>${f$(Math.round(r.net*100)/100)} €</b></div>
-${g.nav.on?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span class="chip tag-dn" style="font-size:9px">justificatif manquant</span>'}<small>${r.nav.base}${r.nav.pending?' · non versé tant que le justificatif manque'
+${g.nav.on&&!r.nav.ended?`<div class="cost-line"><span>Transport ${r.nav.justif?'':'<span class="chip tag-dn" style="font-size:9px">justificatif manquant</span>'}<small>${r.nav.base}${r.nav.pending?' · non versé tant que le justificatif manque'
 :''}</small></span><b style="color:${r.nav.justif?'var(--cyan)':'var(--td)'}">${r.nav.pending?'('+f$(r.nav.pending)+' € en attente)':'+ '+f$(r.nav.amt)+' €'}</b></div>
-<div class="row rb" style="padding:4px 0 8px"><label style="font-size:11.5px;color:var(--tm);display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" ${r.nav.justif?'checked':''} onchange="navRef('${gY}-${String(gM).padStart(2,'0')}',this.checked)" style="width:17px;height:17px;accent-color:var(--gold)">Justificatif d'abonnement reçu</label></div>`:''}
+${r.nav.trajet?`<div class="row" style="gap:6px;padding:4px 0 8px;flex-wrap:wrap;font-size:11px;color:var(--td)"><span>Allers-retours <input class="inp sm mono" type="number" step="1" inputmode="numeric" style="width:58px;text-align:right" placeholder="${r.days}" value="${(g.nav.rtM[gY+'-'+String(gM).padStart(2,'0')]||{}).n??''}" onchange="navRt('${gY}-${String(gM).padStart(2,'0')}','n',this.value)"></span><span>Prix AR <input class="inp sm mono" type="number" step="0.01" inputmode="decimal" style="width:64px;text-align:right" placeholder="${g.nav.rt}" value="${(g.nav.rtM[gY+'-'+String(gM).padStart(2,'0')]||{}).price??''}" onchange="navRt('${gY}-${String(gM).padStart(2,'0')}','price',this.value)"></span><span>Régul. <input class="inp sm mono" type="number" step="0.01" inputmode="decimal" style="width:64px;text-align:right" placeholder="0" value="${(g.nav.rtM[gY+'-'+String(gM).padStart(2,'0')]||{}).adj??''}" onchange="navRt('${gY}-${String(gM).padStart(2,'0')}','adj',this.value)"></span><input class="inp sm" style="flex:1;min-width:120px" placeholder="motif (ex. rattrapage septembre)" value="${esc((g.nav.rtM[gY+'-'+String(gM).padStart(2,'0')]||{}).note||'')}" onchange="navRt('${gY}-${String(gM).padStart(2,'0')}','note',this.value)"></div>`:`<div class="row rb" style="padding:4px 0 8px"><label style="font-size:11.5px;color:var(--tm);display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" ${r.nav.justif?'checked':''} onchange="navRef('${gY}-${String(gM).padStart(2,'0')}',this.checked)" style="width:17px;height:17px;accent-color:var(--gold)">Justificatif d'abonnement reçu</label></div>`}`:''}
 <div class="cost-line tot"><span>Total à verser<small>salaire${g.nav.on?' + transport':''} · virement du mois</small></span><b style="color:var(--gold);font-size:19px">${f$(Math.round(r.toPay*100)/100)} €</b></div>
 <div style="font-size:11.5px;color:var(--td);margin-top:8px">Sur pajemploi.urssaf.fr avant le 5 ${ML[nx.m].toLowerCase()} : ${r.partial?'période d\u2019emploi du <b>'+kDate(r.from).toLocaleDateString('fr-FR')+' au '+nd+'/'+String(gM).padStart(2,'0')+'/'+gY+'</b> (dates réelles, pas le mois civil), heures '+fh(r.hS+r.hP)+' h':'heures normales '+fh(mens?r.baseHs+r.baseHp-r.absH:r.hS+r.hP)+' h'+(Math.max(r.compH,r.extraH)>0?', complémentaires '+fh(Math.max(r.compH,r.extraH))+' h':'')+(r.hsH>0?', supplémentaires '+fh(r.hsH)+' h':'')}, salaire <b>net</b>${g.nav.on&&r.nav.amt>0?', frais de transport '+f$(r.nav.amt)+' € en « indemnités complémentaires »':''}. ${mens&&!r.partial?'Année complète : ne pas remplir la case « congés payés ».':g.mode==='reel'&&!r.partial?'Paiement au réel : déclarer les heures effectivement travaillées du mois.':''}</div>
 </div></div>
@@ -1423,7 +1427,7 @@ ${true?`<div class="card-b">
 <div class="dl-head"><span style="flex:1">Jour</span><span style="width:84px;text-align:center">Solo h</span><span style="width:84px;text-align:center">Partagé h</span></div>
 ${[1,2,3,4,5,6,7].map(i=>{const d=pl.d[i]||{s:0,p:0};return'<div class="dline"><span style="flex:1;font-size:13.5px">'+DOWN[i]+'</span><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" style="width:84px;text-align:center" value="'+(d.s||'')+'" placeholder="0" onchange="DB.garde.plans['+plIdx+'].d['+i+'].s=+this.value||0;gSave()"><input class="inp sm mono" type="number" step="0.5" inputmode="decimal" style="width:84px;text-align:center" value="'+(d.p||'')+'" placeholder="0" onchange="DB.garde.plans['+plIdx+'].d['+i+'].p=+this.value||0;gSave()"></div>'}).join('')}
 <div class="hr"></div>
-<div class="cost-line tot"><span>Salaire mensualisé net<small>(${fh(wk.s)} × ${f$(g.rate)} + ${fh(wk.p)} × ${f$(g.rateShared)}) × 52 ÷ 12 · ${fh((wk.s+wk.p)*52/12)} h/mois</small></span><b style="color:var(--gold)">${f$(Math.round(baseNet))} €</b></div>
+<div class="cost-line tot"><span>Salaire mensualisé net<small>(${fh(wk.s)} × ${f$(gr.rate)} + ${fh(wk.p)} × ${f$(gr.rateShared)}) × 52 ÷ 12 · ${fh((wk.s+wk.p)*52/12)} h/mois</small></span><b style="color:var(--gold)">${f$(Math.round(baseNet))} €</b></div>
 <div style="font-size:10.5px;color:var(--td);margin-top:6px">Le mois d'embauche (${kDate(g.contractFrom).toLocaleDateString('fr-FR')}) est payé au réel ; la mensualisation démarre le mois suivant. Chaque planning s'applique à partir de sa date d'effet. Pour un changement d'horaires : « Nouveau à partir du… », puis ajustez — un avenant au contrat est nécessaire.</div>
 </div>`:''}
 </div>
@@ -1438,15 +1442,21 @@ ${true?`<div class="card-b">
 <div class="eyebrow" style="margin:12px 0 4px">Rémunération</div>
 <div class="prm"><label>Taux net solo<small>€/h</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rate}" onchange="DB.garde.rate=+this.value||0;gSave()"></div>
 <div class="prm"><label>Taux net garde partagée<small>€/h · votre part</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.rateShared}" onchange="DB.garde.rateShared=+this.value||0;gSave()"></div>
+${(g.rateHist||[]).slice().sort((a,b)=>a.to<b.to?-1:1).map((h,hi)=>`<div class="prm"><label>Anciens taux jusqu'à <input class="inp sm mono" style="width:84px;display:inline-block" value="${esc(h.to||'')}" placeholder="AAAA-MM" onchange="rateHistSet(${hi},'to',this.value)"><small>solo / partagée, €/h</small></label><div class="row" style="gap:4px"><input class="inp sm mono" type="number" step="0.01" style="width:64px;text-align:right" value="${h.rate}" onchange="rateHistSet(${hi},'rate',this.value)"><input class="inp sm mono" type="number" step="0.01" style="width:64px;text-align:right" value="${h.rateShared}" onchange="rateHistSet(${hi},'rateShared',this.value)"><button class="btn btn-ghost sm" style="color:var(--dn)" onclick="rateHistDel(${hi})">×</button></div></div>`).join('')}
+<div class="prm" style="border:none"><label><small>Les taux ci-dessus s'appliquent aux mois à venir ; les anciens taux restent sur les mois passés.</small></label><button class="btn btn-ghost sm" onclick="rateHistAdd()">+ ancien taux</button></div>
 <div class="prm"><label>Mode de paie<small>mensualisé = planning × 52/12 + écarts</small></label><select class="inp sm" onchange="DB.garde.mode=this.value;gSave()"><option value="mensualise"${mens?' selected':''}>Mensualisé</option><option value="reel"${!mens?' selected':''}>Au réel</option></select></div>
 <div class="prm"><label>Date de début du contrat<small>le 1er mois est payé au réel, pas mensualisé</small></label><input class="inp sm" type="date" value="${g.contractFrom}" onchange="DB.garde.contractFrom=this.value;gSave()"></div>
 <div class="prm"><label>Date de fin du contrat<small>vide = en cours · déclenche le solde de tout compte</small></label><input class="inp sm" type="date" value="${g.contractTo||''}" onchange="DB.garde.contractTo=this.value;gSave()"></div>
 <div class="eyebrow" style="margin:12px 0 4px">Transport (Navigo)</div>
 <div class="prm"><label>Prise en charge du transport</label><select class="inp sm" onchange="DB.garde.nav.on=this.value==='1';gSave()"><option value="1"${g.nav.on?' selected':''}>Oui</option><option value="0"${!g.nav.on?' selected':''}>Non</option></select></div>
-<div class="prm"><label>Prix de l'abonnement<small>€/mois · Navigo toutes zones 2026 : 90,80 €</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.price}" onchange="DB.garde.nav.price=+this.value||0;gSave()"></div>
-<div class="prm"><label>Verser uniquement sur justificatif<small>le remboursement est légalement conditionné</small></label><select class="inp sm" onchange="DB.garde.nav.requireJustif=this.value==='1';gSave()"><option value="1"${g.nav.requireJustif?' selected':''}>Oui</option><option value="0"${!g.nav.requireJustif?' selected':''}>Non</option></select></div>
+${g.nav.on?`<div class="prm"><label>Dernier mois avec indemnité<small>vide = sans fin · ensuite, intégrée au taux horaire</small></label><input class="inp sm mono" style="width:90px" placeholder="AAAA-MM" value="${esc(g.nav.to||'')}" onchange="DB.garde.nav.to=this.value.trim();gSave()"></div>`:''}
+${g.nav.mode!=='trajet'?`<div class="prm"><label>Prix de l'abonnement<small>€/mois · Navigo toutes zones 2026 : 90,80 €</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.price}" onchange="DB.garde.nav.price=+this.value||0;gSave()"></div>
+<div class="prm"><label>Verser uniquement sur justificatif<small>le remboursement est légalement conditionné</small></label><select class="inp sm" onchange="DB.garde.nav.requireJustif=this.value==='1';gSave()"><option value="1"${g.nav.requireJustif?' selected':''}>Oui</option><option value="0"${!g.nav.requireJustif?' selected':''}>Non</option></select></div>`:''}
 <div class="prm"><label>Libellé de l'abonnement<small>apparaît sur la fiche</small></label><input class="inp sm" value="${g.nav.label||''}" onchange="DB.garde.nav.label=this.value;gSave()"></div>
-<div class="prm"><label>Mode de calcul<small>auto = R3261-9, recalculé si les horaires changent</small></label><select class="inp sm" onchange="DB.garde.nav.mode=this.value;gSave()"><option value="auto"${g.nav.mode==='auto'?' selected':''}>Auto — R3261-9</option><option value="integral"${g.nav.mode==='integral'?' selected':''}>Quote-part fixe</option><option value="manual"${g.nav.mode==='manual'?' selected':''}>Montant fixe</option></select></div>
+<div class="prm"><label>Mode de calcul<small>auto = R3261-9, recalculé si les horaires changent</small></label><select class="inp sm" onchange="DB.garde.nav.mode=this.value;gSave()"><option value="auto"${g.nav.mode==='auto'?' selected':''}>Auto — R3261-9</option><option value="integral"${g.nav.mode==='integral'?' selected':''}>Quote-part fixe</option><option value="trajet"${g.nav.mode==='trajet'?' selected':''}>Par trajet — jours travaillés × aller-retour</option><option value="manual"${g.nav.mode==='manual'?' selected':''}>Montant fixe</option></select></div>
+${g.nav.mode==='trajet'?`<div class="prm"><label>Prix d'un aller-retour<small>€ · 2 tickets bus-tram 2026 = 4,10 € · Liberté+ = 3,28 €</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.rt}" onchange="DB.garde.nav.rt=+this.value||0;gSave()"></div>
+<div class="prm"><label>Part remboursée<small>% du coût des trajets</small></label><input class="inp sm mono" type="number" step="1" inputmode="numeric" value="${g.nav.rtPct}" onchange="DB.garde.nav.rtPct=+this.value||0;gSave()"></div>
+<div class="prm" style="border:none"><label style="color:var(--gold)">Ce mois<small>${r.nav.base}</small></label><div class="mono" style="text-align:right;font-weight:700;color:var(--gold)">${f$(r.nav.amt)} €</div></div>`:''}
 ${g.nav.mode==='auto'?`<div class="prm" style="border:none"><label style="color:var(--gold)">Part employeur calculée<small>50 % × ${fh(r.wk.s+r.wk.p)} h ÷ 17,5 h</small></label><div class="mono" style="text-align:right;font-weight:700;color:var(--gold)">${fh(r.nav.pct)} %</div></div>`:''}
 ${g.nav.mode==='integral'?`<div class="prm"><label>Votre quote-part<small>% de l'abonnement</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.share}" onchange="DB.garde.nav.share=+this.value||0;gSave()"></div>`:''}
 ${g.nav.mode==='manual'?`<div class="prm"><label>Montant mensuel<small>€</small></label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" value="${g.nav.manual}" onchange="DB.garde.nav.manual=+this.value||0;gSave()"></div>`:''}
@@ -1524,6 +1534,10 @@ if(v===''||v==null)delete o[f];else o[f]=+v;
 if(Object.keys(o).length)DB.garde.cmgReal[k]=o;else delete DB.garde.cmgReal[k];
 if(DB.params&&DB.params.journal)DB.params.journal.push({date:new Date().toISOString().slice(0,10),champ:'cmgReal.'+k+'.'+f,old:old==null?null:old,new:v===''?null:+v,motif:'montant réel constaté (Pajemploi / CAF)'});gSave()}
 function navRef(k,v){if(!DB.garde.nav.ref)DB.garde.nav.ref={};if(v)DB.garde.nav.ref[k]=1;else delete DB.garde.nav.ref[k];gSave()}
+function rateHistSet(i,f,v){const H=DB.garde.rateHist=DB.garde.rateHist||[];const S=H.slice().sort((a,b)=>a.to<b.to?-1:1);const h=S[i];if(!h)return;h[f]=f==='to'?v.trim():(+v||0);gSave()}
+function rateHistDel(i){const H=DB.garde.rateHist||[];const S=H.slice().sort((a,b)=>a.to<b.to?-1:1);const h=S[i];DB.garde.rateHist=H.filter(x=>x!==h);gSave()}
+function rateHistAdd(){const g=DB.garde;const n=new Date();const pv=n.getMonth()===0?(n.getFullYear()-1)+'-12':n.getFullYear()+'-'+String(n.getMonth()).padStart(2,'0');(g.rateHist=g.rateHist||[]).push({to:pv,rate:g.rate,rateShared:g.rateShared});gSave()}
+function navRt(k,f,v){const n=DB.garde.nav;if(!n.rtM)n.rtM={};const o=n.rtM[k]||{};if(v===''||v==null)delete o[f];else o[f]=f==='note'?v:+v;if(Object.keys(o).length)n.rtM[k]=o;else delete n.rtM[k];gSave()}
 function gSel(k){GSEL=(GSEL===k)?null:k;rGarde()}
 function gSet(s,p,r,gap){if(!GSEL)return;s=Math.round((+s||0)*100)/100;p=Math.round((+p||0)*100)/100;r=Math.round((+r||0)*100)/100;DB.garde.hours[GSEL]={s,p};if(r)DB.garde.hours[GSEL].r=r;if(gap&&gap!=='unused')DB.garde.hours[GSEL].gap=gap;['leave','abs','sick','recup','unused'].forEach(x=>{if(DB.garde[x])delete DB.garde[x][GSEL]});save();gResync();GSEL=null;rGarde()}
 function gMark(t){if(!GSEL)return;const g=DB.garde;['sick','recup','unused'].forEach(x=>{if(!g[x])g[x]={}});const maps={leave:g.leave,abs:g.abs,sick:g.sick,recup:g.recup,unused:g.unused};const o=maps[t];
@@ -1543,7 +1557,7 @@ function openFiche(y,m){FY=y;FM=m;document.getElementById('fiche').classList.add
 function closeFiche(){document.getElementById('fiche').classList.remove('on')}
 
 function ficheData(y,m){
-const g=DB.garde;const r=gardeCost(y,m);const L=cpLedger(y,m);const pr=cpPeriod(y,m);
+const g=gAt(y,m);const r=gardeCost(y,m);const L=cpLedger(y,m);const pr=cpPeriod(y,m);
 const nd=new Date(y,m,0).getDate();
 const pl=planFor(gKey(y,m,nd))||g.plans[g.plans.length-1];const wk=pl?planWeekly(pl):{s:0,p:0};
 const hebdo=wk.s+wk.p;const baseFull=(wk.s*g.rate+wk.p*g.rateShared)*52/12;const mens=g.mode==='mensualise'&&!r.partial;const B=[];
@@ -1551,6 +1565,7 @@ const hebdo=wk.s+wk.p;const baseFull=(wk.s*g.rate+wk.p*g.rateShared)*52/12;const
 const pay=[{l:'Salaire net',v:fEur(r.net)}];
 if(g.nav.on){
  if(r.nav.pending>0)pay.push({l:'Remboursement transport',v:'en attente',note:'versé dès réception de votre justificatif d\u2019abonnement'});
+ else if(r.nav.trajet&&r.nav.amt>0){const core=Math.round((r.nav.amt-(r.nav.adj||0))*100)/100;if(core>0)pay.push({l:'Participation à vos trajets',v:fEur(core),note:r.nav.n+' aller'+(r.nav.n>1?'s':'')+'-retour'+(r.nav.n>1?'s':'')+' × '+fEur(r.nav.price)+' × '+fh(r.nav.pct)+' %'});if(r.nav.adj)pay.push({l:(r.nav.adj>0?'Rattrapage transport':'Régularisation transport'),v:(r.nav.adj>0?'+ ':'\u2212 ')+fEur(Math.abs(r.nav.adj)),note:r.nav.note||''})}
  else if(r.nav.amt>0)pay.push({l:'Remboursement transport',v:fEur(r.nav.amt),note:'frais professionnels, non imposables'});}
 pay.push({l:'TOTAL VERSÉ',v:fEur(r.toPay),strong:true,note:isPP(y,m)?'versé par Pajemploi+ après déclaration':'virement du mois'});
 B.push({t:'Ce que vous percevez ce mois',rows:pay});
@@ -2249,6 +2264,7 @@ ponctuels:[{l:'Flux employeur PEE / PERECOI',v:13000,mois:8},{l:'Crédit d\u2019
 function ensureProj(){if(!DB.params)return;if(DB.params.cibleFoyer==null)DB.params.cibleFoyer=400;if(DB.params.virementPrecaution==null)DB.params.virementPrecaution=300;if(DB.params.ccPlancher==null)DB.params.ccPlancher=2500;if(!DB.virement)DB.virement={};if(!DB.params.proj)DB.params.proj=defProj();const d=defProj();Object.keys(d).forEach(k=>{if(DB.params.proj[k]==null)DB.params.proj[k]=d[k]});const P=DB.params.proj;
 if(!P.depPonctuels)P.depPonctuels=[{l:'Vacances de Noël',v:1500,mois:12},{l:'Vacances d\u2019été',v:4500,mois:8}];
 {const n=new Date();const F=fyOf(n.getFullYear(),n.getMonth()+1);P.depPonctuels.forEach(d=>{if(!d.id)d.id='p'+Math.random().toString(36).slice(2,8);if(!d.an)d.an=(+d.mois>=(P.anneeDebut||9))?F.fy:F.fy+1})}
+if(!DB.params.navNov26&&DB.garde&&Math.abs(DB.garde.rate-12)<0.001&&Math.abs(DB.garde.rateShared-10.25)<0.001){const g=DB.garde;(g.rateHist=g.rateHist||[]).push({to:'2026-10',rate:12,rateShared:10.25});g.rate=12.90;g.rateShared=11.15;g.nav.on=true;g.nav.mode='trajet';g.nav.rt=4.10;g.nav.rtPct=50;g.nav.to='2026-10';g.nav.rtM=g.nav.rtM||{};g.nav.rtM['2026-10']=Object.assign({},g.nav.rtM['2026-10']||{},{adj:5.48,note:'rattrapage transport septembre'});g.nav.rtM['2026-09']=Object.assign({},g.nav.rtM['2026-09']||{},{adj:-5.48,note:'versé 12,97 € selon l\u2019ancienne formule, rattrapage en octobre'});DB.params.navNov26=true;DB.params.journal.push({date:'2026-10-21',champ:'garde.rate',old:'12 / 10,25 €/h + indemnité transport',new:'12,90 / 11,15 €/h dès nov. 2026, transport intégré',motif:'accord avec la nounou du 21/10/2026 : 50 % des allers-retours, intégré au taux horaire'});if(typeof GM_CACHE!=='undefined')for(const k in GM_CACHE)delete GM_CACHE[k]}
 if(!DB.params.primeJuin26){const b=(P.ponctuels||[]).find(x=>/bonus|prime/i.test(x.l));if(b){b.l='Prime vacances';b.v=1500;b.mois=6}else P.ponctuels.push({l:'Prime vacances',v:1500,mois:6});DB.params.primeJuin26=true;DB.params.journal.push({date:'2026-10-01',champ:'proj.ponctuels',old:'Bonus 0 (mars)',new:'Prime vacances 1 500 (juin)',motif:'demande du 01/10/2026'});DB.params.journal.push({date:'2026-10-01',champ:'proj.depPonctuels',old:null,new:'Noël 1 500 (déc.) · été 4 500 (août)',motif:'poches vacances — été 2026 observé à ~5 300 € ; à ajuster'})}}
 function fyOf(y,m){const s=DB.params.proj.anneeDebut||9;const fy=m>=s?y:y-1;return{fy,fm:s,ty:s===1?fy:fy+1,tm:s===1?12:s-1,label:s===1?String(fy):fy+'-'+String(fy+1).slice(2)}}
 function fyMonths(fy){const s=DB.params.proj.anneeDebut||9;const out=[];for(let i=0;i<12;i++){const idx=fy*12+s+i;const yy=Math.floor((idx-1)/12),mm=idx-yy*12;out.push({y:yy,m:mm})}return out}
