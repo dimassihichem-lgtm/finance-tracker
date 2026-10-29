@@ -368,7 +368,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v115';const VTAG='cotisations calées sur Pajemploi, CMG du mois courant, texte déclaration';
+const VERSION='v116';const VTAG='bulletin dans la MÀJ mensuelle · bulletin octobre injecté';
 
 function defCh(){return[{l:'Loyer',v:1650},{l:'École',v:250},{l:'Crédit auto',v:225},{l:'Natation',v:109},{l:'Frais divers',v:700}]}
 function defRev(){return[{l:'Allocations familiales',v:0},{l:'CMG micro-crèche',v:0}]}
@@ -656,7 +656,7 @@ const v2w=isV2(y,m);const nx=nM(y,m);WZ.py=v2w?nx.y:y;WZ.pm=v2w?nx.m:m;
 WZ.steps=[{t:'soldes'}];
 im.supports.forEach((s,i)=>{if((s.owner||'moi')!=='cash')WZ.steps.push({t:'sup',i})});
 if(DB.params&&DB.params.proj&&(DB.params.proj.ponctuels||[]).some(p=>/employeur|pee|perco|particip|abond/i.test(p.l)&&+p.mois===m))WZ.steps.push({t:'employeur'});
-WZ.steps.push({t:'contribs'},{t:'revenus'},{t:'charges'},{t:'excep'},{t:'recap'});if(v2w)gOBM(WZ.py,WZ.pm);
+WZ.steps.push({t:'contribs'},{t:'revenus'},{t:'charges'},{t:'excep'});{const bk=ym(y,m);const B=(DB.fp&&DB.fp.fisc&&DB.fp.fisc.bulletins)||{};if(!B[bk]||!B[bk].net)WZ.steps.push({t:'bulletin'})}WZ.steps.push({t:'recap'});if(v2w)gOBM(WZ.py,WZ.pm);
 WZ.on=true;document.getElementById('wiz').classList.add('on');
 document.getElementById('wiz-month').textContent=ML[m]+' '+y;
 wizRender()}
@@ -738,6 +738,13 @@ body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Charges${PL}</div>
 <div id="wz-charges">${wzChargesHtml(cmP)}</div>
 <div class="row" style="margin-top:10px"><input class="inp sm" id="wzch-l" placeholder="Charge"><input class="inp sm mono" id="wzch-v" type="number" inputmode="decimal" placeholder="€" style="width:90px"><button class="btn btn-ghost sm" onclick="wzAddCharge()">+</button></div>`}
 
+else if(st.t==='bulletin'){const bk=ym(WZ.y,WZ.m);const B=DB.fp.fisc.bulletins=DB.fp.fisc.bulletins||{};const b=B[bk]||{};const pvk=ym(pv.y,pv.m);const pb=B[pvk]||{};
+const f=(k,l,w)=>'<div class="prm"><label>'+l+(pb[k]!=null?'<small>'+MS[pv.m]+' : '+f$(pb[k])+'</small>':'')+'</label><input class="inp sm mono" type="number" step="0.01" inputmode="decimal" style="width:'+(w||110)+'px" value="'+(b[k]!=null?b[k]:'')+'" onchange="(DB.fp.fisc.bulletins[\''+bk+'\']=DB.fp.fisc.bulletins[\''+bk+'\']||{})[\''+k+'\']=+this.value||0;save()"></div>';
+body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Bulletin de paie</div>
+<div class="wiz-q">Bulletin de ${ML[WZ.m]} ${WZ.y}</div>
+<div class="wiz-where">📍 Bulletin ADP (dossier Bulletins_Paie) · sert à l'estimation de l'impôt et au suivi des heures sup. Laisse vide si tu ne l'as pas encore, l'étape reviendra le mois prochain.</div>
+${f('brut','Rémunération brute')}${f('ni','Net fiscal (net imposable)')}${f('pas','Prélèvement à la source (€)')}${f('taux','Taux PAS (%)',80)}${f('hs','Heures sup (HS structurel 125 %)')}${f('net','Net à payer (virement)')}${f('netSocial','Montant net social')}
+<div class="wiz-ref">Le cumul « HS/HC exonérées fiscal » est plafonné à ${f$((DB.fp.fisc.bareme||{}).hsPlafond||7500)} € par an : une fois atteint, les heures sup deviennent imposables et le net fiscal monte.</div>`}
 else if(st.t==='excep'){
 body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Exceptionnel${PL}</div>
 <div class="wiz-q">${PLAN?'Dépenses exceptionnelles prévues en '+ML[WZ.pm]+' ?':'Dépenses exceptionnelles ?'}</div>
@@ -2605,6 +2612,7 @@ if(!DB.params.add4){const im=gOIM(2026,10);const pea=im.supports.find(x=>/^pea$/
 const P=DB.fp.fisc.plan;if(!P.some(a=>a.id==='pea')){P.push({id:'pea',l:'PEA rééquilibrage — stop S&P 500, bascule Europe / émergents / Japon',g:'IPS §8',q:'fait',done:true,date:'2026-10-02'});P.push({id:'av',l:'Optimisation coût AV BoursoVie — bascule en gestion libre',g:'IPS §8bis',q:'dernière étape, sans date',done:false})}
 const b10=gBM(2026,10);if(b10&&!b10.cl){const it=b10.ch.find(c=>/internet/i.test(c.l));if(it&&it.v===40)it.v=94}
 if(DB.params.journal)DB.params.journal.push({date:'2026-10-03',champ:'addendum 4 · points 4-7',old:null,new:'PEA 4 lignes (5 593 €) · plan fiscal PEA fait / AV sans date · Internet/Tel 94 € dès octobre · descriptions KPI v2',motif:'addendum n°4 validé'});DB.params.add4=true}
+if(!F.bul1026){F.bulletins=F.bulletins||{};if(!F.bulletins['2026-10']||!F.bulletins['2026-10'].net)F.bulletins['2026-10']={ni:7102.83,pas:468.79,taux:6.6,hs:1041.46,net:6221.57,brut:8333.32,netSocial:6724.96};F.bul1026=true;if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-29',champ:'fisc.bulletins.2026-10',old:null,new:'brut 8 333,32 · net imposable 7 102,83 · PAS 468,79 (6,6 %) · HS 1 041,46 · net 6 221,57',motif:'bulletin ADP période 202610 lu sur le dossier Bulletins_Paie · plafond HS exonérées 7 500 € atteint'})}
 if(!F.restore1003){if(!(+F.conjointRevenu[2026]))F.conjointRevenu[2026]=10500;if(!F.pasPeriodes||F.pasPeriodes.length<2)F.pasPeriodes=[{from:'2026-01',taux:12.2},{from:'2026-02',taux:8.9},{from:'2026-06',taux:6.6}];F.restore1003=true;if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-03',champ:'fisc.conjointRevenu.2026 · fisc.pasPeriodes',old:'perdus lors d\u2019une fusion local/cloud',new:'10 500 € · 12,2 % jan, 8,9 % fév, 6,6 % juin',motif:'restauration des valeurs saisies le 02/10 (export du 02/10 faisant foi)'})}
 if(!F.per[2026]){F.per[2026]={engagement:3000,pas:6.6,note:'IPS §10 — PER gelé à l\u2019engagement 2026 tant que Luxembourg n\u2019est pas tranché'};if(DB.params&&DB.params.journal)DB.params.journal.push({date:'2026-10-02',champ:'fisc.per.2026',old:String(DB.fp.perObj||'—')+' / PAS '+String(DB.fp.pas||'—'),new:'engagement 3 000 € · PAS 6,6 %',motif:'alignement sur l\u2019IPS v1.6 §10 et le taux individualisé déclaré'})}
 if(!F.plan.length)F.plan=[
