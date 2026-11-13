@@ -465,7 +465,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v150';const VTAG='sécurité : l’autotest n’enregistre plus rien, annulation protégée';
+const VERSION='v151';const VTAG='mois automatiques : création, clôture et navigation sans manipulation';
 
 function defCh(){return[{l:'Loyer',v:0},{l:'Frais divers',v:0}]}
 function defRev(){return[]}
@@ -565,7 +565,7 @@ const fa=Object.keys(((a.fp||{}).fisc||{}).bulletins||{}).length,fb=Object.keys(
 return out}
 function fmtRev(c){if(!c)return'?';const d=c._ts?new Date(c._ts):null;return'r'+(+(c._rev)||0)+(c._dev?' · '+c._dev:'')+(d?' · '+d.toLocaleDateString('fr-FR')+' '+d.toTimeString().slice(0,5):'')}
 function cloudRef(){return fdb.collection('data').doc(DID)}
-function applyCloud(c,why){DB=c;DB._dirty=false;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}CLOUD_REV=localRev();syncLog('pull',why+' → '+fmtRev(DB));if(!TESTING)histReset()}
+function applyCloud(c,why){DB=c;DB._dirty=false;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}CLOUD_REV=localRev();syncLog('pull',why+' → '+fmtRev(DB));if(!TESTING){try{autoCreate()}catch(e){}histReset();autoSoon()}}
 function gateShow(txt){const g=document.getElementById('syncgate');if(!g)return;g.style.display='flex';const t=document.getElementById('syncgate-t');if(t&&txt)t.textContent=txt}
 function gateHide(){const g=document.getElementById('syncgate');if(g)g.style.display='none'}
 let LC_TIMER=null,LC_RETRY=null;
@@ -597,12 +597,12 @@ tx.set(cloudRef(),{db:P.db,fmt:P.fmt,minApp:P.minApp,rev:nr,dev,devs,app:APPNUM,
 function conflictAsk(){const c=SYNC_CONFLICT;if(!c)return;const d1=diffSummary(DB,c);const txt='CET APPAREIL : '+fmtRev(DB)+' + modifications non envoyées\nCLOUD : '+fmtRev(c)+'\n\nDifférences (appareil vs cloud) :\n'+(d1.length?d1.map(x=>'• '+x).join('\n'):'• aucune différence visible')+'\n\nUne copie des deux versions est prise avant tout choix.';
 uiChoice('Deux versions différentes',{desc:txt,choices:[{l:'Garder cet appareil (écrase le cloud)',v:'local',cls:'btn-gold'},{l:'Prendre le cloud (abandonne les modifications d\u2019ici)',v:'cloud'}]}).then(ch=>{if(ch==null)return;const keepLocal=ch==='local';const keep=DB;DB=c;backupNow('cloud, avant arbitrage');DB=keep;backupNow('cet appareil, avant arbitrage',()=>{if(keepLocal){syncLog('resolve','appareil gardé');cloudPush(true)}else{syncLog('resolve','cloud pris');applyCloud(c,'arbitrage : cloud pris');SYNC_CONFLICT=null;sss('ok');if(typeof RA==='function')RA()}})})}
 let POSTLOADED=false;
-function postLoad(){SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns();if(POSTLOADED){if(typeof RA==='function')RA();return}POSTLOADED=true;migrateGarde();setTimeout(foldWatch,300);setTimeout(versionCheck,1200);const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
-const HIST=[],REDO=[],HIST_MAX=6;let SNAP_LAST=null,UNDOING=false,TESTING=false;
+function postLoad(){try{autoCreate()}catch(e){}SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns();autoSoon();if(POSTLOADED){if(typeof RA==='function')RA();return}POSTLOADED=true;migrateGarde();setTimeout(foldWatch,300);setTimeout(versionCheck,1200);const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
+const HIST=[],REDO=[],HIST_MAX=6;let SNAP_LAST=null,UNDOING=false,TESTING=false,QUIET=0,AUTO_T=null,AUTO_RUN=false,AUTO_YM='';
 function histPush(){if(UNDOING||TESTING)return;if(SNAP_LAST!=null){HIST.push(SNAP_LAST);if(HIST.length>HIST_MAX)HIST.shift();REDO.length=0}SNAP_LAST=JSON.stringify(DB);histBtns()}
 function histReset(){SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns()}
 // v150 · avant d'annuler ou de rétablir : ce que l'état visé contient en moins par rapport à l'état actuel
-function histRisk(snap){let t;try{t=JSON.parse(snap)}catch(e){return['état illisible']}const out=[];const nb=d=>(d.bm||[]).length,nc=d=>(d.bm||[]).filter(b=>b.cl).length,ni=d=>(d.im||[]).length;
+function histRisk(snap,now){let t;try{t=JSON.parse(snap)}catch(e){return['état illisible']}now=now||new Date();const cur=now.getFullYear()*12+now.getMonth()+1;const past=x=>x.y*12+x.m<cur;const out=[];const nb=d=>(d.bm||[]).filter(past).length,nc=d=>(d.bm||[]).filter(b=>b.cl).length,ni=d=>(d.im||[]).filter(past).length;
 const inv=d=>{try{const L=[...(d.im||[])].sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m)).filter(x=>invOf(x)>0);return L.length?invOf(L[L.length-1]):0}catch(e){return 0}};
 if(nb(t)<nb(DB))out.push((nb(DB)-nb(t))+' mois de budget en moins');if(nc(t)<nc(DB))out.push((nc(DB)-nc(t))+' mois clôturé'+(nc(DB)-nc(t)>1?'s':'')+' en moins');if(ni(t)<ni(DB))out.push((ni(DB)-ni(t))+' mois de placements en moins');
 const a=inv(DB),b=inv(t);if(a>0&&b<a*0.5)out.push('placements : '+fE(Math.round(a))+' → '+fE(Math.round(b)));return out}
@@ -610,12 +610,12 @@ async function histGo(from,to,undoing){if(!from.length){uiAlert(undoing?'Rien à
 if(R.length&&!await uiConfirm((undoing?'Annuler':'Rétablir')+' quand même ?',{desc:'L’état qui serait restauré contient moins de données que l’état actuel : '+R.join(' · ')+'. Il remplacerait aussi la version du cloud.',ok:'Continuer'}))return;
 if(from[from.length-1]!==snap)return;from.pop();to.push(SNAP_LAST);histApply(snap)}
 function histBtns(){const u=document.getElementById('undobtn'),r=document.getElementById('redobtn');if(u){u.style.opacity=HIST.length?1:.35;u.title=HIST.length?'Annuler la dernière modification ('+HIST.length+' disponible'+(HIST.length>1?'s':'')+')':'Rien à annuler'}if(r){r.style.opacity=REDO.length?1:.35;r.title=REDO.length?'Rétablir ('+REDO.length+')':'Rien à rétablir'}}
-function histApply(snap){UNDOING=true;try{const rev=localRev();DB=JSON.parse(snap);DB._rev=rev;ensure();GM_CACHE={};DB._ts=Date.now();DB._dirty=true;try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}SNAP_LAST=JSON.stringify(DB);if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}if(typeof RA==='function')RA()}finally{UNDOING=false;histBtns()}}
+function histApply(snap){UNDOING=true;try{const rev=localRev();DB=JSON.parse(snap);DB._rev=rev;ensure();GM_CACHE={};DB._ts=Date.now();DB._dirty=true;try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}try{autoCreate()}catch(e){}SNAP_LAST=JSON.stringify(DB);if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}if(typeof RA==='function')RA()}finally{UNDOING=false;histBtns()}}
 function undo(){return histGo(HIST,REDO,true)}
 function redo(){return histGo(REDO,HIST,false)}
 let LS_WARNED=false;function lsFail(e){if(LS_WARNED)return;LS_WARNED=true;try{errShow('Enregistrement local impossible sur cet appareil ('+((e&&e.name)||'erreur')+'). Vos modifications ne sont gardées que si la synchronisation cloud passe : exportez une sauvegarde (Plus → Sauvegardes) et libérez de l\u2019espace (captures d\u2019écran dans Invest, navigation privée).')}catch(x){}}
-function save(){if(TESTING){GM_CACHE={};FISC_MEMO={};return} // v150 · autotest : base fictive, rien n'est enregistré
-histPush();GM_CACHE={};FISC_MEMO={};DB._ts=Date.now();DB._dirty=true;DB._dirtyAt=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){lsFail(e)}if(fdb){if(SS_STATE!=='conflict')sss(CLOUD_READ?'dirty':'noread');if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
+function save(){if(TESTING||QUIET){GM_CACHE={};FISC_MEMO={};return} // v150 · autotest : rien n'est enregistré ; v151 · idem pendant une création silencieuse
+histPush();autoSoon();GM_CACHE={};FISC_MEMO={};DB._ts=Date.now();DB._dirty=true;DB._dirtyAt=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){lsFail(e)}if(fdb){if(SS_STATE!=='conflict')sss(CLOUD_READ?'dirty':'noread');if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
 const today=todayKey();let last='';try{last=localStorage.getItem('hft7_bkday')||''}catch(e){}if(CLOUD_READ&&last!==today){try{localStorage.setItem('hft7_bkday',today)}catch(e){}setTimeout(()=>backupNow('quotidienne'),4000)}}}
 function toCloud(c){return JSON.stringify(c)}
 /* ---- lot B : format du document cloud. json1 = texte ; gz1 = gzip + base64 (≈ 4 fois plus petit). Un document illisible n'est JAMAIS traité comme vide. ---- */
@@ -711,7 +711,7 @@ return'<div style="font-size:12px;margin-bottom:4px">Taille du document cloud : 
 '<div class="prm" style="border:none;padding:0 0 8px"><label>Compression du cloud<small>divise la taille par ~4 · à activer quand TOUS tes appareils sont en v133 ou plus (une version plus ancienne ne saurait pas lire)</small></label><select class="inp sm" onchange="cloudGzSet(this.value===\'1\')"><option value="0"'+(on?'':' selected')+'>Non</option><option value="1"'+(on?' selected':'')+(gzOk()?'':' disabled')+'>Oui</option></select></div>'+(old.length&&!on?'<div class="al ala" style="margin-bottom:8px">Encore en version antérieure : '+old.map(esc).join(', ')+'. Ouvre-les une fois en v133 avant d’activer.</div>':'')})()+
 '<div style="font-size:10.5px;color:var(--td);max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px">'+(L.length?L.map(x=>'<div><span class="mono">'+lt(x.t)+'</span> · <b>'+esc(x.ev)+'</b> '+esc(x.msg)+'</div>').join(''):'Aucun événement')+'</div>'}
 const BK_KEEP=15;
-function backupNow(reason,cb){if(!fdb){if(cb)cb('local');return}const c=JSON.parse(JSON.stringify(DB));
+function backupNow(reason,cb){if(TESTING){if(cb)cb('test');return}if(!fdb){if(cb)cb('local');return}const c=JSON.parse(JSON.stringify(DB));
 if(c.im)c.im.forEach(m=>{if(m.supports)m.supports.forEach(s=>{if(s.det)s.det.forEach(d=>{if(d.img)d.img='[local]'})})});
 const id=DID+'_bk_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23)+'_'+Math.random().toString(36).slice(2,6);
 const st0=SS_STATE;packDb(c).then(P=>fdb.collection('data').doc(id).set({db:P.db,fmt:P.fmt,minApp:P.minApp,months:(c.bm||[]).filter(b=>b.cl).length,at:new Date().toISOString(),reason:reason||'manuel',parent:DID})).then(()=>{if(SS_STATE==='saving')sss(st0);backupPrune();if(cb)cb('ok')}).catch(e=>{syncLog('error','sauvegarde : '+(e&&(e.message||e.code)));if(cb)cb('error')})}
@@ -1056,7 +1056,7 @@ body.innerHTML=`<div class="wiz-step-eyebrow">${stepN} · Récapitulatif</div><d
 ${mr&&mr.reelConso!=null?`<div class="wiz-recap"><div class="wiz-recap-line"><span>Salaire + entrées</span><b style="color:var(--up)">${fE(mr.salaire+mr.autres)}</b></div><div class="wiz-recap-line"><span>Consommation</span><b style="color:var(--dn)">−${fE(mr.reelConso)}</b></div><div class="wiz-recap-line"><span>Investi</span><b>−${fE(mr.invest)}</b></div><div class="wiz-recap-line" style="border:none"><span style="font-weight:600">Épargne</span><b style="color:${mr.epargne>=0?'var(--up)':'var(--dn)'}">${fE(mr.epargne)}</b></div></div>
 <div class="wiz-sug"><div class="eyebrow" style="color:var(--gold)">Livrets, d\u2019après le relevé</div><div style="font-size:13px;margin-top:4px">versé ${fE(mr.imp?mr.imp.livretOut||0:0)} · retiré ${fE(mr.imp?mr.imp.livretIn||0:0)}${BAL?' · balayage du '+balParams().jour+' : '+fE(BAL.amt)+(BAL.frozen?' (fait)':BAL.est?' (estimé)':' (d\u2019après le solde)'):''}</div></div>`:'<div class="al ala">Réel incomplet : '+(mr?mr.missing.join(', '):'')+'</div>'}
 ${(WZ.py!==WZ.y||WZ.pm!==WZ.m)?'<div style="font-size:11.5px;color:var(--tm);margin-top:10px">Prévisionnel de '+ML[WZ.pm]+' préparé : '+gOBP().ch.length+' charges, '+(gOBP().rev||[]).length+' aides, '+gOBP().ex.length+' exceptionnel'+(gOBP().ex.length>1?'s':'')+'.</div>':''}
-<button class="btn ${ok?'btn-gold':'btn-ghost'} wide" style="margin-top:16px" onclick="if(closeMonth(WZ.y,WZ.m)){gOIM(WZ.y,WZ.m).cl=true;save();wizClose()}">${ok?'✓ Clôturer le mois':'Clôturer quand même'}</button>`}
+${wizEndHtml()}`}
 else if(st.t==='recap'){
 const tCh=cm.ch.reduce((s,c)=>s+c.v,0);const tEx=cm.ex.reduce((s,d)=>s+d.v,0);
 const tRev=(cm.rev||[]).reduce((s,c)=>s+c.v,0);
@@ -1094,14 +1094,6 @@ function wzAddCharge(){const l=document.getElementById('wzch-l').value.trim();if
 function wzExcepHtml(cm){return cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:14px">'+esc(d.l)+'</span><span class="mono" style="color:var(--dn);font-weight:600">'+f$(d.v)+' €</span><span class="xdel" onclick="gOBP().ex.splice('+i+',1);save();wizRender()">×</span></div>').join('')||'<div class="empty">Rien pour l\u2019instant — c\u2019est bon signe</div>'}
 function wzAddExcep(){const l=document.getElementById('wze-l').value.trim();const v=+document.getElementById('wze-v').value;if(!l||!v)return;gOBP().ex.push({l,v});save();wizRender()}
 /* ================= BUDGET ================= */
-function monthTools(prefix,y,m,onCreate,onDel,onPurge){
-return `<div class="mtools">
-<select class="inp sm" style="width:auto" id="${prefix}AY" onchange="${onCreate}">${YRS.map(yy=>'<option'+(yy===y?' selected':'')+'>'+yy+'</option>').join('')}</select>
-<select class="inp sm" style="width:auto" id="${prefix}AM" onchange="${onCreate}">${[1,2,3,4,5,6,7,8,9,10,11,12].map(mm=>'<option value="'+mm+'"'+(mm===m?' selected':'')+'>'+MS[mm]+'</option>').join('')}</select>
-<span style="flex:1"></span>
-<details style="position:relative"><summary style="list-style:none;cursor:pointer;font-size:16px;color:var(--td);padding:2px 8px">⋯</summary><div style="position:absolute;right:0;top:26px;background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:6px;z-index:5;min-width:170px"><button class="btn btn-danger xs wide" style="margin-bottom:4px" onclick="${onDel}">Supprimer ce mois</button><button class="btn btn-danger xs wide" onclick="${onPurge}">Purger les anciens…</button></div></details>
-</div>`}
-
 function rBudget(){if(!bY){const n=new Date();bY=n.getFullYear();bM=n.getMonth()+1}
 const el=document.getElementById('pg-budget');
 const cm=gBM(bY,bM)||defBM(bY,bM);const exists=!!gBM(bY,bM);if(exists)syncMonth(cm);
@@ -1124,10 +1116,9 @@ el.innerHTML=`
 <div class="pagetitle">Budget</div>
 <div class="mnav">
 <button class="arrbtn" onclick="navB(-1)" ${hasPrev?'':'disabled'}>◀</button>
-<div class="mt"><b>${ML[bM]} ${bY}</b><div>${!exists?'⚠ non créé — utiliser + Créer':cm.cl?'✓ Clôturé':'En cours'}</div></div>
-<button class="arrbtn" onclick="navB(1)" ${hasNext?'':'disabled'}>▶</button>
+<div class="mt" style="cursor:pointer" title="Aller à un autre mois" onclick="monthPick('b')"><b>${ML[bM]} ${bY}</b><div>${!exists?'non créé':cm.cl?'✓ Clôturé'+(cm.closedAuto?' automatiquement':''):monthPast(bY,bM)&&isV2(bY,bM)?'À compléter':'En cours'}</div></div>
+<button class="arrbtn" onclick="navB(1)" ${hasNext||monthNextOk('b',bY,bM)?'':'disabled'}>▶</button>
 </div>
-${monthTools('b',bY,bM,"var y=+document.getElementById('bAY').value,m=+document.getElementById('bAM').value;gOBM(y,m);bY=y;bM=m;rBudget()","delBM()","bulkDelBM()")}
 ${exists&&isV2(bY,bM)?'<div class="segtabs" style="margin-bottom:12px"><button class="'+(BTAB==='reel'?'on':'')+'" onclick="BTAB=\'reel\';rBudget()">Réel</button><button class="'+(BTAB==='prev'?'on':'')+'" onclick="BTAB=\'prev\';rBudget()">Prévisionnel</button></div>':''}
 ${exists&&(BTAB==='reel'||!isV2(bY,bM))?budgetAnswer(bY,bM):''}
 ${exists?completeBanner(bY,bM):''}
@@ -1202,7 +1193,7 @@ ${cm.ex.map((d,i)=>'<div class="list-item"><span style="flex:1;font-size:13.5px"
 <div class="card-b"><textarea class="note-ta" style="min-height:70px" onchange="gOBM(bY,bM).nt=this.value;save()">${esc(cm.nt||'')}</textarea></div></div>
 
 </div></div>
-<button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="closeMonth(bY,bM);rBudget()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[bM]}</button>
+${closeBar('b',bY,bM)}
 ${cm.cl&&isV2(bY,bM)?'<div style="font-size:10.5px;color:var(--td);margin:-8px 0 14px;text-align:center">clos le '+(cm.closedAt||'—')+' · paramètres v'+(cm.paramsVersion||1)+(cm.regime?' · '+esc(cm.regime):'')+(cm.reconst?' · reconstitué':'')+'</div>':''}
 
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--cyan)"></span>Historique du compte</div>
@@ -1217,7 +1208,7 @@ ${cm.cl&&isV2(bY,bM)?'<div style="font-size:10.5px;color:var(--td);margin:-8px 0
 setTimeout(rBC,60)}
 function rBC(){const all=sBM().filter(d=>(d.sav>0||d.sap>0)&&(d.y*12+d.m)>=(bCf.fy*12+bCf.fm)&&(d.y*12+d.m)<=(bCf.ty*12+bCf.tm));
 mkC('ch-bh',{type:'line',data:{labels:all.map(d=>mLbl(d.y,d.m)),datasets:[{data:all.map(d=>kE(d.sav)),borderColor:'#4FD1E0',borderWidth:2.5,pointRadius:2.5,tension:.35,fill:true,backgroundColor:'rgba(79,209,224,.07)'}]},options:{...NOLEG,scales:AX}})}
-function navB(d){const t=d>0?nextBM(bY,bM):prevBM(bY,bM);if(t){bY=t.y;bM=t.m;rBudget()}}
+function navB(d){const t=d>0?nextBM(bY,bM):prevBM(bY,bM);if(t){bY=t.y;bM=t.m;rBudget();return}if(d>0&&monthNextOk('b',bY,bM)){const nx=nM(bY,bM);gOBM(nx.y,nx.m);bY=nx.y;bM=nx.m;rBudget()}}
 async function delBM(){if(!gBM(bY,bM))return;if(!await uiC('Supprimer '+ML[bM]+' '+bY+' du budget ?'))return;
 DB.bm=DB.bm.filter(x=>!(x.y===bY&&x.m===bM));save();
 const s=sBM();if(s.length){bY=s[s.length-1].y;bM=s[s.length-1].m}rBudget()}
@@ -1368,10 +1359,9 @@ el.innerHTML=`
 <div class="pagetitle">Investissements</div>
 <div class="mnav">
 <button class="arrbtn" onclick="navI(-1)" ${hasPrev?'':'disabled'}>◀</button>
-<div class="mt"><b>${ML[iM]} ${iY}</b><div>${!exists?'⚠ non créé':cm.cl?'✓ Clôturé':'En cours'}</div></div>
-<button class="arrbtn" onclick="navI(1)" ${hasNext?'':'disabled'}>▶</button>
+<div class="mt" style="cursor:pointer" title="Aller à un autre mois" onclick="monthPick('i')"><b>${ML[iM]} ${iY}</b><div>${!exists?'non créé':cm.cl?'✓ Clôturé':'En cours'}</div></div>
+<button class="arrbtn" onclick="navI(1)" ${hasNext||monthNextOk('i',iY,iM)?'':'disabled'}>▶</button>
 </div>
-${monthTools('i',iY,iM,"var y=+document.getElementById('iAY').value,m=+document.getElementById('iAM').value;gOIM(y,m);iY=y;iM=m;rInvest()","delIM2()","bulkDelIM()")}
 
 <div class="card"><div class="card-b" style="padding-top:16px">
 <div class="eyebrow">Total investi${ref?' · fin '+ML[ref.m]+' '+ref.y:''}</div>
@@ -1426,13 +1416,13 @@ ${cm.contribs.map((c,i)=>'<div class="list-item"><input class="inp sm" style="fl
 <div class="row" style="margin-top:9px"><input class="inp sm" id="nic-l" placeholder="Support"><input class="inp sm mono" id="nic-v" type="number" inputmode="decimal" placeholder="€" style="width:82px"><button class="btn btn-ghost sm" onclick="var l=document.getElementById('nic-l').value.trim();if(!l)return;gOIM(iY,iM).contribs.push({l,v:+document.getElementById('nic-v').value||0});save();rInvest()">+</button></div>
 </div></div>
 
-<button class="btn ${cm.cl?'btn-ghost':'btn-gold'} wide" style="margin-bottom:14px" onclick="closeMonth(iY,iM);rInvest()">${cm.cl?'🔓 Rouvrir le mois':'✓ Clôturer '+MS[iM]}</button>`;
+${closeBar('i',iY,iM)}`;
 setTimeout(rIC,60)}
 function rIC(){let raw=invMonths();if(INV_V.per!=='all')raw=raw.slice(-(+INV_V.per));if(!raw.length)return;const labels=raw.map(d=>mLbl(d.y,d.m));
 if(INV_V.mode==='env'){const names=[...new Set(raw.flatMap(m=>m.supports.filter(s=>(s.owner||'moi')!=='cash'&&!/livret|ldds/i.test(s.n)).map(s=>s.n)))];
 mkC('ch-inv',{type:'line',data:{labels,datasets:names.map((n,i)=>({label:n,data:raw.map(m=>{const s=m.supports.find(x=>x.n===n);return s&&s.v?s.v:null}),borderColor:COLORS[i%COLORS.length],backgroundColor:'transparent',tension:.32,pointRadius:2,borderWidth:2,spanGaps:true}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:9.5},padding:8}}},scales:AX}});return}
 mkC('ch-inv',{type:'line',data:{labels,datasets:[{label:'Total investi',data:raw.map(m=>Math.round(invOf(m))),borderColor:ACC(),borderWidth:2.5,pointRadius:2.5,pointBackgroundColor:ACC(),tension:.35,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,160);g.addColorStop(0,ACCA(.28));g.addColorStop(1,ACCA(0));return g}}]},options:{...NOLEG,scales:AX}})}
-function navI(d){const t=d>0?nextIM(iY,iM):prevIM(iY,iM);if(t){iY=t.y;iM=t.m;rInvest()}}
+function navI(d){const t=d>0?nextIM(iY,iM):prevIM(iY,iM);if(t){iY=t.y;iM=t.m;rInvest();return}if(d>0&&monthNextOk('i',iY,iM)){const nx=nM(iY,iM);gOIM(nx.y,nx.m);iY=nx.y;iM=nx.m;rInvest()}}
 async function delIM2(){if(!gIM(iY,iM))return;if(!await uiC('Supprimer '+ML[iM]+' '+iY+' ?'))return;
 DB.im=DB.im.filter(x=>!(x.y===iY&&x.m===iM));save();
 const s=sIM();if(s.length){iY=s[s.length-1].y;iM=s[s.length-1].m}rInvest()}
@@ -2428,9 +2418,100 @@ if(!IMP_STATE.months.length){IMP_STATE=null;if(IMP_RETURN&&IMP_RETURN.y===y&&IMP
 function readCsvFile(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>importCsvText(e.target.result);r.readAsText(f,'UTF-8')}
 /* ---- clôture v2 ---- */
 function canClose(y,m){if(!isV2(y,m))return{ok:true,missing:[]};const mr=monthReal(y,m);if(!mr)return{ok:false,missing:['mois inexistant']};return{ok:mr.complete,missing:mr.missing}}
-function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){d.cl=false;const im=gIM(y,m);if(im)im.cl=false;save();return true}
+function closeMonth(y,m){const c=canClose(y,m);const d=gOBM(y,m);if(d.cl){monthReopen(y,m);return true}
 if(!c.ok){uiAlert('Impossible de clôturer '+ML[m]+' : '+c.missing.join(', '));return false}
-d.cl=true;d.closedAt=todayKey();d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;gOIM(y,m).cl=true;const nx=nM(y,m);gOBM(nx.y,nx.m);gOIM(nx.y,nx.m);save();backupNow('clôture '+ML[m]+' '+y);return true}
+monthCloseDo(y,m,false);save();backupNow('clôture '+ML[m]+' '+y);return true}
+
+/* ================= MOIS AUTOMATIQUES (v151) =================
+   Le mois en cours existe toujours ; un mois passé se clôture seul dès qu'il est complet ; l'accueil dit ce qui manque. */
+function quietly(fn){QUIET++;try{return fn()}finally{QUIET--}}
+function monthPast(y,m,now){now=now||new Date();return y*12+m<now.getFullYear()*12+now.getMonth()+1}
+function dayKeyOf(d){return gKey(d.getFullYear(),d.getMonth()+1,d.getDate())}
+// clôture d'un mois (manuelle ou automatique) : mêmes effets qu'avant la v151 ; l'appelant enregistre
+function monthCloseDo(y,m,auto,now,forced){const d=gBM(y,m)||quietly(()=>gOBM(y,m));d.cl=true;d.closedAt=dayKeyOf(now||new Date());d.paramsVersion=DB.params.version||1;d.regime=(regimeFor(y,m)||{}).label||null;if(auto)d.closedAuto=true;else delete d.closedAuto;if(forced)d.closedForced=true;else delete d.closedForced;delete d.noAuto;
+if(forced){const im=gIM(y,m);if(im)im.cl=true} // clôture forcée : rien n'est créé autour du mois
+else quietly(()=>{gOIM(y,m).cl=true;const nx=nM(y,m);gOBM(nx.y,nx.m);gOIM(nx.y,nx.m)});
+if(auto){try{DB.params.journal.push({date:d.closedAt,champ:'clôture '+ym(y,m),old:'ouvert',new:'clos',motif:'clôture automatique : mois complet'})}catch(e){}}}
+// réouverture : un mois rouvert à la main ne se reclôture pas tout seul
+function monthReopen(y,m){const d=gBM(y,m);if(!d)return;d.cl=false;delete d.closedAuto;delete d.closedForced;if(isV2(y,m))d.noAuto=todayKey();const im=gIM(y,m);if(im)im.cl=false;save()}
+// clôture forcée : le mois est fermé tel quel et n'est plus réclamé (partie pure, testée) ; l'appelant enregistre
+function monthForceDo(y,m,now){const c=autoCloseCheck(y,m,now);const why=c.missing.concat(c.strict);monthCloseDo(y,m,false,now,true);try{DB.params.journal.push({date:dayKeyOf(now||new Date()),champ:'clôture '+ym(y,m),old:'ouvert',new:'clos',motif:'clôture forcée'+(why.length?' : il manquait '+why.join(', '):'')})}catch(e){}return why}
+async function monthForce(y,m){const b=gBM(y,m);if(!b||b.cl)return;const c=autoCloseCheck(y,m);const why=c.missing.concat(c.strict);
+if(!await uiConfirm('Clôturer '+ML[m]+' '+y+' sans compléter ?',{desc:(why.length?'Il manque : '+why.join(' · ')+'. ':'')+'Le mois est fermé tel quel et ne sera plus réclamé. Tu peux le rouvrir à tout moment.',ok:'Clôturer quand même'}))return;
+monthForceDo(y,m);save();backupNow('clôture forcée '+ML[m]+' '+y);if(typeof RA==='function')RA()}
+async function monthForceBulk(){const now=new Date();const L=sBM().filter(b=>isV2(b.y,b.m)&&!b.cl&&monthPast(b.y,b.m,now));if(!L.length){uiAlert('Aucun mois passé n’est ouvert : rien à clôturer.');return}const lab=b=>ML[b.m]+' '+b.y;
+const v=await uiForm('Clôturer les anciens mois sans les compléter',{desc:L.length+' mois passé'+(L.length>1?'s':'')+' encore ouvert'+(L.length>1?'s':'')+' : '+L.map(lab).join(', ')+'.',fields:[{k:'m',l:'Clôturer tous ceux jusqu’à (inclus)',type:'select',options:L.map(lab).reverse(),value:lab(L[Math.max(0,L.length-2)])}],ok:'Continuer'});if(!v)return;
+const i=L.findIndex(b=>lab(b)===v.m);if(i<0)return;const T=L.slice(0,i+1);
+if(!await uiConfirm('Clôturer '+T.length+' mois sans les compléter ?',{desc:T.map(lab).join(', ')+'. Ils sont fermés tels quels et ne seront plus réclamés. Tu peux les rouvrir un par un.',ok:'Clôturer'}))return;
+T.forEach(b=>monthForceDo(b.y,b.m,now));save();backupNow('clôture forcée de '+T.length+' mois');rMore()}
+// le mois en cours est créé en mémoire, sans enregistrement : il partira avec la première vraie saisie (aucun envoi au cloud, aucun conflit possible)
+function autoCreate(now){now=now||new Date();const y=now.getFullYear(),m=now.getMonth()+1;if(!(DB.bm||[]).length||!isV2(y,m))return false;let made=false;
+quietly(()=>{if(!gBM(y,m)){gOBM(y,m);made=true}if((DB.im||[]).length&&!gIM(y,m)){gOIM(y,m);made=true}});if(made)GM_CACHE={};return made}
+// ce qui empêche la clôture automatique : les manques habituels (missing) + cinq contrôles propres à l'automatique (strict)
+function autoCloseCheck(y,m,now){const out={ok:false,complete:false,missing:[],strict:[]};if(!isV2(y,m))return out;const b=gBM(y,m);const mr=b?monthReal(y,m):null;if(!mr){out.missing=['mois inexistant'];return out}
+out.complete=!!mr.complete;out.missing=mr.missing.slice();const S=out.strict;const imp=(b.imp&&b.imp.done)?b.imp:null;
+if(imp){const end=dayKeyOf(new Date(y,m,0));const lim=dayKeyOf(new Date(y,m,-3));const last=imp.ccEndDate||(imp.lines||[]).map(l=>l.d).sort().pop()||'';const at=String(imp.at||'').slice(0,10);
+if(last&&last<lim&&!(at&&at>end))S.push('relevé importé jusqu’au '+frD(last)+' seulement, à ré-importer en entier');
+const nq=(imp.lines||[]).filter(l=>needsWho(l)||needsDest(l)).length;if(nq)S.push(nq+' ligne'+(nq>1?'s':'')+' à qualifier')}
+if(mr.recon!=null&&mr.reelConso&&Math.abs(mr.recon)/Math.abs(mr.reelConso)>0.02)S.push('écart de contrôle relevé / soldes de '+f$(Math.round(mr.recon))+' €');
+{const pv=pM(y,m);const pb=gBM(pv.y,pv.m);const pc=(pb&&pb.cash)||{};const c=b.cash||{};const N={cc:'compte courant',la:'Livret A',ldds:'LDDS'};const miss=['cc','la','ldds'].filter(k=>pc[k]!=null&&c[k]==null);if(b.cashFin!=null&&miss.length)S.push('solde à saisir : '+miss.map(k=>N[k]).join(', '))}
+{const im=gIM(y,m);const L=sIM().filter(d=>d.y*12+d.m<y*12+m&&invOf(d)>0);const pv=L.length?L[L.length-1]:null;
+if(pv){const zero=pv.supports.filter(s=>(s.owner||'moi')!=='cash'&&+s.v>0).filter(s=>{const c=im&&im.supports.find(x=>x.n===s.n);return !c||!(+c.v>0)});if(zero.length)S.push('valeur des placements à saisir ('+zero.map(s=>s.n).join(', ')+')')}}
+out.ok=out.complete&&!S.length&&monthPast(y,m,now)&&!b.cl&&!b.noAuto;return out}
+// clôture automatique des mois passés complets (partie pure, testée) ; l'appelant enregistre
+function autoCloseRun(now){now=now||new Date();const done=[];sBM().filter(b=>isV2(b.y,b.m)&&!b.cl&&!b.noAuto&&monthPast(b.y,b.m,now)).forEach(b=>{if(autoCloseCheck(b.y,b.m,now).ok){monthCloseDo(b.y,b.m,true,now);done.push({y:b.y,m:b.m})}});return done}
+function autoBusy(){try{if(WZ&&WZ.on)return true;const sh=document.getElementById('sheet');if(sh&&sh.classList.contains('on'))return true;const a=document.activeElement;return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}catch(e){return false}}
+function autoSoon(ms){if(TESTING||UNDOING)return;if(AUTO_T)clearTimeout(AUTO_T);AUTO_T=setTimeout(autoTick,ms||3000)}
+function autoTick(){AUTO_T=null;if(TESTING||AUTO_RUN)return;AUTO_RUN=true;let ch=false;try{const n=new Date();const k=ym(n.getFullYear(),n.getMonth()+1);
+if(AUTO_YM&&AUTO_YM!==k){bY=0;iY=0;ch=true}AUTO_YM=k; // changement de mois, application restée ouverte : les pages repartent sur le nouveau mois
+if(autoCreate(n)){ch=true;if(!HIST.length)SNAP_LAST=JSON.stringify(DB)}
+if(SYNC_CONFLICT||CLOUD_BLOCK||(fdb&&!CLOUD_READ)){/* cloud pas lu ou conflit en cours : aucune clôture automatique */}
+else if(autoBusy()){autoSoon()}
+else{const C=autoCloseRun(n);if(C.length){ch=true;save();backupNow('clôture automatique '+C.map(x=>MS[x.m]+' '+x.y).join(', '));syncLog('auto','clôture automatique : '+C.map(x=>MS[x.m]+' '+x.y).join(', '))}}
+}catch(e){try{syncLog('error','mois automatiques : '+(e&&e.message||e))}catch(x){}}finally{AUTO_RUN=false}
+if(ch&&typeof RA==='function'){try{if(document.getElementById('app').style.display==='block')RA()}catch(e){}}}
+try{document.addEventListener('visibilitychange',()=>{if(!document.hidden)autoSoon(1500)});setInterval(()=>autoSoon(1500),600000)}catch(e){}
+// accueil : une ligne par mois passé non clôturé, avec ce qui manque ; plus les clôtures automatiques des 7 derniers jours
+function monthFixGo(y,m,c){const f=String(c.missing[0]||c.strict[0]||'');const pv=pM(y,m);
+if(/import|non reconnu|relevé/i.test(f))return"PG='more';SUB='import';go('more');SUB='import';rMore()";
+if(/qualifier/i.test(f))return"PO_M='"+ym(y,m)+"';PO_TODO=true;PG='more';SUB='poches';go('more');SUB='poches';rMore()";
+if(/écart/i.test(f))return"bY="+y+";bM="+m+";BTAB='reel';go('budget')";
+if(/^solde fin (?!de mois)/i.test(f))return"wizStartFor("+pv.y+","+pv.m+")";
+return"wizStartFor("+y+","+m+")"}
+function monthTodos(now){now=now||new Date();const out=[];const lab=b=>ML[b.m]+(b.y!==now.getFullYear()?' '+b.y:'');const toB=b=>"bY="+b.y+";bM="+b.m+";go('budget')";
+sBM().filter(b=>isV2(b.y,b.m)&&!b.cl&&monthPast(b.y,b.m,now)).slice(-3).forEach(b=>{const c=autoCloseCheck(b.y,b.m,now);const why=c.missing.concat(c.strict);
+if(!why.length){if(b.noAuto)out.push({t:'Reclôturer '+lab(b),s:'rouvert le '+frD(b.noAuto)+' · complet',go:toB(b),k:'warn'});return}
+const pvm=pM(now.getFullYear(),now.getMonth()+1);const isPv=b.y===pvm.y&&b.m===pvm.m;
+out.push({t:'Compléter '+lab(b),s:'manque : '+why.join(' · ')+(isPv?'':' — ou clôturer sans compléter'),go:isPv?monthFixGo(b.y,b.m,c):"bY="+b.y+";bM="+b.m+";BTAB='reel';go('budget')",k:'warn'})});
+const d7=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7);const lim=dayKeyOf(d7);
+sBM().filter(b=>b.cl&&b.closedAuto&&b.closedAt&&b.closedAt>=lim).slice(-3).forEach(b=>out.push({t:lab(b)+' clôturé automatiquement',s:'le '+frD(b.closedAt)+' · toucher pour vérifier ou rouvrir',go:toB(b),k:'ok'}));return out}
+// bas de page Budget / Invest : état de clôture, et le seul geste encore utile
+function closeBar(kind,y,m){const b=gBM(y,m);const im=gIM(y,m);const re=kind==='b'?'rBudget()':'rInvest()';const btn=(cls,txt)=>'<button class="btn '+cls+' wide" style="margin-bottom:14px" onclick="closeMonth('+y+','+m+');'+re+'">'+txt+'</button>';
+const note=(cls,txt)=>'<div class="al '+cls+'" style="margin-bottom:10px;font-size:12px;line-height:1.5">'+txt+'</div>';
+if(!b)return(kind==='i'&&im)?'':'';if(b.cl)return btn('btn-ghost','🔓 Rouvrir le mois');if(!isV2(y,m))return btn('btn-gold','✓ Clôturer '+MS[m]);
+if(!monthPast(y,m))return note('alb','Mois en cours. Il se clôturera tout seul une fois terminé et complet.');
+const c=autoCloseCheck(y,m);const why=c.missing.concat(c.strict);
+const fbtn=txt=>'<button class="btn btn-ghost wide" style="margin-bottom:14px" onclick="monthForce('+y+','+m+')">'+txt+'</button>';
+if(!c.complete)return note('ala','<b>'+ML[m]+' se clôturera tout seul une fois complet.</b> Il manque : '+why.join(' · ')+'.')+fbtn('Clôturer sans compléter');
+if(c.strict.length)return note('ala','<b>Pas de clôture automatique :</b> '+c.strict.join(' · ')+'.')+fbtn('Clôturer quand même · '+MS[m]);
+if(b.noAuto)return note('alb','Rouvert le '+frD(b.noAuto)+' : ce mois ne se reclôture pas tout seul.')+btn('btn-gold','✓ Reclôturer '+MS[m]);
+return note('alg','✓ Complet : la clôture se fait toute seule dans quelques secondes.')}
+function wizEndHtml(){const y=WZ.y,m=WZ.m;const b=gBM(y,m);let msg;if(b&&b.cl)msg='✓ '+ML[m]+' est clôturé.';else if(!monthPast(y,m))msg='Mois en cours : il se clôturera tout seul une fois terminé et complet.';
+else{const c=autoCloseCheck(y,m);const why=c.missing.concat(c.strict);msg=why.length?'Il manque : '+why.join(' · ')+'. '+ML[m]+' se clôturera tout seul une fois complété.':(b&&b.noAuto?ML[m]+' a été rouvert : reclôture-le depuis Budget.':'✓ Tout est complet : '+ML[m]+' se clôture tout seul à la fermeture de l’assistant.')}
+return'<div class="wiz-ref" style="line-height:1.5;margin-top:14px">'+msg+'</div><button class="btn btn-gold wide" style="margin-top:12px" onclick="wizClose()">Terminer</button>'}
+// navigation : ◀ ▶ entre les mois existants ; ▶ ouvre aussi le mois suivant (Budget : jusqu'au mois qui suit le mois en cours)
+function monthNextOk(kind,y,m,now){now=now||new Date();return y*12+m<now.getFullYear()*12+now.getMonth()+(kind==='b'?2:1)}
+async function monthPick(kind){const L=(kind==='b'?sBM():sIM()).slice().reverse();if(L.length<2)return;const lab=d=>ML[d.m]+' '+d.y;const cur=kind==='b'?{y:bY,m:bM}:{y:iY,m:iM};
+const v=await uiForm('Aller à un mois',{fields:[{k:'m',l:'Mois',type:'select',options:L.map(lab),value:lab(cur)}],ok:'Ouvrir'});if(!v)return;const t=L.find(d=>lab(d)===v.m);if(!t)return;if(kind==='b'){bY=t.y;bM=t.m;rBudget()}else{iY=t.y;iM=t.m;rInvest()}}
+// Réglages : les cas rares (créer un mois ancien, supprimer, purger)
+async function monthAdmin(act){const n=new Date();const T={create:'Créer un mois',del:'Supprimer un mois',purge:'Purger les anciens mois'}[act];
+const v=await uiForm(T,{desc:act==='create'?'Utile seulement pour un mois ancien : le mois en cours se crée tout seul.':act==='del'?'Le mois choisi est effacé (une confirmation suit).':'Supprime tous les mois avant une date (une saisie suit).',fields:[{k:'k',l:'Où',type:'select',options:['Budget','Placements'],value:'Budget'}].concat(act==='purge'?[]:[{k:'m',l:'Mois',type:'month',value:ym(n.getFullYear(),n.getMonth()+1)}]),ok:'Continuer'});if(!v)return;const B=v.k==='Budget';
+if(act==='purge'){if(B)await bulkDelBM();else await bulkDelIM();rMore();return}
+const mm=/^(\d{4})-(\d{2})$/.exec(v.m||'');if(!mm){uiAlert('Mois non reconnu.');return}const y=+mm[1],m=+mm[2];
+if(act==='create'){if(B)gOBM(y,m);else gOIM(y,m);uiAlert(ML[m]+' '+y+' est créé.')}
+else if(B){if(!gBM(y,m)){uiAlert('Ce mois n’existe pas dans le budget.');return}bY=y;bM=m;await delBM()}
+else{if(!gIM(y,m)){uiAlert('Ce mois n’existe pas dans les placements.');return}iY=y;iM=m;await delIM2()}
+rMore()}
 
 /* ---- UI Réel v2 ---- */
 function fS(n){return (n<0?'−':'')+f$(Math.round(Math.abs(n)))+' €'}
@@ -2440,8 +2521,9 @@ return'<div class="al alb" style="margin-bottom:10px">📋 Déclaration Pajemplo
 function completeBanner(y,m){if(!isV2(y,m))return'';const mr=monthReal(y,m);if(!mr)return'';const b=gBM(y,m);
 if(b.cl){let h='';if(mr.warn.length)h+='<div class="al" style="margin-bottom:10px;background:var(--bg2);border-color:var(--line2);color:var(--tm)">Mois clos · ⚠ '+mr.warn.join(' · ')+'<br><span style="font-size:10.5px;color:var(--td)">À corriger : rouvrir le mois, ajuster, refermer. Le solde de fin de mois sert de point de départ au mois suivant.</span></div>';
 if(mr.info.length)h+='<div class="al alb" style="margin-bottom:10px">Mois clos · '+mr.info.join(' · ')+'<br><span style="font-size:10.5px;color:var(--td)">Information, rien à corriger.</span></div>';return h}
-if(mr.complete)return'<div class="al alg" style="margin-bottom:10px">✓ '+ML[m]+' est complet — prêt à clôturer.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+(mr.info.length?'<br>ℹ '+mr.info.join(' · '):'')+'</div>';
-return'<div class="al ala" style="margin-bottom:10px"><b>'+ML[m]+' '+y+' — manque :</b> '+mr.missing.join(' · ')+'.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+' <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="PG=\'more\';SUB=\'import\';go(\'more\');SUB=\'import\';rMore()">Importer →</span></div>'}
+if(mr.complete){const ac=autoCloseCheck(y,m);if(ac.strict.length)return'<div class="al ala" style="margin-bottom:10px"><b>'+ML[m]+' '+y+' — pas de clôture automatique :</b> '+ac.strict.join(' · ')+'.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+'</div>'}
+if(mr.complete)return'<div class="al alg" style="margin-bottom:10px">✓ '+ML[m]+' est complet'+(monthPast(y,m)?(b.noAuto?' — rouvert, à reclôturer.':' — il se clôture tout seul.'):' — il se clôturera tout seul une fois le mois terminé.')+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+(mr.info.length?'<br>ℹ '+mr.info.join(' · '):'')+'</div>';
+return'<div class="al ala" style="margin-bottom:10px"><b>'+ML[m]+' '+y+' — manque :</b> '+mr.missing.join(' · ')+'.'+(mr.warn.length?'<br>⚠ '+mr.warn.join(' · '):'')+' <span style="color:var(--gold);cursor:pointer;text-decoration:underline" onclick="PG=\'more\';SUB=\'import\';go(\'more\');SUB=\'import\';rMore()">Importer →</span>'+(monthPast(y,m)?' · <span style="color:var(--tm);cursor:pointer;text-decoration:underline" onclick="monthForce('+y+','+m+')">Clôturer sans compléter</span>':'')+'</div>'}
 const FX_SYN={loyer:['loyer','logement'],credit:['credit','pret','auto'],nounou:['nounou','garde','pajemploi'],ecole:['ecole','scolarite','cantine','education'],creche:['creche'],electricite:['energie','electricite','edf'],gaz:['energie','gaz'],energie:['energie','electricite'],internet:['telecom','internet','box'],tel:['telecom','mobile'],telephone:['telecom','mobile'],assurance:['assurance'],auto:['auto'],mutuelle:['mutuelle','sante'],natation:['sport'],foot:['sport'],sport:['sport'],abonnement:['abonnement','streaming','cloud'],cotisation:['cotisation','pajemploi'],claude:['cloud','logiciels','anthropic'],chatgpt:['openai'],youtube:['google','youtube','streaming'],chatgpt:['cloud','logiciels'],google:['cloud','logiciels'],icloud:['cloud'],apple:['cloud','logiciels','streaming'],coud:['cloud'],cloud:['cloud','logiciels'],disney:['streaming'],netflix:['streaming'],spotify:['streaming'],deezer:['streaming'],canal:['streaming'],conservatoire:['loisirs','musique','education','ecole'],premieum:['streaming'],premium:['streaming']};
 function fxSyn(t){const a=FX_SYN[t]||[];return t==='nounou'?a.concat(fxTok(nameTokens(DB.garde&&DB.garde.id&&DB.garde.id.sal).join(' '))):a}
 function fxTok(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!['net','sep','oct','nov','dec','jan','fev','mar','avr','mai','jun','jul','aou','les','des','du'].includes(w))}
@@ -2800,9 +2882,8 @@ return'<div class="card"><div class="card-h"><span class="dot" style="background
 (reports>=3?'<div class="al alr" style="margin-top:9px">Balayage reporté une fois sur deux ('+reports+' sur 6 mois) : plancher trop haut ou variables trop fortes.</div>':'<div style="font-size:10.5px;color:var(--td);margin-top:7px">Reports sur 6 mois : '+reports+'. L’app constate, elle n’exécute pas : le virement se fait dans BoursoBank.</div>')+'</div></div>'}
 function todoList(){const n=new Date();const cy=n.getFullYear(),cm=n.getMonth()+1;const items=[];
 const pv=pM(cy,cm);const pb=gBM(pv.y,pv.m);
-if(pb&&isV2(pv.y,pv.m)&&!pb.cl){const mr=monthReal(pv.y,pv.m);if(mr){if(mr.complete)items.push({t:'Clôturer '+ML[pv.m],s:'tout est complet',go:"bY="+pv.y+";bM="+pv.m+";go('budget')",k:'ok'});
-else items.push({t:'Compléter '+ML[pv.m],s:'manque : '+mr.missing.join(', '),go:"PG='more';SUB='import';go('more');SUB='import';rMore()",k:'warn'})}}
-else if(!pb&&isV2(pv.y,pv.m)&&n.getDate()<=7)items.push({t:'Faire la mise à jour de '+ML[pv.m],s:'import du relevé, soldes, supports',go:"wizStart()",k:'warn'});
+try{monthTodos(n).forEach(x=>items.push(x))}catch(e){}
+if(!pb&&isV2(pv.y,pv.m)&&n.getDate()<=7)items.push({t:'Faire la mise à jour de '+ML[pv.m],s:'import du relevé, soldes, supports',go:"wizStart()",k:'warn'});
 const d=n.getDate();if(d>=25||d<=5){const wm=d>=25?{y:cy,m:cm}:pv;const r=gardeCost(wm.y,wm.m);if(!r.before&&!r.after&&!gardeTrack(wm.y,wm.m).decl)items.push({t:'Déclarer '+ML[wm.m]+' sur Pajemploi',s:fh(r.paidH)+' h · net '+fE(r.net)+(r.nav.amt?' · transport '+fE(r.nav.amt):''),go:"gY="+wm.y+";gM="+wm.m+";go('garde')",k:(d<=5&&d>=3)?'bad':'warn'})}
 {const r=gardeCost(pv.y,pv.m);if(!r.before&&!r.after&&(+DB.garde.rate>0||r.net>0)){const t=gardeTrack(pv.y,pv.m);const miss=[];if(!t.paid)miss.push('salaire à verser');if(!t.fiche)miss.push('fiche à envoyer');if(miss.length)items.push({t:'Nounou · '+ML[pv.m],s:miss.join(' · '),go:"gY="+pv.y+";gM="+pv.m+";go('garde')",k:'warn'})}}
 {const cs=cpStatus(cy,cm);cs.alerts.filter(a=>a.t==='warn').slice(0,1).forEach(a=>items.push({t:'Congés de la nounou',s:a.m.slice(0,90),go:"go('garde')",k:'warn'}))}
@@ -2834,7 +2915,7 @@ function rGuide(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';rM
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--gold)"></span>La routine mensuelle</div><div class="card-b" style="font-size:13px;line-height:1.6">
 <div style="margin-bottom:10px"><b>Au fil du mois — Garde, 30 s.</b><br>Saisir uniquement les écarts au planning : heure en plus, congé, absence, jour non utilisé, récupération. Les jours normaux ne demandent rien.</div>
 <div style="margin-bottom:10px"><b>Du 25 au 5 — déclaration Pajemploi.</b><br>La carte « À faire » donne les trois chiffres (heures, net, transport). Après validation : cocher « déclaration validée » dans Garde → Suivi, saisir le CMG réel dans Coût réel, envoyer la fiche PDF.</div>
-<div style="margin-bottom:10px"><b>Du 1er au 5 — mise à jour du mois, 15 min.</b><br>Export CSV BoursoBank du mois écoulé. Bouton doré ⟳ : import + soldes de fin de mois (compte courant, Livret A, LDDS), valeurs des supports, versements, puis <b>relecture du prévisionnel du mois suivant</b> (aides attendues, charges, exceptionnel prévu) et clôture. La clôture ouvre le mois suivant dans Budget et Invest.</div>
+<div style="margin-bottom:10px"><b>Du 1er au 5 — mise à jour du mois, 15 min.</b><br>Export CSV BoursoBank du mois écoulé. Bouton doré ⟳ : import + soldes de fin de mois (compte courant, Livret A, LDDS), valeurs des supports, versements, puis <b>relecture du prévisionnel du mois suivant</b> (aides attendues, charges, exceptionnel prévu). <b>Le mois se clôture tout seul</b> dès qu’il est complet ; tant qu’il manque quelque chose, l’accueil le dit dans « À faire ». Le mois en cours existe toujours : rien à créer.</div>
 <div style="margin-bottom:10px"><b>Le prévisionnel, c\u2019est le théorique.</b><br>Tes lignes Budget (fixes, variables, exceptionnel) sont la référence que le réel vient challenger. Il se saisit <b>avant</b> le mois — ou en début de mois — jamais après avoir vu le relevé. Un mois clos a son prévisionnel figé.</div>
 <div style="margin-bottom:10px"><b>Après validation d\u2019un import — pointer.</b><br>Si des poches existent (vacances…), l\u2019app propose de pointer les lignes du mois. Le pointage n\u2019altère pas le réel : la ligne reste une dépense du mois, elle est en plus comptée dans la poche.</div>
 <div><b>Ensuite — lire.</b><br>Accueil : à faire, virement de précaution, thermomètres, réel du mois. Budget → Réel : les écarts poste par poste. Projection : le mois par mois, les poches, les scénarios de fin d\u2019année.</div></div></div>
@@ -3042,6 +3123,41 @@ ok('Annulation : un état plus pauvre demande confirmation',histRisk(same).lengt
 DB.fp.fisc.enfants=[{n:'A',ne:'2020-01-01'}];const r=correctifApply({type:'patrimoine-correctif',id:'t-cond-1',ops:[{op:'set',path:['fp','fisc','enfants',3,'ne'],value:'2021-01-01',si:'egal',attendu:'2020-12-01'},{op:'set',path:['fp','fisc','enfants',0,'ne'],value:'2020-01-02',si:'egal',attendu:'2020-01-01'}]},true);
 ok('Correctif conditionnel : aucune ligne vide créée',r.ok&&r.n===1&&r.skip===1&&DB.fp.fisc.enfants.length===1&&DB.fp.fisc.enfants[0].ne==='2020-01-02',JSON.stringify(DB.fp.fisc.enfants));
 }catch(e){ok('Sécurité v150',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
+// v151 · mois automatiques, sur données fictives et à dates imposées
+(()=>{const sv=DB;try{DB=defDB();ensure();GM_CACHE={};DB.params.v2From='2026-04';
+const S=(a,b)=>[{n:'PEA',v:a,det:[]},{n:'PEE Fonds',v:b,det:[]}];
+const mk=(y,m,cc)=>Object.assign(defBM(y,m),{ch:[{l:'Loyer',v:1000,fixe:true}],cash:{cc,la:2000,ldds:0},cashFin:cc+2000});
+const mkImp=(y,m)=>({done:true,at:dayKeyOf(new Date(y,m,2))+'T10:00:00.000Z',t:{fixe:1000,variable:2000,invest:0,salaire:5000,entree:0,foyerOut:0,foyerIn:0},bySub:{},byGrp:{},unmatched:[],salaireCount:1,internesOut:0,livretOut:0,livretIn:0,lines:[{d:ym(y,m)+'-05',l:'CB MAGASIN',v:-2000,t:'variable',s:'Courses'},{d:ym(y,m)+'-28',l:'PRLV LOYER',v:-1000,t:'fixe',s:'Loyer'}],ccEndDate:ym(y,m)+'-28',consoCsv:3000});
+DB.bm=[mk(2026,9,8000),mk(2026,10,10000),mk(2026,11,12000)];DB.bm[0].cl=true;[1,2].forEach(i=>{const b=DB.bm[i];b.imp=mkImp(b.y,b.m);b.entrees=[{cat:'salaire',v:5000,l:'SALAIRE'}]});
+DB.im=[{y:2026,m:9,supports:S(5000,3000),contribs:[]},{y:2026,m:10,supports:S(5100,3050),contribs:[]},{y:2026,m:11,supports:S(5200,3100),contribs:[]}];
+const now=new Date(2026,10,10);const oct=gBM(2026,10);const chk=()=>{GM_CACHE={};return autoCloseCheck(2026,10,now)};
+const c0=chk(),cN=autoCloseCheck(2026,11,now);ok('Clôture automatique : mois passé complet oui, mois en cours non',c0.ok&&c0.complete&&!c0.strict.length&&!cN.ok&&cN.complete,c0.missing.concat(c0.strict).join(' · '));
+const bad=[];const tryIt=(lab,rx,mut,undo)=>{mut();const c=chk();if(c.ok||!c.strict.concat(c.missing).some(x=>rx.test(x)))bad.push(lab);undo();};
+tryIt('placements',/placements/,()=>{gIM(2026,10).supports[1].v=0},()=>{gIM(2026,10).supports[1].v=3050});
+tryIt('ligne à qualifier',/qualifier/,()=>{oct.imp.lines.push({d:'2026-10-10',l:'VIR INCONNU',v:-100,t:'transfertFoyer'})},()=>{oct.imp.lines.pop()});
+tryIt('relevé partiel',/relevé importé/,()=>{oct.imp.ccEndDate='2026-10-12';oct.imp.at='2026-10-13T10:00:00.000Z'},()=>{oct.imp=mkImp(2026,10)});
+tryIt('écart de contrôle',/écart/,()=>{oct.imp.consoCsv=2000},()=>{oct.imp.consoCsv=3000});
+tryIt('livret non saisi',/solde à saisir/,()=>{oct.cash.la=null},()=>{oct.cash.la=2000});
+tryIt('solde manquant',/solde fin de mois/,()=>{oct.cashFin=null},()=>{oct.cashFin=12000});
+ok('Clôture automatique : six motifs de blocage reconnus',bad.length===0&&chk().ok,bad.join(', '));
+oct.cashFin=null;GM_CACHE={};const t0=monthTodos(now);oct.cashFin=12000;GM_CACHE={};
+ok('Accueil : un mois incomplet est signalé avec ce qui manque',t0.length===1&&/Compléter Octobre/.test(t0[0].t)&&/solde fin de mois/.test(t0[0].s)&&/wizStartFor\(2026,10\)/.test(t0[0].go),t0.map(x=>x.t).join(' · '));
+oct.noAuto='2026-11-09';GM_CACHE={};const rN=autoCloseRun(now);const tN=monthTodos(now);delete oct.noAuto;
+ok('Mois rouvert : pas de reclôture automatique, rappel sur l’accueil',rN.length===0&&!oct.cl&&tN.length===1&&/Reclôturer/.test(tN[0].t));
+GM_CACHE={};const j0=DB.params.journal.length;const R=autoCloseRun(now);const t1=monthTodos(now),t2=monthTodos(new Date(2026,10,25));
+ok('Clôture automatique : octobre clos, novembre intact, trace au journal',R.length===1&&R[0].m===10&&oct.cl&&oct.closedAuto&&oct.closedAt==='2026-11-10'&&gIM(2026,10).cl&&!gBM(2026,11).cl&&DB.params.journal.length===j0+1&&autoCloseRun(now).length===0);
+ok('Accueil : clôture automatique affichée sept jours',t1.length===1&&/clôturé automatiquement/.test(t1[0].t)&&t2.length===0);
+closeMonth(2026,10);ok('Rouvrir : le mois reste ouvert tant qu’on ne le reclôture pas',!oct.cl&&!!oct.noAuto&&!oct.closedAuto&&!gIM(2026,10).cl&&autoCloseRun(now).length===0);
+const jan=new Date(2027,0,3),sep=new Date(2027,8,1);const mJ=autoCreate(jan),mJ2=autoCreate(jan);const bJ=gBM(2027,1),iJ=gIM(2027,1);const mS=autoCreate(sep);
+ok('Passage de janvier : le mois se crée seul, charges et enveloppes reprises',mJ&&!mJ2&&bJ&&bJ.ch.some(c=>c.l==='Loyer'&&c.v===1000)&&!bJ.cl&&iJ&&iJ.supports.length===2&&iJ.supports[0].v===0,bJ?bJ.ch.length+' charge':'absent');
+ok('Passage de septembre : nouveau mois, nouvelle année de suivi',mS&&!!gBM(2027,9)&&!!gIM(2027,9)&&fyOf(2027,9).fy===2027&&fyOf(2027,8).fy===2026);
+ok('Navigation : Budget jusqu’au mois suivant, Invest jusqu’au mois en cours',monthNextOk('b',2026,11,now)&&!monthNextOk('b',2026,12,now)&&monthNextOk('i',2026,10,now)&&!monthNextOk('i',2026,11,now));
+const full=JSON.stringify(DB);const noCur=JSON.parse(full);noCur.bm=noCur.bm.filter(b=>!(b.y===2027&&b.m===9));const noPast=JSON.parse(full);noPast.bm=noPast.bm.filter(b=>!(b.y===2026&&b.m===9));
+ok('Annulation : le mois en cours ne compte pas, un mois passé oui',histRisk(JSON.stringify(noCur),sep).length===0&&histRisk(JSON.stringify(noPast),sep).length>0);
+DB.bm.push(Object.assign(defBM(2026,6),{ch:[]}));GM_CACHE={};const tF=monthTodos(now).find(x=>/Juin/.test(x.t));const n0=DB.bm.length,i0=DB.im.length,j1=DB.params.journal.length;const whyF=monthForceDo(2026,6,now);const f6=gBM(2026,6);GM_CACHE={};
+const okF=!!tF&&/bM=6/.test(tF.go)&&/clôturer sans compléter/.test(tF.s)&&f6.cl&&f6.closedForced&&!f6.closedAuto&&whyF.length>0&&!gIM(2026,6)&&DB.bm.length===n0&&DB.im.length===i0&&DB.params.journal.length===j1+1&&!monthTodos(now).some(x=>/Juin/.test(x.t));
+closeMonth(2026,6);ok('Clôture forcée : mois fermé tel quel, plus réclamé, rien créé autour, rouvrable',okF&&!f6.cl&&!f6.closedForced,whyF.join(' · '));
+}catch(e){ok('Mois automatiques v151',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
 return results}
 function rAutotestPage(el){el.innerHTML='<button class="backlink" onclick="SUB=\'hub\';rMore()">‹ Plus</button><div class="pagetitle">Autotest</div><div class="card"><div class="card-b" style="font-size:12.5px;line-height:1.55">Quinze scénarios de calcul rejoués sur des données de test — <b>jamais sur ta base</b>. À lancer après chaque mise à jour de l\u2019app : tout doit être vert. Si une ligne est rouge, envoie-moi une capture.</div></div><div id="selftest-out">'+rSelfTest()+'</div><button class="btn btn-ghost sm wide" style="margin-top:10px" onclick="document.getElementById(\'selftest-out\').innerHTML=rSelfTest()">↻ Relancer</button><div style="text-align:center;margin-top:16px;font-size:11px;color:var(--td)">Version '+VERSION+' · '+VTAG+'</div>'}
 function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
@@ -3335,6 +3451,11 @@ function rConfig(el){el.innerHTML=`<button class="backlink" onclick="SUB='hub';r
 <div class="prm" style="grid-template-columns:1fr;border:none;padding-top:0"><label>Couleur d\u2019accent<small>boutons, onglets actifs, chiffres clés · mémorisée sur cet appareil</small></label><div class="row" style="gap:12px;flex-wrap:wrap;padding:4px 2px 6px">${Object.keys(ACCENTS).map(k=>'<span class="swatch'+(accentGet()===k?' on':'')+'" title="'+ACCENTS[k][0]+'" style="background:'+ACCENTS[k][4]+'" onclick="accentApply(\''+k+'\');rMore()">'+(accentGet()===k?'✓':'')+'</span>').join('')}<span style="font-size:12px;color:var(--tm);align-self:center">${ACCENTS[accentGet()][0]}</span></div></div>
 <div class="prm" style="border:none;padding-top:0"><label>Thème<small>automatique = suit le réglage clair / sombre de l'appareil</small></label><select class="inp sm" onchange="themeApply(this.value)"><option value="dark"${themeGet()==='dark'?' selected':''}>Sombre</option><option value="light"${themeGet()==='light'?' selected':''}>Clair</option><option value="auto"${themeGet()==='auto'?' selected':''}>Automatique</option></select></div>
 <div style="font-size:10.5px;color:var(--td);margin-bottom:6px">Pour installer l'app sur l'écran d'accueil : menu Partager → « Sur l'écran d'accueil » (iPhone), ou menu ⋮ → « Installer » (Chrome).</div>
+</div></div>
+<div class="card"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Mois</div><div class="card-b">
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5;margin-bottom:10px">Le mois en cours se crée tout seul et un mois passé se clôture tout seul dès qu’il est complet. Ces actions ne servent qu’aux cas rares.</div>
+<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px"><button class="btn btn-gold sm" onclick="monthForceBulk()">Clôturer les anciens mois sans les compléter…</button></div>
+<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn btn-ghost sm" onclick="monthAdmin('create')">Créer un mois…</button><button class="btn btn-danger sm" onclick="monthAdmin('del')">Supprimer un mois…</button><button class="btn btn-danger sm" onclick="monthAdmin('purge')">Purger les anciens…</button></div>
 </div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--violet)"></span>Accès</div><div class="card-b">
 ${pinIsDefault()?'<div class="al ala" style="margin-bottom:10px"><b>Code d\u2019origine encore en place.</b> Il figurait dans le code de la page, publique. Choisissez-en un autre.</div>':''}
