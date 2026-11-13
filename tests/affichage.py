@@ -12,7 +12,7 @@ import json, sys
 from commun import ouvrir, lancer, option, VUES
 
 MESURE = r"""
-()=>{const W=innerWidth,o={hauteur:document.documentElement.scrollHeight,defile:document.documentElement.scrollWidth>W+1,sort:[],coupe:[],coupeH:[],tronque:0,textes:0,petits:0,tailles:{},polices:{},cibles:0,c32:0,c44:0,ex32:{},contrasteBas:0,paires:{}};
+(sel)=>{const RAC=sel?document.querySelector(sel):document.body;const W=innerWidth,o={hauteur:sel?RAC.scrollHeight:document.documentElement.scrollHeight,defile:document.documentElement.scrollWidth>W+1,sort:[],coupe:[],coupeH:[],tronque:0,textes:0,petits:0,tailles:{},polices:{},cibles:0,c32:0,c44:0,ex32:{},contrasteBas:0,paires:{}};
 const vis=e=>e.checkVisibility?e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}):!!e.offsetParent;
 const nom=e=>{let s=e.tagName.toLowerCase();if(e.id)s+='#'+e.id;const c=(e.getAttribute('class')||'').trim().split(/\s+/).filter(Boolean).slice(0,2).join('.');if(c)s+='.'+c;return s};
 const txt=e=>(e.textContent||'').replace(/\s+/g,' ').trim().slice(0,46);
@@ -24,7 +24,7 @@ const fond=e=>{const pile=[];let grad=false;for(let p=e;p;p=p.parentElement){con
  let b={r:255,g:255,b:255,a:1};for(let i=pile.length-1;i>=0;i--)b=sur(pile[i],b);return{b,grad}};
 const hex=c=>'#'+[c.r,c.g,c.b].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
 // textes
-const tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const vus=new Set();
+const tw=document.createTreeWalker(RAC,NodeFilter.SHOW_TEXT);const vus=new Set();
 for(let n=tw.nextNode();n;n=tw.nextNode()){if(!n.nodeValue.trim())continue;const e=n.parentElement;if(!e||/^(SCRIPT|STYLE|OPTION|TEXTAREA)$/.test(e.tagName)||!vis(e))continue;const r=e.getBoundingClientRect();if(r.width<1||r.height<1)continue;
  const s=getComputedStyle(e);const fs=parseFloat(s.fontSize);o.textes++;if(fs<10.99)o.petits++;const k=String(Math.round(fs*10)/10);o.tailles[k]=(o.tailles[k]||0)+1;const pf=s.fontFamily.split(',')[0].replace(/['"]/g,'').trim();o.polices[pf]=(o.polices[pf]||0)+1;
  if(vus.has(e))continue;vus.add(e);
@@ -33,7 +33,7 @@ for(let n=tw.nextNode();n;n=tw.nextNode()){if(!n.nodeValue.trim())continue;const
  if(e.scrollWidth>e.clientWidth+1&&/(hidden|clip)/.test(s.overflowX)){if(s.textOverflow==='ellipsis')o.tronque++;else if(o.coupe.length<40)o.coupe.push(nom(e)+' « '+txt(e)+' » '+e.clientWidth+'<'+e.scrollWidth)}
  if(e.scrollHeight>e.clientHeight+2&&/(hidden|clip)/.test(s.overflowY)&&e.clientHeight>0&&o.coupeH.length<40)o.coupeH.push(nom(e)+' « '+txt(e)+' » h'+e.clientHeight+'<'+e.scrollHeight)}
 // zones tactiles
-document.querySelectorAll('button,a[href],[onclick],input:not([type=hidden]),select,textarea,[role=button],summary').forEach(e=>{if(!vis(e))return;const r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;o.cibles++;const m=Math.min(r.width,r.height);if(m<31.5){o.c32++;const k=nom(e).replace(/#[\w-]+/,'');o.ex32[k]=(o.ex32[k]||0)+1}else if(m<43.5)o.c44++});
+RAC.querySelectorAll('button,a[href],[onclick],input:not([type=hidden]),select,textarea,[role=button],summary').forEach(e=>{if(!vis(e))return;if(/^(checkbox|radio)$/.test(e.type||'')&&e.closest('label'))return;const r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;o.cibles++;const m=Math.min(r.width,r.height);if(m<31.5){o.c32++;const k=nom(e).replace(/#[\w-]+/,'');o.ex32[k]=(o.ex32[k]||0)+1}else if(m<43.5)o.c44++});
 return o}
 """
 ALLER = "(c)=>{(0,eval)(c);return true}"
@@ -58,11 +58,11 @@ async def passe(largeur, theme, base, detail):
     async with ouvrir(largeur=largeur, hauteur=844 if mobile else 900, horloge='2026-11-14T10:00:00', base=base, theme=theme) as (pg, erreurs):
         for nom, code in VUES:
             await pg.evaluate(ALLER, code); await pg.wait_for_timeout(250)
-            res[nom] = await pg.evaluate(MESURE)
+            res[nom] = await pg.evaluate(MESURE, None)
         i = 0
         while await pg.evaluate(ASSISTANT, i):
             await pg.wait_for_timeout(150)
-            res['assistant/%d' % i] = await pg.evaluate(MESURE); i += 1
+            res['assistant/%d' % i] = await pg.evaluate(MESURE, '#wiz'); i += 1
         res['_erreurs'] = erreurs
     return res
 

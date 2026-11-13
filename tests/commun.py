@@ -64,6 +64,12 @@ VUES = [
      ['hub', 'fiscal', 'proj', 'cap', 'recur', 'decis', 'analyses', 'notes', 'gouv', 'rules', 'perso', 'donnees', 'config', 'guide', 'import', 'poches']]
 
 
+def _servir(corps, genre):
+    async def f(route):
+        await route.fulfill(status=200, content_type=genre, body=corps, headers={'access-control-allow-origin': '*'})
+    return f
+
+
 @asynccontextmanager
 async def ouvrir(largeur=430, hauteur=900, horloge=None, dernier=(2026, 11), base=None, echelle=1, theme=None, accent=None, semer=True):
     """Ouvre l'application hors réseau sur la base fictive (ou sur un export local : base=chemin).
@@ -72,11 +78,19 @@ async def ouvrir(largeur=430, hauteur=900, horloge=None, dernier=(2026, 11), bas
     """
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=chrome(), args=['--no-sandbox'])
-        ctx = await b.new_context(viewport={'width': largeur, 'height': hauteur}, device_scale_factor=echelle)
+        mobile = largeur < 700  # téléphone : écran tactile, comme sur l'appareil
+        ctx = await b.new_context(viewport={'width': largeur, 'height': hauteur}, device_scale_factor=echelle, has_touch=mobile, is_mobile=mobile)
         pg = await ctx.new_page()
         erreurs = []
         pg.on('pageerror', lambda e: erreurs.append(str(e)[:300]))
         await pg.route('**/*', lambda r: r.continue_() if r.request.url.startswith('file:') else r.abort())
+        # Modules externes servis depuis des copies locales, si on en fournit :
+        #   LOCAL='**/chart.umd.min.js=/chemin/chart.umd.js;**/css2*=/chemin/polices.css'
+        for regle in filter(None, (os.environ.get('LOCAL') or '').split(';')):
+            motif, chemin = regle.split('=', 1)
+            corps = open(chemin, 'rb').read()
+            genre = 'text/css' if chemin.endswith('.css') else 'application/javascript'
+            await pg.route(motif, _servir(corps, genre))
         if horloge:
             await pg.clock.set_fixed_time(horloge)
         await pg.goto('file://' + APP)

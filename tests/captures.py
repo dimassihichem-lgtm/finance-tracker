@@ -18,7 +18,12 @@ async def main():
                 for nom, code in vues:
                     await pg.evaluate("(c)=>{(0,eval)(c);window.scrollTo(0,0)}", code); await pg.wait_for_timeout(500)
                     f = os.path.join(sortie, f"{nom.replace('/', '_')}_{w}_{th}.png")
-                    await pg.screenshot(path=f, full_page=True)
+                    # Pas de capture « pleine page » : elle fait perdre au navigateur son écran tactile simulé,
+                    # et l'image ne montrerait pas les réglages propres au téléphone. On agrandit la fenêtre à la place.
+                    h = await pg.evaluate("()=>document.documentElement.scrollHeight")
+                    await pg.set_viewport_size({'width': w, 'height': max(600, min(h, 15000))}); await pg.wait_for_timeout(250)
+                    await pg.screenshot(path=f, full_page=False)
+                    await pg.set_viewport_size({'width': w, 'height': 844 if w < 700 else 900})
                 print(f"{w} px · {th} : {len(vues)} captures dans {sortie} · erreurs de page : {erreurs[:3]}")
 
 lancer(main())
