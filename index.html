@@ -465,7 +465,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v151';const VTAG='mois automatiques : création, clôture et navigation sans manipulation';
+const VERSION='v152';const VTAG='impôt : heures sup plafonnées, déduction de 10 % par personne, tests durables';
 
 function defCh(){return[{l:'Loyer',v:0},{l:'Frais divers',v:0}]}
 function defRev(){return[]}
@@ -3158,6 +3158,44 @@ DB.bm.push(Object.assign(defBM(2026,6),{ch:[]}));GM_CACHE={};const tF=monthTodos
 const okF=!!tF&&/bM=6/.test(tF.go)&&/clôturer sans compléter/.test(tF.s)&&f6.cl&&f6.closedForced&&!f6.closedAuto&&whyF.length>0&&!gIM(2026,6)&&DB.bm.length===n0&&DB.im.length===i0&&DB.params.journal.length===j1+1&&!monthTodos(now).some(x=>/Juin/.test(x.t));
 closeMonth(2026,6);ok('Clôture forcée : mois fermé tel quel, plus réclamé, rien créé autour, rouvrable',okF&&!f6.cl&&!f6.closedForced,whyF.join(' · '));
 }catch(e){ok('Mois automatiques v151',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
+// v152 (lot 2) · impôt et lecture du bulletin, sur données fictives.
+// Sources du barème par défaut : service-public.gouv.fr (barème des revenus 2025), economie.gouv.fr (décote), BOFiP BOI-BAREME-000035 (déduction de 10 %), consultés le 13/11/2026.
+(()=>{const sv=DB;try{DB=defDB();ensure();GM_CACHE={};try{FISC_MEMO={}}catch(e){}const F=DB.fp.fisc;const off=JSON.parse(JSON.stringify(F.bareme));const Y=2031;const K=m=>ym(Y,m);
+const run=(ni,cj,parts)=>{F.bulletins={};F.netImposable={};if(ni!=null)F.netImposable[Y]=ni;F.conjointRevenu={};if(cj!=null)F.conjointRevenu[Y]=cj;F.parts=parts;GM_CACHE={};try{FISC_MEMO={}}catch(e){}return fiscYear(Y)};
+ok('Barème par défaut = loi de finances 2026, revenus 2025 (test à mettre à jour avec le barème)',JSON.stringify(off.tranches.slice(0,4))==='[[11600,0],[29579,0.11],[84577,0.3],[181917,0.41]]'&&off.tranches[4][1]===0.45&&off.plafondQF===1807&&off.decoteBase===1483&&off.decoteTaux===0.4525&&off.abatMin===509&&off.abatMax===14555&&off.hsPlafond===7500);
+const E=run(48505,0,2);ok('Décote : exemple officiel du couple (2 250 € d’impôt → 1 785 €)',Math.abs(E.decote-465)<1&&E.irBrut===1785,fE(Math.round(E.decote))+' · '+fE(E.irBrut));
+// barème d'essai à chiffres ronds : les tests du moteur ne dépendent pas du barème de l'année
+F.bareme={tranches:[[10000,0],[30000,0.10],[80000,0.30],[1e12,0.40]],plafondQF:1500,abattement:0.10,abatMin:500,abatMax:12000,decoteSeuil:3000,decoteBase:1200,decoteTaux:0.40,hsPlafond:7500};
+const A=run(60000,0,3),Q=run(110000,20000,3),C=run(150000,30000,3),D=run(60000,3000,3),Z=run(20000,0,3),P1=run(4000,0,1);
+ok('Impôt : tranches, quotient familial et décote',A.rni===54000&&Math.round(A.avantage)===1000&&Math.round(A.decote)===240&&A.irBrut===2160,fE(A.irBrut));
+ok('Impôt : avantage du quotient familial plafonné',Q.rni===117000&&Math.round(Q.avantage)===3000&&Q.decote===0&&Q.irBrut===18100,fE(Q.irBrut));
+ok('Déduction de 10 % : par personne, plafonnée, avec minimum',Math.round(C.abat)===15000&&Math.round(D.abat)===6500&&Math.round(P1.abat)===500&&Z.irBrut===0,Math.round(C.abat)+' · '+Math.round(D.abat)+' · '+Math.round(P1.abat));
+F.netImposable={};F.netImposable[Y]=50000;F.conjointRevenu={};F.conjointRevenu[Y-1]=12000;GM_CACHE={};const J1=fiscYear(Y);F.conjointRevenu[Y]=0;const J2=fiscYear(Y);
+ok('Revenu du conjoint : année non saisie reprise de la dernière saisie',J1.conj===12000&&J1.conjDe===Y-1&&J2.conj===0&&J2.conjDe==null);
+// heures sup : 8 mois à 900 €, plafond atteint en septembre (300 €), octobre déclare 1 000 € à tort
+F.netImposable={};F.conjointRevenu={};F.conjointRevenu[Y]=0;F.bulletins={};for(let m=1;m<=8;m++)F.bulletins[K(m)]={ni:5000,hs:900,net:1};F.bulletins[K(9)]={ni:5600,hs:300,net:1};F.bulletins[K(10)]={ni:5900,hs:1000,net:1};GM_CACHE={};
+const H=fiscYear(Y);const r10=hsRoom(Y,10),r9=hsRoom(Y,9);delete F.bulletins[K(10)];delete F.bulletins[K(9)];const H8=fiscYear(Y);
+ok('Heures sup : cumul plafonné, pas de double compte après le plafond',H.hsCum===7500&&H.hsDeclare===8500&&H.hsMoisCap===9&&H.niProjM===5900&&Math.round(H.niProj)===11800&&H.netImp===63300&&r10===0&&r9===300,fE(H.netImp));
+ok('Heures sup : passage du plafond pendant les mois projetés',H8.hsCum===7200&&Math.round(H8.niProj)===23300&&H8.netImp===63300,fE(H8.netImp));
+// crèche : 10 mois à 500 €, enfant de moins de 6 ans puis de 6 ans
+F.bulletins={};F.netImposable[Y]=50000;DB.bm=[];for(let m=1;m<=10;m++)DB.bm.push(Object.assign(defBM(Y,m),{imp:{done:true,t:{salaire:0},lines:[{d:K(m)+'-05',l:'PRLV CRECHE DES LUTINS',s:'Crèche',v:-500,t:'fixe'}]}}));
+F.enfants=[{n:'Enfant',ne:(Y-2)+'-05-01'}];GM_CACHE={};const G1=fiscYear(Y);F.enfants=[{n:'Enfant',ne:(Y-7)+'-06-01'}];const G2=fiscYear(Y);
+ok('Crédit crèche : 50 % plafonné à 3 500 €, enfant de moins de 6 ans au 1er janvier',G1.creche.base===3500&&G1.creche.ci===1750&&G2.creche.ci===0,fE(G1.creche.ci)+' · '+fE(G2.creche.ci));
+// bulletin fictif, même mise en page que le bulletin réel (format en vigueur en octobre 2026) : montants inventés
+const L=["PERIODE D'EMPLOI DU : 01 OCTOBRE "+Y,'OU BASE TAUX OU % MONTANT MONTANT','HS STRUCTUREL. 125% 1000 5000 50000 M 02 7 80 CP','HS EXO SOC. : 500,00 S 05','*REMUNERATION BRUTE.(1).....................................................500000 D 06','IMPOT SUR LE REVENU PRELEVE 400000 7500 30000-','TAUX PERSONNALISE','MONTANT NET SOCIAL 3900 00','NET A PAYER AVANT IMPOT SUR LE REVENU 4000 00','REVENUS EN EUROS DU MOIS DEPUIS 01 '+Y+' NET A PAYER','PRELEVEMENT A LA SOURCE 300 00 2900 00 1-2+3-4','NET FISCAL 4000 00 38000 00 BIC : XXXXFRPPXXX','HS/HC EXONEREES FISCAL 450 00 4500 00 0000 1111 222'];
+const R=bulParse(L),R2=bulParse(['Document sans rapport','Total 12,00']),R3=bulParse(L.map(x=>/^PRELEVEMENT/.test(x)?'PRELEVEMENT A LA SOURCE 310 00 2900 00 1-2+3-4':x)),R4=bulParse(L.map(x=>/^HS\/HC/.test(x)?'HS/HC EXONEREES FISCAL 7500 00 0000 1111 222':x)),R5=bulParse(L.filter(x=>!/^HS\/HC/.test(x)));
+ok('Bulletin : montants du mois et cumuls lus, contrôles concordants',R.y===Y&&R.m===10&&R.n===7&&R.vals.brut===5000&&R.vals.hs===450&&R.hsSoc===500&&R.vals.netSocial===3900&&R.vals.ni===4000&&R.vals.pas===300&&R.vals.taux===7.5&&R.vals.net===3700&&R.cum.hs===4500&&R.cum.ni===38000&&R.cum.pas===2900&&!R.hsAuto&&!R.notes.length&&R.checks.length>=6&&R.checks.every(c=>c.ok),R.n+' montants · '+R.checks.length+' contrôles');
+ok('Bulletin : autre mise en page refusée, écart entre montants signalé',R2.n<3&&R3.checks.some(c=>!c.ok)&&R5.vals.hs==null&&R5.notes.length===1);
+// plafond atteint : le bulletin n'imprime que le cumul ; le mois se déduit de ce qui est déjà saisi, et les cumuls sont comparés
+F.bulletins={};for(let m=1;m<=9;m++)F.bulletins[K(m)]={ni:m<9?3750:4000,pas:m<9?285:320,hs:m<9?900:300};R4.y=Y;R4.m=10;const A4=bulCumBefore(Y,10);R4.vals.hs=Math.max(0,R4.cum.hs-A4.hs);const C4=bulCumulChecks(R4);
+delete F.bulletins[K(3)];const C5=bulCumulChecks(R4);
+ok('Bulletin : heures sup déduites du cumul quand le plafond est atteint',R4.hsAuto&&R4.vals.hs===0&&R4.cum.hs===7500&&A4.complet&&A4.hs===7500&&A4.ni===34000&&A4.pas===2600,String(R4.vals.hs));
+ok('Bulletin : cumuls de l’application comparés à ceux du bulletin',C4.length===3&&C4[0].ok&&C4[1].ok&&C4[2].ok===true&&C5.length===1&&/manque/.test(C5[0].l),C4.map(c=>c.ok?'✓':'✗').join(' '));
+F.bulletins[K(3)]={ni:3750,pas:285,hs:900};R4.cum.ni=37000;const C7=bulCumulChecks(R4);R4.cum.ni=38000;
+ok('Bulletin : un écart de cumul est signalé avec son montant',C7.length===3&&C7[0].ok&&C7[1].ok&&C7[2].ok===false&&/écart/.test(C7[2].l),C7[2]?C7[2].l.slice(0,90):'');
+Object.assign(F.bulletins[K(9)],{niCumul:34000,pasCumul:2600,hsCumul:7500});delete F.bulletins[K(2)];const C8=bulCumulChecks(R4);R4.vals.ni=4100;const C9=bulCumulChecks(R4);
+ok('Bulletin : d’un mois à l’autre, la hausse du cumul doit valoir le mois',C8.length===3&&C8.every(c=>c.ok)&&/monte de/.test(C8[2].l)&&C9[2].ok===false,C8.map(c=>c.ok?'✓':'✗').join(' ')+' puis '+C9.map(c=>c.ok?'✓':'✗').join(' '));
+}catch(e){ok('Impôt et bulletin v152',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
 return results}
 function rAutotestPage(el){el.innerHTML='<button class="backlink" onclick="SUB=\'hub\';rMore()">‹ Plus</button><div class="pagetitle">Autotest</div><div class="card"><div class="card-b" style="font-size:12.5px;line-height:1.55">Quinze scénarios de calcul rejoués sur des données de test — <b>jamais sur ta base</b>. À lancer après chaque mise à jour de l\u2019app : tout doit être vert. Si une ligne est rouge, envoie-moi une capture.</div></div><div id="selftest-out">'+rSelfTest()+'</div><button class="btn btn-ghost sm wide" style="margin-top:10px" onclick="document.getElementById(\'selftest-out\').innerHTML=rSelfTest()">↻ Relancer</button><div style="text-align:center;margin-top:16px;font-size:11px;color:var(--td)">Version '+VERSION+' · '+VTAG+'</div>'}
 function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
@@ -3215,9 +3253,9 @@ if(SUB==='donnees'){rDonnees(el);setTimeout(rBackups,50);return}
 if(SUB==='config'){rConfig(el);return}}
 
 /* ================= FISCAL v2 ================= */
-function defFisc(){return{per:{},pasPeriodes:[],pasManuel:{},perReelDepuis:'',netImposable:{},garderie:{mensuel:0,moisDe:9,moisA:6,extras:[]},bareme:{tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500},bulletins:{},parts:1,conjointRevenu:{},enfants:[],plan:[]}}
+function defFisc(){return{per:{},pasPeriodes:[],pasManuel:{},perReelDepuis:'',netImposable:{},garderie:{mensuel:0,moisDe:9,moisA:6,extras:[]},bareme:{tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,abatMin:509,abatMax:14555,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500},bulletins:{},parts:1,conjointRevenu:{},enfants:[],plan:[]}}
 function ensureFisc(){if(!DB.fp)DB.fp={};const d=defFisc();if(!DB.fp.fisc)DB.fp.fisc=d;const F=DB.fp.fisc;Object.keys(d).forEach(k=>{if(F[k]==null)F[k]=d[k]});
-if(!F.baremeLF2026){F.bareme={tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500};F.baremeLF2026=true}
+if(!F.baremeLF2026){F.bareme={tranches:[[11600,0],[29579,0.11],[84577,0.30],[181917,0.41],[1e12,0.45]],plafondQF:1807,abattement:0.10,abatMin:509,abatMax:14555,decoteSeuil:3278,decoteBase:1483,decoteTaux:0.4525,source:'LF 2026 (loi n° 2026-103 du 19/02/2026), revenus 2025 — en attendant la LF 2027',hsPlafond:7500};F.baremeLF2026=true}
 if(!F.plan.length)F.plan=[
 {id:'hs',l:'Contrôler les heures supplémentaires exonérées sur la déclaration pré-remplie',g:'variable',q:'déclaration (avril-juin)',done:false},
 {id:'per',l:'Verser le solde PER avant le 31/12 (engagement de l\u2019année)',g:'selon engagement',q:'décembre',done:false},
@@ -3257,16 +3295,23 @@ const isDon=l=>/^don/i.test(l.s)||/\bdon\b/i.test(l.l);let dons=0,donsProj=0,don
 const per=perRealYear(y);const eng=perEng(y)||{engagement:0,pas:0};
 // 6. impôt estimé
 const B=F.bulletins||{};let niBul=0,hsCum=0,bulMois=[],lastB=null;for(let m=1;m<=12;m++){const b=B[ym(y,m)];if(b){niBul+=+b.ni||0;hsCum+=+b.hs||0;bulMois.push(m);lastB=b}}
-const hsCap=F.bareme.hsPlafond||7500;const niProjM=lastB?(+lastB.ni+(hsCum>=hsCap-1?+lastB.hs:0)):Math.round(((DB.params.proj||{}).salaire||0)*1.035);
-let niProj=0,niProjMois=[];for(let m=1;m<=12;m++){if(!B[ym(y,m)]){niProj+=niProjM;niProjMois.push(m)}}
+// v152 · heures sup exonérées : le cumul ne peut pas dépasser le plafond annuel ; ce qu'un bulletin déclare au-delà est ignoré.
+// hsExoLast = part encore exonérée dans le dernier bulletin ; niPlein = net fiscal d'un mois type quand plus rien n'est exonéré.
+const hsCap=F.bareme.hsPlafond||7500;const hsDeclare=hsCum;let hsExoLast=0,hsMoisCap=null;{let c=0;for(let m=1;m<=12;m++){const b=B[ym(y,m)];if(!b)continue;const ex=Math.max(0,Math.min(+b.hs||0,hsCap-c));c+=ex;if(hsMoisCap==null&&c>=hsCap-0.5)hsMoisCap=m;if(b===lastB)hsExoLast=ex}hsCum=Math.round(c*100)/100}
+const niPlein=lastB?(+lastB.ni+hsExoLast):0;let hsReste=Math.max(0,hsCap-hsCum);const lastM=bulMois.length?bulMois[bulMois.length-1]:0;
+const niProjM=lastB?(hsReste<1?niPlein:+lastB.ni):Math.round(((DB.params.proj||{}).salaire||0)*1.035);const niProjBy={};
+let niProj=0,niProjMois=[];for(let m=1;m<=12;m++){if(!B[ym(y,m)]){let v=niProjM;if(lastB&&m>lastM){const ex=hsReste>=1?Math.min(hsExoLast,hsReste):0;hsReste-=ex;v=niPlein-ex}niProjBy[m]=v;niProj+=v;niProjMois.push(m)}}
 const netImp=F.netImposable[y]!=null?+F.netImposable[y]:Math.round(bulMois.length?niBul+niProj:niProjM*12);
-const conj=F.conjointRevenu[y]!=null?+F.conjointRevenu[y]:0;const brut=netImp+conj;const abat=Math.min(Math.max(brut*F.bareme.abattement,0),14426);const rni=Math.max(0,brut-abat-per.tot);
+let conj=0,conjDe=null;if(F.conjointRevenu[y]!=null)conj=+F.conjointRevenu[y];else{const ks=Object.keys(F.conjointRevenu||{}).map(Number).filter(k=>k<y&&F.conjointRevenu[k]!=null).sort((a,b)=>b-a);if(ks.length){conj=+F.conjointRevenu[ks[0]]||0;conjDe=ks[0]}} // v152 · année non saisie : on reprend la dernière saisie
+const brut=netImp+conj;
+// v152 · déduction forfaitaire de 10 % : calculée par personne, avec un minimum et un plafond (jamais plus que le revenu)
+const aMin=F.bareme.abatMin!=null?+F.bareme.abatMin:509,aMax=F.bareme.abatMax!=null?+F.bareme.abatMax:14555;const ded=r=>r>0?Math.min(r,Math.max(aMin,Math.min(r*F.bareme.abattement,aMax))):0;const abat=ded(netImp)+ded(conj);const rni=Math.max(0,brut-abat-per.tot);
 const ir=(R,parts)=>{const q=R/parts;let t=0,prev=0;for(const [lim,tx] of F.bareme.tranches){if(q>prev)t+=(Math.min(q,lim)-prev)*tx;prev=lim;if(q<=lim)break}return t*parts};
 const parts=F.parts||3;const irFull=ir(rni,parts),ir2=ir(rni,2);const halfParts=(parts-2)*2;const avantage=Math.min(ir2-irFull,halfParts*(F.bareme.plafondQF||1807));let irBrut=Math.max(0,ir2-avantage);const decote=(irBrut<(F.bareme.decoteSeuil||0))?Math.max(0,(F.bareme.decoteBase||0)-(F.bareme.decoteTaux||0)*irBrut):0;irBrut=Math.round(Math.max(0,irBrut-decote));
 const credits=Math.round((dom.ci||0)+crecheCI+gardCI);const reductions=donsRed;const irNet=Math.max(0,irBrut-reductions);const solde=irNet-credits;
 const pasAt=k=>{let t=0;(F.pasPeriodes||[]).filter(p=>p.from&&p.from<=k).sort((a,b)=>a.from<b.from?-1:1).forEach(p=>{t=+p.taux||0});return t};
 let pasBul=0,pasRel=0,pasProj=0,pasMois=[],pasProjMois=[];for(let m=1;m<=12;m++){const k=ym(y,m);const bb=B[k];const b=gBM(y,m);const t=pasAt(k)/100;
-if(bb){pasBul+=+bb.pas||0}else if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK||bulMois.length){pasProj+=Math.round(niProjM*t);pasProjMois.push(m)}}
+if(bb){pasBul+=+bb.pas||0}else if(b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){pasRel+=Math.round(b.imp.t.salaire*t/(1-t));pasMois.push(m)}else if(k>=nowK||bulMois.length){pasProj+=Math.round((niProjBy[m]!=null?niProjBy[m]:niProjM)*t);pasProjMois.push(m)}}
 const pasMan=bulMois.length?0:+(F.pasManuel[y]||0);const pasPaye=Math.round(pasMan+pasBul+pasRel+pasProj);const reste=Math.round(solde-pasPaye);
 // ---- colonne « à date » : réel encaissé / versé / payé
 let niRel=0;for(let m=1;m<=12;m++){const k=ym(y,m);const b=gBM(y,m);if(!B[k]&&b&&b.imp&&b.imp.t&&b.imp.t.salaire>0){const t=pasAt(k)/100;niRel+=Math.round(b.imp.t.salaire/(1-t))}}
@@ -3275,7 +3320,8 @@ const crecheNetReal=Math.max(0,creche-crecheMonths.reduce((a,m)=>{const k=ym(y,m
 const creditsDate=Math.round((dom.ciEngaged||0)+crecheCIDate+gardCI*share);const redDate=Math.round(dons*0.66);
 const irDate=Math.round(irNet*share);const pasDate=Math.round(pasBul+pasRel+(bulMois.length?0:pasMan));const resteDate=irDate-creditsDate-pasDate;
 const aDate={ni:niDate,share,per:per.aDate,ir:irDate,red:redDate,credits:creditsDate,creditsDetail:{dom:Math.round(dom.ciEngaged||0),creche:crecheCIDate,gard:Math.round(gardCI*share)},pas:pasDate,reste:resteDate};
-return{y,aDate,monthsKnown,pasMan,pasBul,pasRel,pasProj,pasMois,pasProjMois,bulMois,niBul,niProj,niProjM,niProjMois,hsCum,hsCap,decote,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:enfCOk,n:enfC?enfC.n:'',months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:enfGOk,n:enfG?enfG.n:'',age:enfG?ageAt(enfG.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
+const cumCtl=(lastB&&lastB.niCumul!=null&&bulMois.length===lastM)?{m:lastM,ni:+lastB.niCumul,niSomme:Math.round(niBul*100)/100,ecart:Math.round((niBul-lastB.niCumul)*100)/100}:null; // v152 · contrôle : somme des mois saisis contre cumul du dernier bulletin
+return{y,cumCtl,conjDe,hsDeclare,hsMoisCap,aDate,monthsKnown,pasMan,pasBul,pasRel,pasProj,pasMois,pasProjMois,bulMois,niBul,niProj,niProjM,niProjMois,hsCum,hsCap,decote,dom,creche:{brut:creche,proj:crecheProj,cmg:cmgCreche,net:crecheNet,base:crecheBase,ci:crecheCI,ok:enfCOk,n:enfC?enfC.n:'',months:crecheMonths,projMonths:crecheProjMonths},gard:{brut:gard,base:gardBase,ci:gardCI,ok:enfGOk,n:enfG?enfG.n:'',age:enfG?ageAt(enfG.ne,y):null},dons:{brut:dons,proj:donsProj,red:donsRed},per,eng,netImp,conj,abat,rni,irBrut,avantage,credits,reductions,irNet,solde,pasPaye,reste}}
 function declYear(y){const g=DB.garde;const now=new Date();const cur=now.getFullYear()*12+now.getMonth()+1;let dep=0,cmg=0,depD=0,cmgD=0;
 const from=g.contractFrom?+g.contractFrom.slice(0,4)*12+ +g.contractFrom.slice(5,7):y*12+1;
 for(let idx=y*12+1;idx<=y*12+12;idx++){if(idx<from)continue;const yy=y,mm=idx-y*12;const c=gardeCost(yy,mm);if(c.before||c.after)continue;
@@ -3301,7 +3347,7 @@ ${[['Revenu imposable encaissé',X.aDate.ni,X.netImp],['PER versé',X.aDate.per,
 <div class="eyebrow" style="margin-bottom:4px">Détail de la projection fin d\u2019année</div>
 ${line('Revenu imposable (toi)',fE(X.netImp),null,X.bulMois.length?'bulletins '+MS[X.bulMois[0]]+'→'+MS[X.bulMois.slice(-1)[0]]+' '+fE(X.niBul)+(X.niProj?' + projeté '+fE(X.niProj)+' ('+X.niProjMois.map(m=>MS[m]).join(', ')+' à '+fE(X.niProjM)+'/mois'+(X.hsCum>=X.hsCap-1?', HS exonérées épuisées':'')+')':''):'estimation · saisis les bulletins ci-dessous')}
 ${X.hsCum?line('dont heures supplémentaires exonérées','− '+fE(Math.min(X.hsCum,X.hsCap)),'var(--up)','déjà retirées par '+esc(emplL())+' · impôt évité ≈ '+fE(Math.round(Math.min(X.hsCum,X.hsCap)*0.30))+' à la tranche de 30 %'):''}
-${line('Revenu conjoint',fE(X.conj))}
+${line('Revenu conjoint',fE(X.conj),null,X.conjDe?'repris de '+X.conjDe+' : à saisir pour '+y+' dans les hypothèses':'')}
 ${line('Abattement 10 %','− '+fE(X.abat))}
 ${line('PER déduit','− '+fE(X.per.tot),null,(X.per.src==='mixte'?'en dur jusqu\u2019à '+F.perReelDepuis+' ('+fE(X.per.dur)+'), relevés ensuite ('+fE(X.per.rel)+')':X.per.src==='relevé'?'d\u2019après les relevés':'montants en dur (Invest → versements)')+(X.per.proj?' · '+fE(X.per.proj)+' projetés sur les mois à venir (dernier versement connu)':''))}
 ${line('Revenu net imposable du foyer',fE(X.rni),'var(--t)')}
@@ -3331,7 +3377,8 @@ ${line('Crédit 50 %',fE(X.gard.ci),'var(--up)','sur '+fE(X.gard.brut)+' · plaf
 ${line('Dons',fE(X.dons.brut+X.dons.proj),null,'relevé '+fE(X.dons.brut)+(X.dons.proj?' + projeté '+fE(X.dons.proj):''))}
 ${line('Réduction 66 %',fE(X.dons.red),'var(--up)')}
 <div class="eyebrow" style="margin:10px 0 4px">Heures supplémentaires</div>
-<div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt jusqu\u2019à ${fE(X.hsCap)} par an. Cumul ${y} d\u2019après les bulletins : <b>${fE(X.hsCum)}</b>${X.hsCum>=X.hsCap-1?' — plafond atteint en '+ML[X.bulMois.slice(-1)[0]]+', les heures sup des mois suivants sont imposables (déjà pris en compte dans la projection).':'.'} Déjà retirées du revenu imposable par ${esc(emplL())} ; à contrôler sur la déclaration pré-remplie.</div>
+<div style="font-size:11.5px;color:var(--tm);line-height:1.5">Exonérées d\u2019impôt jusqu\u2019à ${fE(X.hsCap)} par an. Cumul exonéré ${y} : <b>${fE(X.hsCum)}</b>${X.hsDeclare>X.hsCum+1?' (les bulletins déclarent '+fE(X.hsDeclare)+' : ce qui dépasse le plafond est ignoré)':''}${X.hsCum>=X.hsCap-1?' — plafond atteint en '+ML[X.hsMoisCap||X.bulMois.slice(-1)[0]]+', les heures sup des mois suivants sont imposables (déjà pris en compte dans la projection).':'.'} Déjà retirées du revenu imposable par ${esc(emplL())} ; à contrôler sur la déclaration pré-remplie.</div>
+${X.cumCtl&&Math.abs(X.cumCtl.ecart)>1?'<div class="al alb" style="margin-top:8px;font-size:11.5px;line-height:1.5"><b>Contrôle du net fiscal.</b> Somme des mois saisis : '+fE2(X.cumCtl.niSomme)+'. Cumul imprimé sur le bulletin de '+ML[X.cumCtl.m].toLowerCase()+' : '+fE2(X.cumCtl.ni)+'. Écart : '+fE2(X.cumCtl.ecart)+'. L’estimation garde la somme des mois : elle compte aussi ce que l’employeur a soumis au prélèvement sans l’inscrire dans son net fiscal (indemnités de Sécurité sociale, par exemple), qui reste imposable. Sans indemnités dans l’année, un mois saisi est à revoir.</div>':''}
 </div></div>
 
 ${(()=>{const D=declYear(y);const cr=X.creche;const crecheD=Math.max(0,cr.brut-cr.months.reduce((a,m)=>{const k=ym(y,m);const c=((DB.params.proj||{}).aides||[]).find(a2=>/cr[eè]che/i.test(a2.l));return a+((c&&(!c.from||c.from<=k)&&(!c.to||c.to>=k))?(+c.v||0):0)},0));
@@ -3362,7 +3409,7 @@ ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{const k=ym(y,m);const b=F.bulletins[k]||{
 </tbody></table></div></div>
 <div class="card"><div class="card-h"><span class="dot" style="background:var(--td)"></span>Hypothèses de calcul</div><div class="card-b">
 <div class="prm"><label>Forcer le revenu imposable ${y}<small>€ · optionnel — sinon bulletins + projection</small></label><input class="inp sm mono" type="number" value="${F.netImposable[y]!=null?F.netImposable[y]:''}" placeholder="${X.netImp}" onchange="fscSet('netImposable.${y}',+this.value||0)"></div>
-<div class="prm"><label>Revenu imposable conjoint ${y}<small>€</small></label><input class="inp sm mono" type="number" value="${X.conj}" onchange="fscSet('conjointRevenu.${y}',+this.value||0)"></div>
+<div class="prm"><label>Revenu imposable conjoint ${y}<small>€${X.conjDe?' · repris de '+X.conjDe+' tant que '+y+' n’est pas saisi':''}</small></label><input class="inp sm mono" type="number" value="${X.conj}" onchange="fscSet('conjointRevenu.${y}',+this.value||0)"></div>
 <div class="prm"><label>PAS payé avant les relevés ${y}<small>€ · cumul « impôt prélevé » des bulletins jusqu\u2019à mars</small></label><input class="inp sm mono" type="number" value="${F.pasManuel[y]||''}" placeholder="0" onchange="fscSet('pasManuel.${y}',+this.value||0)"></div>
 <div class="eyebrow" style="margin:8px 0 4px">Taux de PAS par période</div>
 ${(F.pasPeriodes||[]).map((pp,i)=>'<div class="row" style="gap:6px;align-items:center;font-size:12px;margin-bottom:4px"><span>à partir de</span><input class="inp sm mono" style="width:86px" value="'+esc(pp.from)+'" placeholder="AAAA-MM" onchange="fscSet(\'pasPeriodes.'+i+'.from\',this.value)"><input class="inp sm mono" type="number" step="0.1" style="width:70px" value="'+pp.taux+'" onchange="fscSet(\'pasPeriodes.'+i+'.taux\',+this.value||0)"><span>%</span>'+(i>0?'<span class="xdel" onclick="DB.fp.fisc.pasPeriodes.splice('+i+',1);save();rMore()">×</span>':'')+'</div>').join('')}
@@ -3644,23 +3691,45 @@ rows.sort((a,b)=>b.y-a.y).forEach(r=>{r.parts.sort((a,b)=>a.x-b.x);let t='',end=
 try{doc.destroy()}catch(e){}return out}
 const BUL_F=[['brut','Rémunération brute'],['ni','Net fiscal (base du prélèvement)'],['taux','Taux du prélèvement (%)'],['pas','Impôt prélevé à la source'],['hs','Heures sup exonérées'],['net','Net à payer (virement)'],['netSocial','Montant net social']];
 function bulParse(lines){const T=lines.map(l=>l.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''));const find=re=>{for(const l of T){const m=l.match(re);if(m)return m}return null};
-const cents=s=>Math.round(parseInt(s,10))/100;const sp=(a,b)=>+(String(a).replace(/\s/g,'')+'.'+b);const v={},R={y:null,m:null,vals:v,checks:[],n:0};
+const cents=s=>Math.round(parseInt(s,10))/100;const sp=(a,b)=>+(String(a).replace(/\s/g,'')+'.'+b);const v={},R={y:null,m:null,vals:v,checks:[],n:0,cum:{},notes:[],hsAuto:false,hsSoc:null};
 const MO=['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE'];
 let m=find(/PERIODE D.EMPLOI\s+DU\s*:?\s*\d{1,2}\s+([A-Z]+)\s+(\d{4})/);if(m&&MO.indexOf(m[1])>=0){R.m=MO.indexOf(m[1])+1;R.y=+m[2]}
 m=find(/REMUNERATION BRUTE.*?\.{3,}\s*(\d{3,})\b/);if(m)v.brut=cents(m[1]);
-m=find(/HS EXO SOC\.?\s*:?\s*([\d ]+),(\d{2})/);if(m)v.hs=sp(m[1],m[2]);
+// v152 · « HS EXO SOC. » est le montant brut des heures sup exonérées de cotisations : il n'est plus lu comme montant exonéré d'impôt.
+m=find(/HS EXO SOC\.?\s*:?\s*([\d ]+),(\d{2})/);if(m)R.hsSoc=sp(m[1],m[2]);
+// « HS/HC EXONEREES FISCAL » : montant du mois puis cumul depuis janvier. Un seul montant = le cumul (rien d'exonéré ce mois-ci) : le mois se déduit alors du cumul.
+m=find(/HS\/HC EXONEREES FISCAL\s+(\d{1,6}) (\d{2})(?!\d)(?:\s+(\d{1,6}) (\d{2})(?!\d))?/);if(m){if(m[3]!=null){v.hs=sp(m[1],m[2]);R.cum.hs=sp(m[3],m[4])}else{R.cum.hs=sp(m[1],m[2]);R.hsAuto=true}}else R.notes.push('Ligne « HS/HC exonérées fiscal » introuvable : saisir à la main les heures sup exonérées d’impôt');
 m=find(/MONTANT NET SOCIAL\s+(\d[\d ]*?)\s(\d{2})\s*$/);if(m)v.netSocial=sp(m[1],m[2]);
 let avant=null;m=find(/NET A PAYER AVANT IMPOT SUR LE REVENU\s+(\d[\d ]*?)\s(\d{2})\s*$/);if(m)avant=sp(m[1],m[2]);
-let netL=null;m=find(/PRELEVEMENT A LA SOURCE\s+(\d+) (\d{2})\s+(\d+) (\d{2})(?:\s+(\d+) (\d{2}))?/);if(m){v.pas=sp(m[1],m[2]);if(m[5])netL=sp(m[5],m[6])}
-m=find(/NET FISCAL\s+(\d+) (\d{2})/);if(m)v.ni=sp(m[1],m[2]);
-let pas2=null;m=find(/IMPOT SUR LE REVENU PRELEVE\s+(\d+)\s+(\d{4})\s+(\d+)-/);if(m){v.taux=Math.round(parseInt(m[2],10))/1000;pas2=cents(m[3]);if(v.pas==null)v.pas=pas2;if(v.ni==null)v.ni=cents(m[1])}
+let netL=null;m=find(/PRELEVEMENT A LA SOURCE\s+(\d+) (\d{2})\s+(\d+) (\d{2})(?:\s+(\d+) (\d{2}))?/);if(m){v.pas=sp(m[1],m[2]);R.cum.pas=sp(m[3],m[4]);if(m[5])netL=sp(m[5],m[6])}
+m=find(/NET FISCAL\s+(\d+) (\d{2})(?!\d)(?:\s+(\d+) (\d{2})(?!\d))?/);if(m){v.ni=sp(m[1],m[2]);if(m[3]!=null)R.cum.ni=sp(m[3],m[4])}
+let pas2=null,ni2=null;m=find(/IMPOT SUR LE REVENU PRELEVE\s+(\d+)\s+(\d{4})\s+(\d+)-/);if(m){v.taux=Math.round(parseInt(m[2],10))/1000;pas2=cents(m[3]);ni2=cents(m[1]);if(v.pas==null)v.pas=pas2;if(v.ni==null)v.ni=cents(m[1])}
 if(netL!=null)v.net=netL;else if(avant!=null&&v.pas!=null)v.net=Math.round((avant-v.pas)*100)/100;
 R.n=BUL_F.filter(f=>v[f[0]]!=null).length;const ck=(l,ok)=>R.checks.push({l,ok});
 if(v.net!=null&&avant!=null&&v.pas!=null)ck('Net à payer = net avant impôt − impôt prélevé',Math.abs(v.net-(avant-v.pas))<0.02);
 if(v.pas!=null&&v.ni!=null&&v.taux!=null)ck('Impôt prélevé = net fiscal × taux',Math.abs(v.pas-v.ni*v.taux/100)<1);
 if(v.pas!=null&&pas2!=null)ck('Impôt prélevé identique aux deux endroits du bulletin',Math.abs(v.pas-pas2)<0.02);
 if(v.brut!=null&&v.net!=null)ck('Net inférieur au brut',v.net<v.brut);
+if(v.ni!=null&&ni2!=null)ck('Net fiscal identique aux deux endroits du bulletin',Math.abs(v.ni-ni2)<0.02);
+if(v.hs!=null&&R.cum.hs!=null)ck('Heures sup exonérées du mois inférieures au cumul annuel',v.hs<=R.cum.hs+0.01);
+if(R.cum.pas!=null&&v.pas!=null)ck('Impôt prélevé du mois inférieur au cumul annuel',v.pas<=R.cum.pas+0.01);
+if(v.ni==null||v.pas==null||v.brut==null)R.notes.push('Mise en page différente de celle attendue : des montants essentiels manquent, vérifier chaque champ');
 return R}
+// v152 · ce qu'il reste du plafond annuel d'heures sup exonérées avant le mois m
+function hsRoom(y,m){const cap=+((DB.fp.fisc.bareme||{}).hsPlafond)||7500;return Math.max(0,Math.round((cap-bulCumBefore(y,m).hs)*100)/100)}
+// cumuls de l'application avant le mois m (heures sup exonérées plafonnées, net fiscal, impôt prélevé) ; complet = tous les mois précédents sont saisis
+function bulCumBefore(y,m){const F=DB.fp.fisc;const B=F.bulletins||{};const cap=+((F.bareme||{}).hsPlafond)||7500;let hs=0,ni=0,pas=0,complet=true;for(let i=1;i<m;i++){const b=B[ym(y,i)];if(!b){complet=false;continue}hs+=Math.max(0,Math.min(+b.hs||0,cap-hs));ni+=+b.ni||0;pas+=+b.pas||0}return{hs,ni,pas,complet}}
+const fE2=x=>(x<0?'−':'')+(Math.round(Math.abs(x)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+// contrôles des cumuls : ce que l'application aurait après ce bulletin, comparé à ce que le bulletin imprime (« depuis 01 »)
+function bulCumulChecks(R){const out=[];const C=R.cum||{};if(C.hs==null&&C.ni==null&&C.pas==null)return out;const A=bulCumBefore(R.y,R.m);const pv=R.m>1?((DB.fp.fisc.bulletins||{})[ym(R.y,R.m-1)]||null):null;let saute=false;
+// si le bulletin du mois précédent a ses cumuls : on contrôle la hausse du cumul ; sinon, si tous les mois précédents sont saisis : on contrôle le total
+const un=(lab,key,val,avant,note)=>{if(C[key]==null||val==null)return;const pc=pv?pv[key+'Cumul']:null;
+if(pc!=null){const d=C[key]-pc;out.push({l:lab+' : le cumul du bulletin monte de '+fE2(d)+', le mois vaut '+fE2(val)+(Math.abs(d-val)>1?' · écart '+fE2(val-d)+(note||''):''),ok:Math.abs(d-val)<=1})}
+else if(A.complet){const app=avant+val;out.push({l:lab+' : cumul de l’application '+fE2(app)+' · cumul du bulletin '+fE2(C[key])+(Math.abs(app-C[key])>1?' · écart '+fE2(app-C[key])+(note||''):''),ok:Math.abs(app-C[key])<=1})}
+else saute=true};
+const ij=' (normal si des indemnités de Sécurité sociale sont passées par l’employeur dans l’année ; sinon un mois saisi est à revoir)';
+un('Heures sup exonérées','hs',R.vals.hs,A.hs);un('Impôt prélevé','pas',R.vals.pas,A.pas);un('Net fiscal','ni',R.vals.ni,A.ni,ij);
+if(saute)out.push({l:'Cumuls non contrôlés : il manque des bulletins avant '+ML[R.m],ok:true});return out}
 let BUL_R=null,BUL_CTX='';
 function bulImport(inp,ctx){const f=inp.files&&inp.files[0];inp.value='';if(!f)return;BUL_CTX=ctx||'';const fr=new FileReader();fr.onerror=()=>uiAlert('Lecture impossible. Le fichier n’a pas pu être ouvert.');
 fr.onload=async()=>{try{const lines=await pdfLines(fr.result);if(!lines.length){uiAlert('Bulletin illisible. Ce PDF ne contient pas de texte (c’est sans doute une image scannée). Saisissez les montants à la main.');return}
@@ -3668,15 +3737,16 @@ const R=bulParse(lines);if(R.n<3){uiAlert('Format de bulletin non reconnu. Seuls
 if(!R.y&&ctx&&/^\d{4}-\d{2}$/.test(ctx)){R.y=+ctx.slice(0,4);R.m=+ctx.slice(5)}if(!R.y){const n=new Date();R.y=n.getFullYear();R.m=n.getMonth()+1}R.file=f.name;BUL_R=R;bulReview()}
 catch(e){uiAlert('Lecture du bulletin impossible. '+((e&&e.message)||e)+'. Vérifiez la connexion, puis réessayez ; sinon saisissez les montants à la main.')}};fr.readAsArrayBuffer(f)}
 function bulReview(){const R=BUL_R;if(!R)return;const s=document.getElementById('sheet'),b=document.getElementById('sheet-b');if(!s||!b)return;const B=(DB.fp.fisc.bulletins=DB.fp.fisc.bulletins||{});const k=ym(R.y,R.m);const old=B[k]||{};const hasOld=BUL_F.some(f=>old[f[0]]);
-const bad=R.checks.filter(c=>!c.ok);SHEET_CB=()=>{};
-b.innerHTML='<div class="sh-t">Bulletin lu : vérifiez avant d’enregistrer</div><div class="sh-d" style="margin-bottom:8px">'+esc(R.file||'')+' · '+R.n+' montants sur 7 trouvés</div>'+
+const hsCalc=!!(R.hsAuto&&!R.hsTouched&&R.cum&&R.cum.hs!=null);if(hsCalc)R.vals.hs=Math.max(0,Math.round((R.cum.hs-bulCumBefore(R.y,R.m).hs)*100)/100);
+const room=hsRoom(R.y,R.m);const CK=R.checks.concat(R.vals.hs!=null?[{l:'Heures sup exonérées dans le plafond annuel : il reste '+fE(room)+' pour ce mois'+(R.vals.hs>room+0.5?' (à corriger dans le champ)':''),ok:!(R.vals.hs>room+0.5)}]:[]).concat(bulCumulChecks(R));const bad=CK.filter(c=>!c.ok);const nLu=BUL_F.filter(f=>R.vals[f[0]]!=null).length;SHEET_CB=()=>{};
+b.innerHTML='<div class="sh-t">Bulletin lu : vérifiez avant d’enregistrer</div><div class="sh-d" style="margin-bottom:8px">'+esc(R.file||'')+' · '+nLu+' montants sur 7 trouvés</div>'+((R.notes||[]).length?'<div class="al ala" style="margin-bottom:8px;font-size:11.5px">'+R.notes.map(esc).join('<br>')+'</div>':'')+
 '<div style="max-height:56vh;overflow:auto;padding-right:2px">'+
 '<div class="prm" style="grid-template-columns:minmax(0,1fr) auto"><label>Mois du bulletin</label><div class="row" style="gap:4px"><select class="inp sm" id="bul-m" style="width:118px" onchange="BUL_R.m=+this.value;bulReview()">'+ML.map((n,i)=>i?'<option value="'+i+'"'+(i===R.m?' selected':'')+'>'+n+'</option>':'').join('')+'</select><input class="inp sm mono" id="bul-y" type="number" style="width:74px" value="'+R.y+'" onchange="BUL_R.y=+this.value||BUL_R.y;bulReview()"></div></div>'+
-BUL_F.map(f=>{const x=R.vals[f[0]];const o=old[f[0]];return'<div class="prm"><label>'+f[1]+'<small>'+(x==null?'<span style="color:var(--dn)">non trouvé, à saisir</span>':'lu dans le PDF')+(o?' · déjà saisi : '+f$(o)+(x!=null&&Math.abs(o-x)>0.005?' <span style="color:var(--gold)">(différent)</span>':''):'')+'</small></label><input class="inp sm mono" style="text-align:right" type="number" step="0.01" inputmode="decimal" value="'+(x!=null?x:'')+'" onchange="BUL_R.vals[\''+f[0]+'\']=this.value===\'\'?null:(+this.value||0)"></div>'}).join('')+
-(R.checks.length?'<div class="al '+(bad.length?'ala':'alg')+'" style="margin-top:10px"><b>'+(bad.length?'Contrôles : '+bad.length+' écart'+(bad.length>1?'s':'')+' à regarder':'Contrôles de cohérence : tout concorde')+'</b>'+R.checks.map(c=>'<div style="font-size:11.5px;margin-top:3px">'+(c.ok?'✓':'✗')+' '+esc(c.l)+'</div>').join('')+'</div>':'')+
+BUL_F.map(f=>{const x=R.vals[f[0]];const o=old[f[0]];return'<div class="prm"><label>'+f[1]+'<small>'+(x==null?'<span style="color:var(--dn)">non trouvé, à saisir</span>':(f[0]==='hs'&&hsCalc?'calculé : cumul du bulletin − cumul déjà saisi':'lu dans le PDF'))+(o?' · déjà saisi : '+f$(o)+(x!=null&&Math.abs(o-x)>0.005?' <span style="color:var(--gold)">(différent)</span>':''):'')+'</small></label><input class="inp sm mono" style="text-align:right" type="number" step="0.01" inputmode="decimal" value="'+(x!=null?x:'')+'" onchange="BUL_R.vals[\''+f[0]+'\']=this.value===\'\'?null:(+this.value||0)'+(f[0]==='hs'?';BUL_R.hsTouched=true;bulReview()':'')+'"></div>'}).join('')+
+(CK.length?'<div class="al '+(bad.length?'ala':'alg')+'" style="margin-top:10px"><b>'+(bad.length?'Contrôles : '+bad.length+' écart'+(bad.length>1?'s':'')+' à regarder':'Contrôles de cohérence : tout concorde')+'</b>'+CK.map(c=>'<div style="font-size:11.5px;margin-top:3px">'+(c.ok?'✓':'✗')+' '+esc(c.l)+'</div>').join('')+'</div>':'')+
 (hasOld?'<div style="font-size:11px;color:var(--td);margin-top:8px">'+ML[R.m]+' '+R.y+' a déjà des valeurs : elles seront remplacées.</div>':'')+
 '</div><div class="row" style="gap:8px;margin-top:14px"><button class="btn btn-ghost" onclick="BUL_R=null;sheetClose(null)">Annuler</button><button class="btn btn-gold" style="flex:1" onclick="bulSave()">Enregistrer '+MS[R.m]+' '+R.y+'</button></div>';s.classList.add('on')}
-function bulSave(){const R=BUL_R;if(!R)return;const B=(DB.fp.fisc.bulletins=DB.fp.fisc.bulletins||{});const k=ym(R.y,R.m);const o=Object.assign({},B[k]||{});BUL_F.forEach(f=>{const x=R.vals[f[0]];if(x!=null&&!isNaN(x))o[f[0]]=Math.round(x*100)/100});B[k]=o;BUL_R=null;sheetClose(null);save();try{if(typeof WZ!=='undefined'&&WZ&&document.getElementById('wiz')&&document.getElementById('wiz').classList.contains('on'))wizRender();else RA()}catch(e){try{RA()}catch(x){}}}
+function bulSave(){const R=BUL_R;if(!R)return;const B=(DB.fp.fisc.bulletins=DB.fp.fisc.bulletins||{});const k=ym(R.y,R.m);const o=Object.assign({},B[k]||{});BUL_F.forEach(f=>{const x=R.vals[f[0]];if(x!=null&&!isNaN(x))o[f[0]]=Math.round(x*100)/100});['hs','ni','pas'].forEach(c=>{if(R.cum&&R.cum[c]!=null)o[c+'Cumul']=Math.round(R.cum[c]*100)/100});B[k]=o;BUL_R=null;sheetClose(null);save();try{if(typeof WZ!=='undefined'&&WZ&&document.getElementById('wiz')&&document.getElementById('wiz').classList.contains('on'))wizRender();else RA()}catch(e){try{RA()}catch(x){}}}
 
 /* ================= VUE ORDINATEUR : colonnes principale / latérale ================= */
 const DK={budget:{side:[/^point d'étape/,/^revenus compl/,/^investissements/,/^livrets/,/^exceptionnel/,/^notes du mois/],intro:'side'},
