@@ -465,7 +465,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v149';const VTAG='corrections du Cap, du balayage et du récapitulatif ; correctif importable hors connexion';
+const VERSION='v150';const VTAG='sécurité : l’autotest n’enregistre plus rien, annulation protégée';
 
 function defCh(){return[{l:'Loyer',v:0},{l:'Frais divers',v:0}]}
 function defRev(){return[]}
@@ -565,7 +565,7 @@ const fa=Object.keys(((a.fp||{}).fisc||{}).bulletins||{}).length,fb=Object.keys(
 return out}
 function fmtRev(c){if(!c)return'?';const d=c._ts?new Date(c._ts):null;return'r'+(+(c._rev)||0)+(c._dev?' · '+c._dev:'')+(d?' · '+d.toLocaleDateString('fr-FR')+' '+d.toTimeString().slice(0,5):'')}
 function cloudRef(){return fdb.collection('data').doc(DID)}
-function applyCloud(c,why){DB=c;DB._dirty=false;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}CLOUD_REV=localRev();syncLog('pull',why+' → '+fmtRev(DB))}
+function applyCloud(c,why){DB=c;DB._dirty=false;ensure();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}CLOUD_REV=localRev();syncLog('pull',why+' → '+fmtRev(DB));if(!TESTING)histReset()}
 function gateShow(txt){const g=document.getElementById('syncgate');if(!g)return;g.style.display='flex';const t=document.getElementById('syncgate-t');if(t&&txt)t.textContent=txt}
 function gateHide(){const g=document.getElementById('syncgate');if(g)g.style.display='none'}
 let LC_TIMER=null,LC_RETRY=null;
@@ -598,14 +598,24 @@ function conflictAsk(){const c=SYNC_CONFLICT;if(!c)return;const d1=diffSummary(D
 uiChoice('Deux versions différentes',{desc:txt,choices:[{l:'Garder cet appareil (écrase le cloud)',v:'local',cls:'btn-gold'},{l:'Prendre le cloud (abandonne les modifications d\u2019ici)',v:'cloud'}]}).then(ch=>{if(ch==null)return;const keepLocal=ch==='local';const keep=DB;DB=c;backupNow('cloud, avant arbitrage');DB=keep;backupNow('cet appareil, avant arbitrage',()=>{if(keepLocal){syncLog('resolve','appareil gardé');cloudPush(true)}else{syncLog('resolve','cloud pris');applyCloud(c,'arbitrage : cloud pris');SYNC_CONFLICT=null;sss('ok');if(typeof RA==='function')RA()}})})}
 let POSTLOADED=false;
 function postLoad(){SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns();if(POSTLOADED){if(typeof RA==='function')RA();return}POSTLOADED=true;migrateGarde();setTimeout(foldWatch,300);setTimeout(versionCheck,1200);const n=new Date();syncMonth(gBM(n.getFullYear(),n.getMonth()+1));if(typeof RA==='function'&&document.getElementById('app').style.display==='block')RA()}
-const HIST=[],REDO=[],HIST_MAX=6;let SNAP_LAST=null,UNDOING=false;
-function histPush(){if(UNDOING)return;if(SNAP_LAST!=null){HIST.push(SNAP_LAST);if(HIST.length>HIST_MAX)HIST.shift();REDO.length=0}SNAP_LAST=JSON.stringify(DB);histBtns()}
+const HIST=[],REDO=[],HIST_MAX=6;let SNAP_LAST=null,UNDOING=false,TESTING=false;
+function histPush(){if(UNDOING||TESTING)return;if(SNAP_LAST!=null){HIST.push(SNAP_LAST);if(HIST.length>HIST_MAX)HIST.shift();REDO.length=0}SNAP_LAST=JSON.stringify(DB);histBtns()}
+function histReset(){SNAP_LAST=JSON.stringify(DB);HIST.length=0;REDO.length=0;histBtns()}
+// v150 · avant d'annuler ou de rétablir : ce que l'état visé contient en moins par rapport à l'état actuel
+function histRisk(snap){let t;try{t=JSON.parse(snap)}catch(e){return['état illisible']}const out=[];const nb=d=>(d.bm||[]).length,nc=d=>(d.bm||[]).filter(b=>b.cl).length,ni=d=>(d.im||[]).length;
+const inv=d=>{try{const L=[...(d.im||[])].sort((a,b)=>(a.y*12+a.m)-(b.y*12+b.m)).filter(x=>invOf(x)>0);return L.length?invOf(L[L.length-1]):0}catch(e){return 0}};
+if(nb(t)<nb(DB))out.push((nb(DB)-nb(t))+' mois de budget en moins');if(nc(t)<nc(DB))out.push((nc(DB)-nc(t))+' mois clôturé'+(nc(DB)-nc(t)>1?'s':'')+' en moins');if(ni(t)<ni(DB))out.push((ni(DB)-ni(t))+' mois de placements en moins');
+const a=inv(DB),b=inv(t);if(a>0&&b<a*0.5)out.push('placements : '+fE(Math.round(a))+' → '+fE(Math.round(b)));return out}
+async function histGo(from,to,undoing){if(!from.length){uiAlert(undoing?'Rien à annuler dans cette session.':'Rien à rétablir.');return}const snap=from[from.length-1];const R=histRisk(snap);
+if(R.length&&!await uiConfirm((undoing?'Annuler':'Rétablir')+' quand même ?',{desc:'L’état qui serait restauré contient moins de données que l’état actuel : '+R.join(' · ')+'. Il remplacerait aussi la version du cloud.',ok:'Continuer'}))return;
+if(from[from.length-1]!==snap)return;from.pop();to.push(SNAP_LAST);histApply(snap)}
 function histBtns(){const u=document.getElementById('undobtn'),r=document.getElementById('redobtn');if(u){u.style.opacity=HIST.length?1:.35;u.title=HIST.length?'Annuler la dernière modification ('+HIST.length+' disponible'+(HIST.length>1?'s':'')+')':'Rien à annuler'}if(r){r.style.opacity=REDO.length?1:.35;r.title=REDO.length?'Rétablir ('+REDO.length+')':'Rien à rétablir'}}
 function histApply(snap){UNDOING=true;try{const rev=localRev();DB=JSON.parse(snap);DB._rev=rev;ensure();GM_CACHE={};DB._ts=Date.now();DB._dirty=true;try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){}SNAP_LAST=JSON.stringify(DB);if(fdb){if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500)}if(typeof RA==='function')RA()}finally{UNDOING=false;histBtns()}}
-function undo(){if(!HIST.length){uiAlert('Rien à annuler dans cette session.');return}REDO.push(SNAP_LAST);histApply(HIST.pop())}
-function redo(){if(!REDO.length){uiAlert('Rien à rétablir.');return}HIST.push(SNAP_LAST);histApply(REDO.pop())}
+function undo(){return histGo(HIST,REDO,true)}
+function redo(){return histGo(REDO,HIST,false)}
 let LS_WARNED=false;function lsFail(e){if(LS_WARNED)return;LS_WARNED=true;try{errShow('Enregistrement local impossible sur cet appareil ('+((e&&e.name)||'erreur')+'). Vos modifications ne sont gardées que si la synchronisation cloud passe : exportez une sauvegarde (Plus → Sauvegardes) et libérez de l\u2019espace (captures d\u2019écran dans Invest, navigation privée).')}catch(x){}}
-function save(){histPush();GM_CACHE={};FISC_MEMO={};DB._ts=Date.now();DB._dirty=true;DB._dirtyAt=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){lsFail(e)}if(fdb){if(SS_STATE!=='conflict')sss(CLOUD_READ?'dirty':'noread');if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
+function save(){if(TESTING){GM_CACHE={};FISC_MEMO={};return} // v150 · autotest : base fictive, rien n'est enregistré
+histPush();GM_CACHE={};FISC_MEMO={};DB._ts=Date.now();DB._dirty=true;DB._dirtyAt=Date.now();try{localStorage.setItem('hft7',JSON.stringify(DB))}catch(e){lsFail(e)}if(fdb){if(SS_STATE!=='conflict')sss(CLOUD_READ?'dirty':'noread');if(svT)clearTimeout(svT);svT=setTimeout(s2c,1500);
 const today=todayKey();let last='';try{last=localStorage.getItem('hft7_bkday')||''}catch(e){}if(CLOUD_READ&&last!==today){try{localStorage.setItem('hft7_bkday',today)}catch(e){}setTimeout(()=>backupNow('quotidienne'),4000)}}}
 function toCloud(c){return JSON.stringify(c)}
 /* ---- lot B : format du document cloud. json1 = texte ; gz1 = gzip + base64 (≈ 4 fois plus petit). Un document illisible n'est JAMAIS traité comme vide. ---- */
@@ -728,7 +738,7 @@ for(const op of c.ops){if(!op||(op.op!=='set'&&op.op!=='del'))return'opération 
 function corrParent(path,create){let o=DB;for(let i=0;i<path.length-1;i++){const k=path[i];if(o[k]==null){if(!create)return null;o[k]=(typeof path[i+1]==='number')?[]:{}}o=o[k];if(o===null||typeof o!=='object')return null}return o}
 function correctifDone(id){return((DB.params&&DB.params.correctifs)||[]).some(x=>x.id===id)}
 function correctifApply(c,silent){const err=correctifCheck(c);if(err)return{ok:false,err};if(correctifDone(c.id))return{ok:false,err:'déjà appliqué',deja:true};const snap=JSON.stringify(DB);
-try{let n=0,skip=0;c.ops.forEach(op=>{const p=op.path,k=p[p.length-1];const o=corrParent(p,op.op==='set');if(!o){skip++;return}
+try{let n=0,skip=0;c.ops.forEach(op=>{const p=op.path,k=p[p.length-1];const o=corrParent(p,op.op==='set'&&op.si!=='egal');if(!o){skip++;return}
 if(op.op==='del'){if(Array.isArray(o)){if(typeof k==='number'&&k>=0&&k<o.length){o.splice(k,1);n++}else skip++}else if(Object.prototype.hasOwnProperty.call(o,k)){delete o[k];n++}else skip++;return}
 if(op.si==='absent'&&o[k]!=null){skip++;return}if(op.si==='egal'&&JSON.stringify(o[k])!==JSON.stringify(op.attendu)){skip++;return}
 o[k]=JSON.parse(JSON.stringify(op.value));n++});
@@ -2933,7 +2943,13 @@ ${(P.depPonctuels||[]).map((p,i)=>'<div class="pjrow"><div class="l1"><input cla
 mkC('ch-proj',{type:'line',data:{labels:labs,datasets:[{data:T,borderColor:ACC(),backgroundColor:ACCA(.08),fill:true,tension:.3,pointRadius:2},{data:Rr,borderColor:'#3DDC97',backgroundColor:'rgba(61,220,151,.1)',fill:true,tension:.3,pointRadius:3,spanGaps:false},{data:O,borderColor:'#6B7488',borderDash:[5,4],pointRadius:0,fill:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fE(c.parsed.y)}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{font:{size:10},callback:v=>Math.round(v/1000)+' k'}}}}})})()}
 
 /* ================= AUTOTEST ================= */
-function runSelfTests(){const saved=DB;const savedCache=GM_CACHE;const results=[];const ok=(n,c,d)=>results.push({n,ok:!!c,d:d||''});
+// v150 · l'autotest rejoue ses scénarios sur une base fictive. Avant la v150, ces scénarios appelaient save() : la base fictive entrait dans l'historique d'annulation et dans la copie locale.
+function runSelfTests(){const k={db:DB,s:SNAP_LAST,h:HIST.slice(),r:REDO.slice()};let ls0=null,ls1=null;try{ls0=localStorage.getItem('hft7')}catch(e){}let res=[];TESTING=true;
+try{res=runSelfTests0()}catch(e){res.push({n:'Exception pendant les tests',ok:false,d:String(e&&e.message||e).slice(0,120)})}
+finally{TESTING=false;DB=k.db;SNAP_LAST=k.s;HIST.length=0;k.h.forEach(x=>HIST.push(x));REDO.length=0;k.r.forEach(x=>REDO.push(x));GM_CACHE={};try{FISC_MEMO={}}catch(e){}histBtns()}
+try{ls1=localStorage.getItem('hft7')}catch(e){}
+res.push({n:'Autotest isolé : copie locale, base et historique d’annulation intacts',ok:ls0===ls1&&DB===k.db&&SNAP_LAST===k.s&&HIST.length===k.h.length,d:''});return res}
+function runSelfTests0(){const saved=DB;const savedCache=GM_CACHE;const results=[];const ok=(n,c,d)=>results.push({n,ok:!!c,d:d||''});
 try{DB=defDB();ensure();
 // jeu d'essai fictif : rien de personnel dans le programme
 Object.assign(DB.garde,{rate:12,rateShared:10.25,contractFrom:'2026-09-11',startY:2026,startM:10,plans:[{from:'2026-09-01',d:defPlanDays([[0,0],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])},{from:'2026-09-14',d:defPlanDays([[0.5,2],[0,0],[2.5,0],[0,0],[2.5,0],[0,0],[0,0]])}]});DB.garde.p.rev=6500;
@@ -3017,6 +3033,15 @@ ok('Synchronisation : version cloud affichée à jour après un envoi',cloudRevS
 ok('Correctif hors connexion : sauvegarde locale, sans attendre le cloud',corrBackupMode(true,false)==='local'&&corrBackupMode(true,true)==='cloud'&&corrBackupMode(false,true)==='local');
 let st=null;const fdb0=fdb;fdb=null;corrBackupGate('autotest',x=>{st=x},10);fdb=fdb0;ok('Correctif sans cloud : appliqué tout de suite',st==='local',String(st));
 }catch(e){ok('Corrections v149',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
+// v150 · sécurité de l'enregistrement et de l'annulation, sur données fictives
+(()=>{const sv=DB;try{DB=defDB();ensure();GM_CACHE={};
+const s0=SNAP_LAST,h0=HIST.length;DB.gn='essai';save();gOBM(2031,1);ok('Autotest : aucun enregistrement pendant les tests',SNAP_LAST===s0&&HIST.length===h0&&TESTING===true);
+DB.bm=[Object.assign(defBM(2026,9),{cl:true,cashFin:1}),Object.assign(defBM(2026,10),{cl:true,cashFin:1})];DB.im=[{y:2026,m:10,supports:[{n:'PEA',v:50000,det:[]}],contribs:[]}];
+const same=JSON.stringify(DB);const poor=JSON.parse(same);poor.bm.pop();poor.im[0].supports[0].v=0;const R=histRisk(JSON.stringify(poor));
+ok('Annulation : un état plus pauvre demande confirmation',histRisk(same).length===0&&R.length===3&&histRisk('{')[0]==='état illisible',R.join(' · '));
+DB.fp.fisc.enfants=[{n:'A',ne:'2020-01-01'}];const r=correctifApply({type:'patrimoine-correctif',id:'t-cond-1',ops:[{op:'set',path:['fp','fisc','enfants',3,'ne'],value:'2021-01-01',si:'egal',attendu:'2020-12-01'},{op:'set',path:['fp','fisc','enfants',0,'ne'],value:'2020-01-02',si:'egal',attendu:'2020-01-01'}]},true);
+ok('Correctif conditionnel : aucune ligne vide créée',r.ok&&r.n===1&&r.skip===1&&DB.fp.fisc.enfants.length===1&&DB.fp.fisc.enfants[0].ne==='2020-01-02',JSON.stringify(DB.fp.fisc.enfants));
+}catch(e){ok('Sécurité v150',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
 return results}
 function rAutotestPage(el){el.innerHTML='<button class="backlink" onclick="SUB=\'hub\';rMore()">‹ Plus</button><div class="pagetitle">Autotest</div><div class="card"><div class="card-b" style="font-size:12.5px;line-height:1.55">Quinze scénarios de calcul rejoués sur des données de test — <b>jamais sur ta base</b>. À lancer après chaque mise à jour de l\u2019app : tout doit être vert. Si une ligne est rouge, envoie-moi une capture.</div></div><div id="selftest-out">'+rSelfTest()+'</div><button class="btn btn-ghost sm wide" style="margin-top:10px" onclick="document.getElementById(\'selftest-out\').innerHTML=rSelfTest()">↻ Relancer</button><div style="text-align:center;margin-top:16px;font-size:11px;color:var(--td)">Version '+VERSION+' · '+VTAG+'</div>'}
 function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
