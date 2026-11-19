@@ -38,15 +38,16 @@ DB.params.cap={label:'Test',to:'2046-02',cibles:[{l:'Cible',v:900000}]};
 DB.params.proj.salaire=5000;DB.params.proj.aides=[{l:'Allocations familiales',v:150,from:'2026-01',to:''}];
 DB.params.proj.ponctuels=[{l:'Participation et intéressement',mois:8,v:9000}];
 DB.params.proj.depPonctuels=[{l:'Vacances été',v:3000,mois:8,an:2026,rec:true,id:'pvac'},{l:'Noël',v:800,mois:12,an:2026,rec:true,id:'pnoel'}];
+DB.params.recv={payers:[{id:'emp',n:'Employeur fictif',pat:'EMPLOYEUR FICTIF',delai:30,from:'2026-04-01',ini:0}],rules:[{id:'box',l:'Box internet',match:'FOURNISSEUR BOX',sauf:'',p:'emp',mode:'fixe',v:40,on:true}]};
 const S=(a,b)=>[{n:'PEA',v:a,det:[]},{n:'PEE Fonds',v:b,det:[]}];DB.bm=[];DB.im=[];
 const CH=()=>[{l:'Loyer',v:1000,fixe:true},{l:'Assurance habitation et responsabilité civile',v:38.5,fixe:true},{l:'Courses',v:2000}];
-const mkImp=(y,m,full)=>({done:true,at:(full?dayKeyOf(new Date(y,m,2)):ym(y,m)+'-13')+'T10:00:00.000Z',t:{fixe:1000,variable:2000,invest:200,salaire:5000,entree:0,foyerOut:0,foyerIn:0},bySub:{fixe:{},variable:{},entree:{},transfertFoyer:{}},byGrp:{},unmatched:[],salaireCount:1,internesOut:0,livretOut:0,livretIn:0,entrees:[],
- lines:[{d:ym(y,m)+'-05',l:'CB MAGASIN DU CENTRE COMMERCIAL REGIONAL',v:-2000,t:'variable',s:'Courses'},{d:ym(y,m)+(full?'-28':'-12'),l:'PRLV LOYER',v:-1000,t:'fixe',s:'Loyer'}],ccEndDate:ym(y,m)+(full?'-28':'-12'),consoCsv:3000});
+const mkImp=(y,m,full,paye)=>({done:true,at:(full?dayKeyOf(new Date(y,m,2)):ym(y,m)+'-13')+'T10:00:00.000Z',t:{fixe:1000,variable:2000,invest:200,salaire:5000,entree:0,foyerOut:0,foyerIn:0},bySub:{fixe:{},variable:{},entree:{},transfertFoyer:{}},byGrp:{},unmatched:[],salaireCount:1,internesOut:0,livretOut:0,livretIn:0,entrees:[],
+ lines:[{d:ym(y,m)+'-05',l:'CB MAGASIN DU CENTRE COMMERCIAL REGIONAL',v:-2000,t:'variable',s:'Courses'},{d:ym(y,m)+(full?'-28':'-12'),l:'PRLV LOYER',v:-1000,t:'fixe',s:'Loyer'},{d:ym(y,m)+'-02',l:'PRLV FOURNISSEUR BOX INTERNET ET TELEVISION',v:-45,t:'fixe',s:'Internet'}].concat(paye?[{d:ym(y,m)+'-17',l:'VIR EMPLOYEUR FICTIF REMBOURSEMENT DE FRAIS',v:40,t:'entree',s:'Remboursement frais'}]:[]).concat(paye&&m===4?[{d:ym(y,m)+'-20',l:'VIR EMPLOYEUR FICTIF NOTE DE FRAIS',v:120,t:'entree',s:'Remboursement frais'}]:[]),ccEndDate:ym(y,m)+(full?'-28':'-12'),consoCsv:3000});
 let y=2026,m=3,cc=6000,i=0;const end=o.last[0]*12+o.last[1];
 DB.bm.push(Object.assign(defBM(2026,3),{ch:CH(),cash:{cc:6000,la:2000,ldds:0},cashFin:8000,cl:true}));DB.im.push({y:2026,m:3,supports:S(20000,10000),contribs:[{l:'PEA mensuel',v:200}],cl:true});
 while(true){m++;if(m>12){m=1;y++}if(y*12+m>end)break;i++;const last=y*12+m===end;cc+=1800;
  const b=Object.assign(defBM(y,m),{ch:CH(),entrees:[{cat:'salaire',v:5000,l:'SALAIRE'}]});
- b.imp=mkImp(y,m,!last);if(!last){b.cash={cc,la:2000,ldds:0};b.cashFin=cc+2000;b.cl=true;b.closedAt=ym(y,m)+'-28'}
+ b.imp=mkImp(y,m,!last,y*12+m<=end-2);if(!last){b.cash={cc,la:2000,ldds:0};b.cashFin=cc+2000;b.cl=true;b.closedAt=ym(y,m)+'-28'}
  DB.bm.push(b);DB.im.push({y,m,supports:last?S(0,0):S(20000+i*300,10000+i*100),contribs:[{l:'PEA mensuel',v:200}],cl:!last})}
 if(o.code)pinSet(o.code);
 DB._marque='BASE FICTIVE';localStorage.setItem('hft7',JSON.stringify(DB));return DB.bm.length+' mois'}
@@ -61,7 +62,7 @@ OUVRIR_SANS_CODE = "()=>{document.getElementById('lock').style.display='none';do
 VUES = [
     ['accueil', "go('home')"], ['budget', "go('budget')"], ['invest', "go('invest')"], ['garde', "go('garde')"],
 ] + [['plus/' + s, "PG='more';go('more');SUB='%s';rMore()" % s] for s in
-     ['hub', 'fiscal', 'proj', 'cap', 'recur', 'decis', 'analyses', 'notes', 'gouv', 'rules', 'perso', 'donnees', 'config', 'guide', 'import', 'poches']]
+     ['hub', 'fiscal', 'proj', 'cap', 'recur', 'recv', 'decis', 'analyses', 'notes', 'gouv', 'rules', 'perso', 'donnees', 'config', 'guide', 'import', 'poches']]
 
 
 def _servir(corps, genre):

@@ -6,7 +6,7 @@ from commun import ouvrir, lancer, VUES
 PIEGE = r"""
 ()=>{const P='<img src=x onerror="window.__inj=(window.__inj||0)+1">\'"><b id=__inj_b>x</b>';let n=0;
 const walk=(o,d)=>{if(!o||d>6)return;if(Array.isArray(o)){o.forEach(x=>walk(x,d+1));return}if(typeof o!=='object')return;
- for(const k of Object.keys(o)){const v=o[k];if(typeof v==='string'&&/^(l|n|label|nom|lib|titre|note|motif|env|t|s|name|pattern)$/.test(k)&&!/^\d{4}-\d{2}/.test(v)){o[k]=P+' '+v.slice(0,12);n++}else walk(v,d+1)}};
+ for(const k of Object.keys(o)){const v=o[k];if(typeof v==='string'&&/^(l|n|label|nom|lib|titre|note|motif|env|t|s|name|pattern|pat|match|sauf)$/.test(k)&&!/^\d{4}-\d{2}/.test(v)){o[k]=P+' '+v.slice(0,12);n++}else walk(v,d+1)}};
 walk(DB.bm,0);walk(DB.im,0);walk(DB.params,0);walk(DB.rules,0);walk(DB.decisions,0);walk(DB.fiscal,0);GM_CACHE={};return n}
 """
 RENDU = "(vues)=>{const e=[];vues.forEach(([n,c])=>{try{(0,eval)(c)}catch(x){e.push(n+' : '+(x&&x.message||x))}if(document.getElementById('__inj_b')||document.querySelector('img[src=x]'))e.push(n+' : libellé interprété comme du HTML')});return e}"
