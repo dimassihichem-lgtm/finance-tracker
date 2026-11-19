@@ -489,7 +489,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v153';const VTAG='lisibilité : deux polices embarquées, six tailles de texte, contrastes, zones tactiles ; module PDF à la demande ; bilan de l’année terminée';
+const VERSION='v154';const VTAG='point d’étape : une dépense en transit (remboursée ou en attente) ne compte plus dans les variables du mois en cours';
 
 function defCh(){return[{l:'Loyer',v:0},{l:'Frais divers',v:0}]}
 function defRev(){return[]}
@@ -2608,20 +2608,23 @@ subs.map(([k,v])=>'<div class="row rb" style="font-size:var(--f1);padding:2px 0 
 function midMonth(y,m){const b=gBM(y,m);if(!b||!b.imp||!b.imp.done||b.cashFin!=null||b.cl)return null;const imp=b.imp;
 const lastD=(imp.lines&&imp.lines.length?imp.lines.map(l=>l.d).sort().pop():(imp.ccEndDate||null));if(!lastD)return null;
 const dim=new Date(y,m,0).getDate();const day=Math.min(dim,+lastD.slice(8,10));const frac=day/dim;
-const pv=prevuConso(y,m);const varPrev=pv.variable;const varNow=imp.t.variable;const fixNow=imp.t.fixe;
+// v154 · comme à la clôture (monthReal), une dépense en transit ne compte que pour ce qui n'est pas revenu
+const TR=transitSums(b);const transitVar=Math.min(imp.t.variable,TR.byT.variable||0);
+const pv=prevuConso(y,m);const varPrev=pv.variable;const varNow=Math.round((imp.t.variable-transitVar)*100)/100;const fixNow=imp.t.fixe;
 const pace=day>0?varNow/day*dim:0;const varProrata=varPrev*frac;
 // fixes prévus : déjà passés ou à venir
 const P=prevuFixeLines(y,m);const seen=Object.keys((imp.bySub||{}).fixe||{}).map(x=>x.toLowerCase());
 const fixRest=Math.max(0,pv.fixe-fixNow);
 const FM=fxMatch(y,m);const passed=FM.lines.filter(l=>l.real!=null),todo=FM.lines.filter(l=>l.real==null);
 const fxPassedPrev=passed.reduce((a,l)=>a+l.v,0),fxPassedReal=passed.reduce((a,l)=>a+l.real,0),fxTodo=todo.reduce((a,l)=>a+l.v,0),fxExtra=FM.extra.reduce((a,l)=>a+l.v,0);
-const fixEst=fxPassedReal+fxTodo+fxExtra;const foyerNow=(imp.t.foyerOut||0)-(imp.t.foyerIn||0);
-return{day,dim,frac,lastD,varNow,varPrev,varProrata,pace,fixNow,fixPrev:pv.fixe,fixRest,prevuTotal:pv.total,resteVar:varPrev-varNow,joursRest:dim-day,
+const fixEst=fxPassedReal+fxTodo+fxExtra;const foyerNow=((imp.t.foyerOut||0)-(TR.byT.transfertFoyer||0))-((imp.t.foyerIn||0)-(TR.byT.foyerIn||0));
+return{day,dim,frac,lastD,varNow,transitVar,varPrev,varProrata,pace,fixNow,fixPrev:pv.fixe,fixRest,prevuTotal:pv.total,resteVar:varPrev-varNow,joursRest:dim-day,
 foyerNow,foyerPrev:pv.foyer||0,fx:{passed,todo,extra:FM.extra,passedPrev:fxPassedPrev,passedReal:fxPassedReal,todoSum:fxTodo,extraSum:fxExtra,est:fixEst,ecartPasses:fxPassedReal-fxPassedPrev},finEstimee:fixEst+Math.max(M_PACE_FLOOR(varNow,pace),0)}}
 function M_PACE_FLOOR(now,pace){return Math.max(now,pace)}
 function midCard(y,m){const M=midMonth(y,m);if(!M)return'';const ok=M.varNow<=M.varProrata;const col=ok?'var(--up)':'var(--dn)';const pct=M.varPrev>0?M.varNow/M.varPrev:0;
 return'<div class="card" style="border-color:rgba(110,168,254,.4)"><div class="card-h"><span class="dot" style="background:var(--blue)"></span>Point d\u2019étape au '+M.lastD.slice(8)+'/'+M.lastD.slice(5,7)+'<span class="aux">jour '+M.day+' / '+M.dim+'</span></div><div class="card-b">'+
 '<div class="eyebrow" style="margin-bottom:6px">Variables · au rythme</div><div class="row rb" style="font-size:var(--f3)"><span>Variables dépensées</span><b class="mono" style="color:'+col+'">'+fE(M.varNow)+' <span style="color:var(--td);font-weight:400">/ '+fE(M.varPrev)+'</span></b></div>'+
+(M.transitVar>0.5?'<div style="font-size:var(--f1);color:var(--td);margin-top:3px">hors '+fE(M.transitVar)+' en transit (remboursés ou en attente de remboursement)</div>':'')+
 '<div class="gauge-track" style="margin-top:7px;position:relative"><div class="gauge-fill '+(ok?'ok':'bad')+'" style="width:'+Math.min(100,Math.round(pct*100))+'%"></div><div style="position:absolute;left:'+Math.round(M.frac*100)+'%;top:-3px;width:2px;height:calc(100% + 6px);background:var(--gold)" title="rythme prévu à date"></div></div>'+
 '<div class="row rb" style="font-size:var(--f1);color:var(--td);margin-top:3px"><span>trait doré = rythme prévu au jour '+M.day+' ('+fE(M.varProrata)+')</span><span style="color:'+col+'">'+(ok?'en avance de '+fE(M.varProrata-M.varNow):'en retard de '+fE(M.varNow-M.varProrata))+'</span></div>'+
 '<div class="hr" style="margin:10px 0"></div>'+
@@ -3188,6 +3191,17 @@ ok('Point d’étape : absent dès que le solde de fin est saisi, que le mois es
 ok('Code d’accès : aucune attente avant cinq erreurs, puis 30 s, 1 min, 2 min, 15 min au plus',pinDelay(0)===0&&pinDelay(4)===0&&pinDelay(5)===30000&&pinDelay(6)===60000&&pinDelay(7)===120000&&pinDelay(30)===900000,[4,5,6,7,30].map(n=>pinDelay(n)/1000+' s').join(' · '));
 ok('Code d’accès : attente bornée même si l’horloge recule, nulle une fois le délai passé',pinWaitOf({n:5,until:1e15},1000)===30000&&pinWaitOf({n:5,until:900},1000)===0&&pinWaitOf({n:2,until:1e15},1000)===0&&pinWaitOf(null,1000)===0&&pinDur(28000)==='28 s'&&pinDur(90000)==='1 min 30 s');
 }catch(e){ok('Point d’étape et code d’accès v153',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
+// v154 · point d'étape net du transit (données fictives)
+(()=>{const sv=DB;try{DB=defDB();ensure();GM_CACHE={};try{FISC_MEMO={}}catch(e){}DB.params.v2From='2031-01';
+const b=Object.assign(defBM(2031,11),{ch:[{l:'Loyer',v:1000,fixe:true},{l:'Courses',v:2000}]});
+b.imp={done:true,at:'2031-11-13T10:00:00.000Z',t:{fixe:0,variable:0,invest:0,salaire:5000,entree:0,foyerOut:0,foyerIn:0},bySub:{fixe:{},variable:{},entree:{},transfertFoyer:{}},byGrp:{},unmatched:[],salaireCount:1,internesOut:0,livretOut:0,livretIn:0,entrees:[],lines:[{d:'2031-11-05',l:'CB MAGASIN',v:-600,t:'variable',s:'Courses'},{d:'2031-11-10',l:'CB CABINET TEST',v:-80,t:'variable',s:'Médecin'},{d:'2031-11-12',l:'VIR CAISSE TEST',v:70,t:'entree',s:'Remboursement santé'}],ccEndDate:'2031-11-12',consoCsv:680};
+reagg(b);DB.bm.push(b);GM_CACHE={};const M0=midMonth(2031,11);const dep=b.imp.lines[1],rf=b.imp.lines[2];
+transitLink(dep,rf);GM_CACHE={};const M1=midMonth(2031,11);
+ok('Point d’étape : une dépense remboursée en partie ne compte que pour son reste',!!M0&&!!M1&&M0.varNow===680&&M1.varNow===610&&M1.resteVar===1390&&M1.transitVar===70&&Math.abs(M1.pace-610/12*30)<0.01,M0&&M1?(M0.varNow+' → '+M1.varNow+' · reste '+M1.resteVar):'absent');
+delete dep.transitRefs;delete rf.transit;delete rf.transitRef;dep.transit=true;dep.transitMotif='en attente de remboursement';GM_CACHE={};const M2=midMonth(2031,11);
+delete dep.transit;delete dep.transitMotif;GM_CACHE={};const M3=midMonth(2031,11);
+ok('Point d’étape : en transit avec un motif, la dépense sort en entier ; sans transit, rien ne change',!!M2&&!!M3&&M2.varNow===600&&M2.transitVar===80&&M3.varNow===680&&M3.transitVar===0,M2&&M3?(M2.varNow+' · '+M3.varNow):'absent');
+}catch(e){ok('Point d’étape net du transit v154',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={};try{FISC_MEMO={}}catch(e){}}})();
 return results}
 function rAutotestPage(el){el.innerHTML='<button class="backlink" onclick="SUB=\'hub\';rMore()">‹ Plus</button><div class="pagetitle">Autotest</div><div class="card"><div class="card-b" style="font-size:var(--f3);line-height:1.55">Quinze scénarios de calcul rejoués sur des données de test — <b>jamais sur ta base</b>. À lancer après chaque mise à jour de l\u2019app : tout doit être vert. Si une ligne est rouge, envoie-moi une capture.</div></div><div id="selftest-out">'+rSelfTest()+'</div><button class="btn btn-ghost sm wide" style="margin-top:10px" onclick="document.getElementById(\'selftest-out\').innerHTML=rSelfTest()">↻ Relancer</button><div style="text-align:center;margin-top:16px;font-size:var(--f1);color:var(--td)">Version '+VERSION+' · '+VTAG+'</div>'}
 function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
