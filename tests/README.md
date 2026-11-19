@@ -23,7 +23,7 @@ local avec `--base /chemin/export.json` et laisser les résultats hors du dépô
 | `verrou.py` | Écran de code : attente après cinq codes faux, bon code refusé pendant l'attente, remise à zéro ensuite |
 | `pdf.py` | Le module PDF n'est pas chargé à l'ouverture, se charge à la demande (contrôle d'intégrité compris) et fabrique un document. Demande une copie locale du module (voir l'en-tête du script) |
 | `injection.py` | Des libellés contenant du HTML ou des apostrophes ne s'exécutent pas et ne cassent rien |
-| `recevoir.py` | « À recevoir » : état par payeur, alerte sur l'accueil, déclaration d'une dépense, virement écarté, étiquettes conservées au ré-import |
+| `recevoir.py` | « À recevoir » : état par payeur, alerte sur l'accueil, déclaration d'une dépense, virement écarté, avoir à confirmer (refusé, remis, accepté), étiquettes conservées au ré-import |
 | `affichage.py` | Vue par vue : débordements, textes coupés, textes sous 11 px, tailles et polices, zones tactiles trop petites, contrastes sous 4,5:1, hauteur des pages. `--json` enregistre, `--ref` compare à une version précédente |
 | `captures.py` | Captures d'écran de chaque vue, pour comparer deux versions à l'œil |
 | `tout.py` | Lance tout à la suite |
