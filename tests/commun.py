@@ -38,7 +38,7 @@ DB.params.cap={label:'Test',to:'2046-02',cibles:[{l:'Cible',v:900000}]};
 DB.params.proj.salaire=5000;DB.params.proj.aides=[{l:'Allocations familiales',v:150,from:'2026-01',to:''}];
 DB.params.proj.ponctuels=[{l:'Participation et intéressement',mois:8,v:9000}];
 DB.params.proj.depPonctuels=[{l:'Vacances été',v:3000,mois:8,an:2026,rec:true,id:'pvac'},{l:'Noël',v:800,mois:12,an:2026,rec:true,id:'pnoel'}];
-DB.params.recv={payers:[{id:'emp',n:'Employeur fictif',pat:'EMPLOYEUR FICTIF',delai:30,from:'2026-04-01',ini:0}],rules:[{id:'box',l:'Box internet',match:'FOURNISSEUR BOX',sauf:'',p:'emp',mode:'fixe',v:40,on:true}]};
+DB.params.recv={payers:[{id:'emp',n:'Employeur fictif',pat:'EMPLOYEUR FICTIF',delai:30,from:'2026-04-01',ini:0}],rules:[{id:'box',l:'Box internet',match:'FOURNISSEUR BOX',sauf:'',p:'emp',mode:'fixe',v:40,on:true}],pairs:[{id:'carte',l:'Carte fictive',cr:'BONUS CARTE FICTIVE',db:'FRAIS CARTE FICTIVE',on:true}]};
 const S=(a,b)=>[{n:'PEA',v:a,det:[]},{n:'PEE Fonds',v:b,det:[]}];DB.bm=[];DB.im=[];
 const CH=()=>[{l:'Loyer',v:1000,fixe:true},{l:'Assurance habitation et responsabilité civile',v:38.5,fixe:true},{l:'Courses',v:2000}];
 const mkImp=(y,m,full,paye)=>({done:true,at:(full?dayKeyOf(new Date(y,m,2)):ym(y,m)+'-13')+'T10:00:00.000Z',t:{fixe:1000,variable:2000,invest:200,salaire:5000,entree:0,foyerOut:0,foyerIn:0},bySub:{fixe:{},variable:{},entree:{},transfertFoyer:{}},byGrp:{},unmatched:[],salaireCount:1,internesOut:0,livretOut:0,livretIn:0,entrees:[],
