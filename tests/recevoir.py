@@ -10,7 +10,7 @@ async()=>{const wait=ms=>new Promise(r=>setTimeout(r,ms));const out={};const txt
 const E=recvCalc().payers[0];out.depart={du:E.du,recu:E.recu,reste:E.reste,retard:E.late.length,sans_depense:E.extraAmt};
 // 2 · accueil, menu Plus, page
 go('home');await wait(150);out.accueil=/Remboursement en retard · Employeur fictif/.test(document.getElementById('pg-home').innerText);
-go('more');await wait(150);out.menu=/À recevoir[\s\S]{0,80}1 en retard/.test(txt());
+go('more');await wait(150);out.menu=/Remboursements[\s\S]{0,80}1 en retard/.test(txt());
 SUB='recv';rMore();await wait(150);out.page={reste:/80 €/.test(txt()),retard:/1 remboursement en retard de plus de 30 jours : 40 € à réclamer/.test(txt()),sans:/Reçu sans dépense en face/.test(txt())};
 // 3 · déclarer une dépense : on la choisit dans le relevé (recherche), puis 12,50 € attendus
 document.querySelector('#pg-more button[onclick="recvPickOpen()"]').click();await wait(120);const M=()=>document.getElementById('recv-modal');
