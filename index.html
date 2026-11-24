@@ -489,7 +489,7 @@ const nM=(y,m)=>m===12?{y:y+1,m:1}:{y,m:m+1};
 const mLbl=(y,m)=>MS[m]+' '+(y-2000);
 const COLORS=['#E5C36A','#6EA8FE','#3FCF8E','#A78BFA','#4FD1E0','#F286B7','#F0716F','#98A2BC'];
 const YRS=[2025,2026,2027,2028];
-const VERSION='v159';const VTAG='Un remboursement reçu d’un payeur « compensé » sort la dépense du budget ; le détail des variables dit ce qui est remboursé ou attendu';
+const VERSION='v160';const VTAG='Balayage du 25 en clair : le montant à virer, son calcul, et le solde lu dans le relevé importé ce jour-là ou saisi à la main';
 
 function defCh(){return[{l:'Loyer',v:0},{l:'Frais divers',v:0}]}
 function defRev(){return[]}
@@ -949,9 +949,21 @@ row('Revenus attendus',fE(pj.rev),'salaire '+fE(pj.sal)+' · aides '+fE(pj.aides
 row('Dépenses prévues','− '+fE(pj.dep),(()=>{const ex=(b.ex||[]).reduce((a,x)=>a+(+x.v||0),0);const v=(pc.variable||0)-ex;return'fixes '+fE(pc.fixe||0)+' · variables '+fE(v)+(ex>0.5?' · exceptionnel '+fE(ex):'')+(pc.foyer>0.5?' · foyer '+fE(pc.foyer):'')})())+
 row('Épargne estimée',(pj.ep>=0?'+':'−')+fE(Math.abs(pj.ep)),'si le budget est tenu',pj.ep>=0?'var(--up)':'var(--dn)')+
 (mm?'<div class="hr" style="margin:8px 0"></div>'+row('Variables à date',fE(mm.varNow),'jour '+mm.day+'/'+mm.dim+' · rythme '+fE(mm.pace)+' sur le mois · prévu '+fE(mm.varPrev),mm.pace<=mm.varPrev?'var(--up)':'var(--dn)')+row('Dépenses fin de mois estimées','− '+fE(mm.finEstimee),'fixes passés + restants + variables au rythme'):'')+
-(A.active?'<div class="hr" style="margin:8px 0"></div><div class="row rb"><div><div style="font-size:var(--f3);font-weight:600">Balayage du '+balParams().jour+' <span class="mono" style="color:var(--gold)">'+fE(R.amt)+'</span> → '+(R.mode==='pea'?'PEA':'Livret A')+'</div><div style="font-size:var(--f1);color:var(--td);margin-top:2px">'+(R.solde&&R.solde.onJ?'solde au '+R.solde.d.slice(8)+'/'+R.solde.d.slice(5,7)+' : '+fE(R.solde.v)+' · plancher '+fE(balParams().plancher):'estimation · importe le relevé le '+balParams().jour)+'</div></div>'+
-'<div class="row" style="gap:6px">'+(st!=='fait'?'<button class="btn btn-gold xs" onclick="virementSet(\''+k+'\',\'fait\')">Fait</button>':'<span class="chip tag-up">Fait</span>')+(st==='planifie'?'<button class="btn btn-ghost xs" onclick="uiPrompt(\'Motif du report\',{placeholder:\'ex. mois chargé, solde trop bas\'}).then(m=>{if(m!==null)virementSet(\''+k+'\',\'reporte\',m)})">Reporter</button>':st==='reporte'?'<span class="chip tag-dn">Reporté</span>':'')+(st!=='planifie'?'<button class="btn btn-ghost xs" onclick="virementSet(\''+k+'\',\'planifie\')">↺</button>':'')+'</div></div>':'')+
+(A.active?'<div class="hr" style="margin:8px 0"></div>'+balHomeHtml(R,cy,cm,st)+'<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">'+
+'<div class="row" style="gap:6px">'+(st!=='fait'?'<button class="btn btn-gold xs" onclick="virementSet(\''+k+'\',\'fait\')">Fait</button>':'<span class="chip tag-up">Fait</span>')+(st==='planifie'?'<button class="btn btn-ghost xs" onclick="uiPrompt(\'Motif du report\',{placeholder:\'ex. mois chargé, solde trop bas\'}).then(m=>{if(m!==null)virementSet(\''+k+'\',\'reporte\',m)})">Reporter</button>':st==='reporte'?'<span class="chip tag-dn">Reporté</span>':'')+(st!=='planifie'?'<button class="btn btn-ghost xs" onclick="virementSet(\''+k+'\',\'planifie\')">↺</button>':'')+(st==='planifie'&&!R.frozen&&todayKey()>=R.dJ?'<button class="btn btn-ghost xs" onclick="balSaisir('+cy+','+cm+')">'+(R.solde&&R.solde.manual?'Corriger mon solde':'Saisir mon solde')+'</button>':'')+'</div>':'')+
 '</div></div>'}
+// v160 · balayage : ce qu'il faut faire, et le calcul, en clair
+function balHomeHtml(R,y,m,st){const dest=R.mode==='pea'?'PEA':'Livret A';const jm=d=>d.slice(8)+'/'+d.slice(5,7);const sub=t=>'<div style="font-size:var(--f1);color:var(--td);margin-top:3px;line-height:1.5">'+t+'</div>';
+if(R.frozen)return'<div style="font-size:var(--f3);font-weight:600">Balayage du '+R.jour+' fait : <span class="mono" style="color:var(--gold)">'+fE(R.amt)+'</span> vers le '+dest+'</div>'+(R.log&&R.log.solde!=null?sub('solde de référence '+fE(R.log.solde)+(R.log.d?' au '+jm(R.log.d):'')):'');
+if(st==='reporte')return'<div style="font-size:var(--f3);font-weight:600">Balayage du '+R.jour+' reporté</div>';
+const S=R.solde;
+if(S&&S.onJ){const ex=R.X&&R.X.amt>0.5;const minUsed=R.base<R.min;
+return'<div style="font-size:var(--f3);font-weight:600">Le '+R.jour+', vire <span class="mono" style="color:var(--gold)">'+fE(R.amt)+'</span> vers le '+dest+'</div>'+
+sub(fE(S.v)+' sur le compte ('+esc(S.src)+(S.manual?' · <a href="#" onclick="balEffacer('+y+','+m+');return false" style="color:var(--td)">effacer</a>':'')+') − '+fE(R.plancher)+' de réserve'+(ex?' − '+fE(R.X.amt)+' d’exceptionnel à venir ('+R.X.items.map(x=>esc(x.l)).join(', ')+')':'')+(minUsed?' : '+fE(Math.max(0,R.base))+', sous le minimum de '+fE(R.min)+' → '+fE(R.amt):' = '+fE(R.base)+', arrondi à la centaine inférieure'))+
+(R.after!=null&&R.after<R.plancher-0.5?'<div style="font-size:var(--f1);color:var(--dn);margin-top:3px;line-height:1.5">Après ce virement'+(ex?' et l’exceptionnel à venir':'')+', il resterait '+fE(Math.max(0,R.after))+' sur le compte, moins que la réserve de '+fE(R.plancher)+' : tu peux reporter.</div>':'')}
+const before=todayKey()<R.dJ;
+return'<div style="font-size:var(--f3);font-weight:600">Balayage du '+R.jour+' : <span class="mono" style="color:var(--gold)">≈ '+fE(R.amt)+'</span> vers le '+dest+' <span style="font-weight:400;color:var(--td)">(estimation)</span></div>'+
+sub(before?'Le montant exact se calcule le '+R.jour+' : ton solde ce jour-là − '+fE(R.plancher)+' de réserve, arrondi à la centaine inférieure. Ce jour-là, importe ton relevé ou saisis ton solde.':'Pour le montant exact : importe ton relevé d’aujourd’hui, ou saisis ton solde. Calcul : solde − '+fE(R.plancher)+' de réserve, arrondi à la centaine inférieure.')}
 function variablesReel3(){let B=sBM().filter(d=>isV2(d.y,d.m)&&d.cashFin!=null);if(B.length){const reg=regimeFor(B[B.length-1].y,B[B.length-1].m);B=B.filter(b=>regimeFor(b.y,b.m)===reg)}B=B.slice(-3);const used=[];let sum=0;B.forEach(b=>{const mr=monthReal(b.y,b.m);if(!mr||mr.variables==null)return;const ex=(b.ex||[]).reduce((a,x)=>a+(+x.v||0),0);const v=Math.max(0,mr.variables-ex);sum+=v;used.push({y:b.y,m:b.m,v})});return used.length?{v:sum/used.length,n:used.length,used}:null}
 function yearEstimate(K){const m3=variablesReel3();let adj=0,nf=0;if(m3){const all=sBM().filter(d=>d.ch.length);const t=all.length?all[all.length-1]:null;const vbT=t?t.ch.reduce((a,c)=>a+(!c.fixe?(+c.v||0):0),0):0;K.rows.forEach(row=>{if(row.r.known)return;const b=gBM(row.y,row.m);let vb;if(b&&b.ch.length){const pc=prevuConso(row.y,row.m);const ex=(b.ex||[]).reduce((a,x)=>a+(+x.v||0),0);vb=(pc.variable||0)-ex}else vb=vbT;if(vb>0){adj+=vb-m3.v;nf++}})}return{m3,est:K.full.ep+(K.cum.rEp-K.cum.tEp)+adj,adj,nf}}
 // v153 (lot 4) · au début d'une nouvelle année de suivi, tant qu'aucun mois n'y est connu, l'accueil affiche le bilan de l'année qui vient de finir
@@ -2303,7 +2315,7 @@ if(dt.length===8&&!isNaN(amt))out.push({d:dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt
 return out.length?{tx:out}:null}
 function buildImport(txs,force){force=force||{};const t={salaire:0,entree:0,interneLivret:0,interneAutre:0,invest:0,fixe:0,variable:0,foyerOut:0,foyerIn:0};
 const bySub={fixe:{},variable:{},entree:{},invest:{},transfertFoyer:{}};const byGrp={fixe:{},variable:{},entree:{},invest:{},transfertFoyer:{}};const unmatched=[],big=[],entrees=[],internes=[],lines=[];
-const ccL=txs.filter(x=>x.bal!=null&&!/livret|ldds/i.test(x.acc||''));const lastD=ccL.length?ccL.map(x=>x.d).sort().pop():null;const ccEnd=lastD?ccL.filter(x=>x.d===lastD)[0].bal:null;let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0,payDate=null,ccBeforePay=null;const bourso={};const groups={};
+const ccL=txs.filter(x=>x.bal!=null&&!/livret|ldds/i.test(x.acc||''));const lastD=ccL.length?ccL.map(x=>x.d).sort().pop():null;const ccEnd=lastD?ccL.filter(x=>x.d===lastD)[0].bal:null;const ccJ=lastD?balAtDay(ccL,lastD.slice(0,8)+String(balParams().jour).padStart(2,'0')):null;let salaireCount=0,livretIn=0,livretOut=0,internesOut=0,internesIn=0,debits=0,viaBourso=0,investIn=0,investOut=0,payDate=null,ccBeforePay=null;const bourso={};const groups={};
 const add=(o,k,v)=>{o[k||'autre']=(o[k||'autre']||0)+v};
 txs.forEach(x=>{const fk=x.d.slice(0,7)+'|'+x.l+'|'+x.v;const a=Math.abs(x.v);const c=force[fk]?Object.assign({ruleId:'manual',unmatched:false},force[fk]):(/livret|ldds/i.test(x.acc||'')?{type:'interneLivret',sub:'Livret A',grp:'Épargne & investissement',ruleId:'acc',unmatched:false}:classify(x));const G=(o,v)=>{const g=c.grp||'Divers';if(!byGrp[o])byGrp[o]={};byGrp[o][g]=(byGrp[o][g]||0)+v};if(c.via==='bourso')viaBourso++;
 if(!c.unmatched){const mk=(x.s||suggestPattern(x.l)).toUpperCase();const key=mk+'|'+c.type+'|'+(c.grp||'')+'|'+(c.sub||'');const src=c.ruleId==='manual'?'manuel':c.via==='bourso'?'bourso':c.ruleId==='acc'?'compte':'règle';(groups[key]=groups[key]||{key,s:mk,type:c.type,grp:c.grp||'',sub:c.sub||'',src,n:0,tot:0,lines:[]}).n++;groups[key].tot+=x.v;groups[key].lines.push({d:x.d,l:x.l,v:x.v})}if(x.v<0)debits+=a;
@@ -2320,7 +2332,7 @@ else if(c.type==='transfertFoyer'){if(x.v<0){t.foyerOut+=a;add(bySub.transfertFo
 else{if(x.v<0){t.variable+=a;add(bySub.variable,c.sub,a);G('variable',a);if(a>=100)big.push({l:x.l,v:a,sub:c.sub||'',grp:c.grp||'',d:x.d})}}
 if(c.unmatched)unmatched.push({l:x.l,v:x.v,d:x.d,s:x.s||'',cat:x.cat||''})});
 unmatched.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));big.sort((a,b)=>b.v-a.v);
-return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,groups:Object.values(groups).sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot)),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,internes,lines,ccEnd,ccEndDate:lastD,payDate,ccBeforePay,consoCsv:t.fixe+t.variable+t.foyerOut-t.foyerIn}}
+return{done:true,at:new Date().toISOString(),n:txs.length,t,bySub,byGrp,unmatched,viaBourso,groups:Object.values(groups).sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot)),big:big.slice(0,25),entrees,salaireCount,livretIn,livretOut,internesOut,internesIn,investIn,investOut,internes,lines,ccEnd,ccEndDate:lastD,ccJ,payDate,ccBeforePay,consoCsv:t.fixe+t.variable+t.foyerOut-t.foyerIn}}
 /* ---- calcul mensuel ---- */
 function prevuConso(y,m){let fixe=0,varb=0;const idx=y*12+m;
 for(let o=0;o<=2;o++){const i=idx-o;const yy=Math.floor((i-1)/12),mm=i-yy*12;const b=gBM(yy,mm);if(!b)continue;b.ch.forEach(c=>{if(((+c.payOffset)||0)===o){if(c.fixe)fixe+=c.v;else varb+=c.v}})}
@@ -2862,16 +2874,31 @@ return{fy:F,rows,n,cum:{tRev,tDep,tEp,rRev,rDep,rEp},full,pctEp:tEp>0?rEp/tEp:nu
 function balParams(){const P=DB.params;if(!P.balayage)P.balayage={plancher:1500,min:300,jour:25,la:100,pea:0};const B=P.balayage;if(B.la==null)B.la=100;if(B.pea==null)B.pea=100-B.la;return B}
 function floor100(x){return Math.floor(x/100)*100}
 // solde de référence pour le balayage du mois : relevé importé (ccEnd, au plus tard le jour J), sinon solde saisi, sinon fin du mois précédent
-function balSolde(y,m){const B=balParams();const b=gBM(y,m);const k=ym(y,m);const dJ=k+'-'+String(B.jour).padStart(2,'0');
-if(b&&b.imp&&b.imp.ccEnd!=null&&b.imp.ccEndDate&&b.imp.ccEndDate.slice(0,7)===k){const salSame=(b.imp.lines||[]).filter(l=>l.t==='salaire'&&l.d===b.imp.ccEndDate).reduce((a,l)=>a+l.v,0);return{v:b.imp.ccEnd,d:b.imp.ccEndDate,src:'relevé'+(salSame>0?' (avant la paie du jour)':''),onJ:b.imp.ccEndDate>=dJ}}
-return null}
+// v160 · solde du compte courant à la fin du jour dK, d'après les soldes du relevé (export du plus récent au plus ancien)
+function balAtDay(rows,dK){let best=null;rows.forEach(x=>{if(x.bal==null||x.d>dK)return;if(!best||x.d>best.d)best={d:x.d,v:x.bal}});return best}
+// solde de référence pour le balayage du mois : saisi à la main à partir du jour J, sinon relevé qui couvre le jour J
+// (dernière opération ce jour-là ou après, ou relevé importé ce jour-là ou après) ; une paie arrivée après J n'est pas comptée
+function balSolde(y,m){const B=balParams();const b=gBM(y,m);const k=ym(y,m);const dJ=k+'-'+String(B.jour).padStart(2,'0');const jm=d=>d.slice(8)+'/'+d.slice(5,7);
+if(b&&b.balSaisie&&b.balSaisie.d&&b.balSaisie.d.slice(0,7)===k&&b.balSaisie.d>=dJ&&isFinite(+b.balSaisie.v))return{v:+b.balSaisie.v,d:b.balSaisie.d,src:'saisi le '+jm(b.balSaisie.d),onJ:true,manual:true};
+const I=b&&b.imp;if(!I||I.ccEnd==null||!I.ccEndDate||I.ccEndDate.slice(0,7)!==k)return null;let impD=null;try{impD=I.at?dayKeyOf(new Date(I.at)):null}catch(e){}
+if(I.ccEndDate<dJ){if(impD&&impD>=dJ)return{v:I.ccEnd,d:I.ccEndDate,src:'relevé importé le '+jm(impD)+' · dernière opération le '+jm(I.ccEndDate),onJ:true};return{v:I.ccEnd,d:I.ccEndDate,src:'relevé',onJ:false}}
+if(I.ccJ&&I.ccJ.v!=null)return{v:I.ccJ.v,d:I.ccJ.d<dJ?dJ:I.ccJ.d,src:'relevé · solde au '+jm(dJ)+(I.ccEndDate>dJ?', sans ce qui est passé après':''),onJ:true};
+if(I.payDate&&I.payDate>dJ&&I.ccBeforePay!=null)return{v:I.ccBeforePay,d:I.payDate,src:'relevé · solde juste avant la paie du '+jm(I.payDate),onJ:true};
+return{v:I.ccEnd,d:I.ccEndDate,src:'relevé',onJ:true}}
+// v160 · dépenses exceptionnelles du mois pas encore passées sur le relevé : elles restent sur le compte en plus de la réserve
+// une ligne payée à 90 % ou plus est tenue pour passée (budget un peu au-dessus du réel) ; payée en partie, son reste est gardé
+function balExRest(y,m){const b=gBM(y,m);if(!b||!(b.ex||[]).length)return{amt:0,items:[]};let items=[];
+try{const V=b.imp?varBreakdown(y,m):null;if(V)items=V.lines.filter(L=>L.ex).map(L=>({l:L.l.replace(/ \(exceptionnel\)$/,''),rest:L.real>=L.v*0.9?0:Math.max(0,Math.round((L.v-L.real)*100)/100)}));else items=b.ex.filter(x=>+x.v>0).map(x=>({l:x.l,rest:+x.v}))}catch(e){errNote(e,'balExRest')}
+items=items.filter(x=>x.rest>0.5);return{amt:Math.round(items.reduce((a,x)=>a+x.rest,0)*100)/100,items}}
 // v149 · ce qui arrive réellement sur le compte courant dans la projection : épargne projetée − flux employeur (versés sur PEE / PER) − versements programmés (pris sur le compte)
 function projProg(){const L=sIM().filter(im=>(im.contribs||[]).length);const im=L.length?L[L.length-1]:null;if(!im)return 0;const rx=emplFlowRx();return im.contribs.filter(c=>!rx.test(c.l||'')).reduce((a,c)=>a+(+c.v||0),0)}
 function projCash(y,m){const pj=projMonth(y,m);const P=DB.params.proj||{};const rx=emplFlowRx();const emp=(P.ponctuels||[]).filter(x=>+x.mois===m&&(rx.test(x.l||'')||/employeur|pee|perco|particip|abond/i.test(x.l||''))).reduce((a,x)=>a+(+x.v||0),0);const prog=projProg();return{ep:pj.ep,emp,prog,cc:pj.ep-emp-prog}}
 function balayageFor(y,m){const B=balParams();const A=virementActive();const S=balSolde(y,m);const k=ym(y,m);const log=(DB.balayageLog||{})[k];
-let amt=B.min,est=false;if(S&&S.onJ){const ex=S.v-B.plancher;amt=ex>B.min?Math.max(B.min,floor100(ex)):B.min}else{const pc=projCash(y,m);const ex=Math.max(0,pc.cc);amt=ex>B.min?Math.max(B.min,floor100(ex)):B.min;est=true}
-const pea=A.reached?100:(+B.pea||0);const la=100-pea;const r={k,solde:S,amt,est,la:Math.round(amt*la/100),pea:Math.round(amt*pea/100),mode:A.reached?'pea':'prec',liv:A.liv,cible:A.cible,log};
+let amt=B.min,est=false,X={amt:0,items:[]},base=null,after=null;if(S&&S.onJ){X=balExRest(y,m);base=Math.round((S.v-B.plancher-X.amt)*100)/100;amt=base>B.min?Math.max(B.min,floor100(base)):B.min;after=Math.round((S.v-amt-X.amt)*100)/100}else{const pc=projCash(y,m);const ex=Math.max(0,pc.cc);amt=ex>B.min?Math.max(B.min,floor100(ex)):B.min;est=true}
+const pea=A.reached?100:(+B.pea||0);const la=100-pea;const r={k,solde:S,amt,est,X,base,after,plancher:B.plancher,min:B.min,jour:B.jour,dJ:k+'-'+String(B.jour).padStart(2,'0'),la:Math.round(amt*la/100),pea:Math.round(amt*pea/100),mode:A.reached?'pea':'prec',liv:A.liv,cible:A.cible,log};
 if(log){r.amt=log.amt;r.la=log.la;r.pea=log.pea;r.frozen=true}return r}
+function balSaisir(y,m){uiPrompt('Solde du compte courant aujourd\u2019hui',{desc:'Le solde affiché dans ton application bancaire, avant la paie. Il remplace celui du relevé pour le balayage de ce mois.',type:'number',placeholder:'ex. 3900'}).then(v=>{if(v===null)return;const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));if(!isFinite(n)){uiAlert('Montant non reconnu.');return}gOBM(y,m).balSaisie={v:Math.round(n*100)/100,d:todayKey()};save();RA()})}
+function balEffacer(y,m){const b=gBM(y,m);if(b){delete b.balSaisie;save();RA()}}
 function balayageMark(k,st){const r=balayageFor(+k.slice(0,4),+k.slice(5,7));DB.balayageLog=DB.balayageLog||{};if(st==='fait')DB.balayageLog[k]={amt:r.amt,la:r.la,pea:r.pea,solde:r.solde?r.solde.v:null,d:r.solde?r.solde.d:null};else delete DB.balayageLog[k];}
 // date estimée d'atteinte de la cible précaution, en rejouant la projection avec le balayage (part Livret A)
 function precautionEta(){const A=virementActive();if(!A.cible)return null;if(A.reached)return{reached:true};const B=balParams();let liv=A.liv;const n=new Date();let y=n.getFullYear(),m=n.getMonth()+1;
@@ -2894,6 +2921,7 @@ try{if(pinIsDefault())items.push({t:'Changer le code d\u2019accès',s:'le code d
 try{decTodo().forEach(o=>items.push({t:(o.s==='pret'?'Décision prête · ':'Décision à relire · ')+o.x.t,s:o.s==='pret'?'délai de réflexion terminé le '+frD(o.x.exec):'exécutée le '+frD(o.x.done)+' : écrire le bilan',go:"PG='more';go('more');SUB='decis';rMore()",k:o.s==='pret'?'info':'warn'}))}catch(e){errNote(e,'todoList')}
 try{fiscTodo(n).forEach(x=>items.push({t:(x.days<0?'Échéance dépassée · ':'')+x.f.l,s:(x.days<0?'prévu le '+x.f.d:x.days===0?'aujourd\u2019hui':'dans '+x.days+' jour'+(x.days>1?'s':'')+' ('+x.f.d+')')+(x.f.n?' · '+String(x.f.n).slice(0,60):''),go:"PG='more';go('more');viewGo('fiscal','act')",k:'warn'}))}catch(e){errNote(e,'todoList')}
 try{allocDue().forEach(d=>items.push({t:d.t,s:d.s,go:"go('invest');alwStart()",k:d.k==='ips'?'warn':'info'}))}catch(e){errNote(e,'todoList')}
+try{const n0=new Date(),y0=n0.getFullYear(),m0=n0.getMonth()+1,k0=ym(y0,m0);const A=virementActive();const st0=(DB.virement||{})[k0]||'planifie';if(A.active&&st0==='planifie'){const R=balayageFor(y0,m0);if(!R.frozen&&todayKey()>=R.dJ)items.push(R.solde&&R.solde.onJ?{t:'Balayage du '+R.jour+' : vire '+fE(R.amt)+' vers le '+(R.mode==='pea'?'PEA':'Livret A'),s:'solde '+fE(R.solde.v)+' − réserve '+fE(R.plancher)+(R.X.amt>0.5?' − exceptionnel '+fE(R.X.amt):'')+' · puis touche « Fait » sur l\u2019accueil',go:"go('home')",k:'warn'}:{t:'Balayage du '+R.jour+' : importe ton relevé ou saisis ton solde',s:'le montant à virer se calcule avec ton solde d\u2019aujourd\u2019hui',go:"go('home')",k:'warn'})}}catch(e){errNote(e,'todoList')}
 try{const n=rapList().length;if(n)items.push({t:n>1?n+' avoirs à confirmer':'1 avoir à confirmer',s:'argent rentré qui ressemble à un achat du même commerçant',go:"recvGo()",k:'info'})}catch(e){errNote(e,'todoList')}
 try{recvCalc().payers.forEach(o=>{if(o.late.length)items.push({t:'Remboursement en retard · '+(o.p.n||'payeur'),s:recvE(o.lateAmt)+' attendus depuis plus de '+o.p.delai+' jours ('+o.late.length+' dépense'+(o.late.length>1?'s':'')+')',go:"recvGo()",k:'warn'})})}catch(e){errNote(e,'todoList')}
 {let lx='';try{lx=localStorage.getItem('hft7_xport')||''}catch(e){errNote(e,'todoList')}const days=lx?Math.round((Date.now()-new Date(lx).getTime())/864e5):99;if(days>7)items.push({t:'Exporter une sauvegarde JSON',s:lx?'dernier fichier il y a '+days+' jours':'aucun export enregistré sur cet appareil',go:"xport()",k:'info'})}
@@ -3485,6 +3513,24 @@ ok('Compensation : un virement qui couvre deux dépenses n’est pas relié d’
 b5.imp.lines[1].recvSkip=2;recvUnlink(b5.imp.lines[1]);const d0=b5.imp.lines[0];
 ok('Compensation : sortir un virement du suivi défait son lien, l’autre reste',!b5.imp.lines[1].transit&&d0.transit&&transitRefList(d0).length===1&&transitLeft(d0)===24.15&&b5.imp.lines[2].transit===true,'reste '+transitLeft(d0));
 }catch(e){ok('Compensation v159',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={}}})();
+// v160 · balayage du jour J (données fictives)
+(()=>{const sv=DB;try{DB=defDB();ensure();GM_CACHE={};DB.params.v2From='2031-01';DB.params.balayage={plancher:1500,min:300,jour:25,la:100,pea:0};
+const rows=[{d:'2031-11-29',v:6000,bal:9900},{d:'2031-11-27',v:-100,bal:3900},{d:'2031-11-24',v:-50,bal:4000},{d:'2031-11-24',v:-20,bal:4050}];
+const J=balAtDay(rows,'2031-11-25'),J2=balAtDay(rows,'2031-11-23');
+ok('Balayage : solde à la fin du jour J d’après les soldes du relevé',!!J&&J.d==='2031-11-24'&&J.v===4000&&J2===null,J?J.d+' '+J.v:'rien');
+const mk=(imp,ex)=>{DB.bm=[];const b=Object.assign(defBM(2031,11),{ch:[{l:'Courses',v:400}],ex:ex||[]});b.imp=Object.assign({done:true,t:{fixe:0,variable:0,invest:0,salaire:0,entree:0,foyerOut:0,foyerIn:0},bySub:{fixe:{},variable:{},entree:{},transfertFoyer:{}},byGrp:{},unmatched:[],salaireCount:0,internesOut:0,livretOut:0,livretIn:0,entrees:[],lines:[],consoCsv:0},imp);DB.bm.push(b);GM_CACHE={};return b};
+let b=mk({at:'2031-11-25T08:00:00',ccEnd:3912.4,ccEndDate:'2031-11-24'});let S=balSolde(2031,11),R=balayageFor(2031,11);
+ok('Balayage : relevé importé le 25, dernière opération le 24 → solde retenu, 2 400 € à virer',!!S&&S.onJ&&S.v===3912.4&&R.amt===2400&&R.base===2412.4&&!R.est,(S?S.src:'—')+' · '+R.amt);
+b=mk({at:'2031-11-24T20:00:00',ccEnd:3912.4,ccEndDate:'2031-11-24'});S=balSolde(2031,11);
+ok('Balayage : relevé importé la veille → encore une estimation',!!S&&S.onJ===false&&balayageFor(2031,11).est===true,'estimation');
+b=mk({at:'2031-11-30T08:00:00',ccEnd:9800,ccEndDate:'2031-11-29',ccJ:{d:'2031-11-24',v:4000},payDate:'2031-11-29',ccBeforePay:3900});S=balSolde(2031,11);R=balayageFor(2031,11);
+ok('Balayage : la paie arrivée après le 25 n’est pas comptée',S.v===4000&&R.amt===2500,S.src+' · '+R.amt);
+b.balSaisie={v:1700,d:'2031-11-25'};S=balSolde(2031,11);R=balayageFor(2031,11);b.balSaisie={v:2000,d:'2031-11-20'};const S20=balSolde(2031,11);
+ok('Balayage : solde saisi à partir du 25 prioritaire, minimum de 300 €, alerte sous la réserve',S.manual&&S.v===1700&&R.amt===300&&R.after===1400&&/il resterait 1\s?400/.test(balHomeHtml(R,2031,11,'planifie').replace(/\u202f/g,' '))&&S20.v===4000&&!S20.manual,R.amt+' · reste '+R.after);
+b=mk({at:'2031-11-25T08:00:00',ccEnd:3900,ccEndDate:'2031-11-25',lines:[{d:'2031-11-10',l:'CB BIJOUTERIE TEST',v:-400,t:'variable',s:'Cadeaux'}]},[{l:'Bijoutier',v:1000,match:'BIJOUTERIE'}]);R=balayageFor(2031,11);
+b.ex.push({l:'Garage',v:580,match:'GARAGE'});b.imp.lines.push({d:'2031-11-12',l:'CB GARAGE TEST',v:-557.2,t:'variable',s:'Auto'});R=balayageFor(2031,11);
+ok('Balayage : l’exceptionnel du mois pas encore passé reste sur le compte',R.X.amt===600&&R.base===1800&&R.amt===1800&&R.after===1500&&/600 € d’exceptionnel à venir \(Bijoutier\)/.test(balHomeHtml(R,2031,11,'planifie').replace(/ /g,' ')),'exceptionnel '+R.X.amt+' · à virer '+R.amt);
+}catch(e){ok('Balayage v160',false,String(e&&e.message||e))}finally{DB=sv;GM_CACHE={}}})();
 return results}
 function rAutotestPage(el){el.innerHTML='<button class="backlink" onclick="SUB=\'hub\';rMore()">‹ Plus</button><div class="pagetitle">Autotest</div><div class="card"><div class="card-b" style="font-size:var(--f3);line-height:1.55">Quinze scénarios de calcul rejoués sur des données de test — <b>jamais sur ta base</b>. À lancer après chaque mise à jour de l\u2019app : tout doit être vert. Si une ligne est rouge, envoie-moi une capture.</div></div><div id="selftest-out">'+rSelfTest()+'</div><button class="btn btn-ghost sm wide" style="margin-top:10px" onclick="document.getElementById(\'selftest-out\').innerHTML=rSelfTest()">↻ Relancer</button><div style="text-align:center;margin-top:16px;font-size:var(--f1);color:var(--td)">Version '+VERSION+' · '+VTAG+'</div>'}
 function rSelfTest(){const R=runSelfTests();const nOk=R.filter(r=>r.ok).length;
