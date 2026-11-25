@@ -38,6 +38,7 @@ DB.params.cap={label:'Test',to:'2046-02',cibles:[{l:'Cible',v:900000}]};
 DB.params.proj.salaire=5000;DB.params.proj.aides=[{l:'Allocations familiales',v:150,from:'2026-01',to:''}];
 DB.params.proj.ponctuels=[{l:'Participation et intéressement',mois:8,v:9000}];
 DB.params.proj.depPonctuels=[{l:'Vacances été',v:3000,mois:8,an:2026,rec:true,id:'pvac'},{l:'Noël',v:800,mois:12,an:2026,rec:true,id:'pnoel'}];
+DB.params.remdiff={tr:[{id:'t1',l:'Tranche fictive A',pts:10,vpt:1000,part:60,verse:5000,date:'2031-03'},{id:'t2',l:'Tranche fictive B',pts:10,vpt:1000,part:60,verse:6000,date:'2031-06'}],net:50,mip:{bas:0,central:1000,haut:2000,fx:1.2,date:'2031-03',dev:'£'},note:'Conditions fictives : présence jusqu’au versement.'};
 DB.params.recv={payers:[{id:'emp',n:'Employeur fictif',pat:'EMPLOYEUR FICTIF',delai:30,from:'2026-04-01',ini:0}],rules:[{id:'box',l:'Box internet',match:'FOURNISSEUR BOX',sauf:'',p:'emp',mode:'fixe',v:40,on:true}],pairs:[{id:'carte',l:'Carte fictive',cr:'BONUS CARTE FICTIVE',db:'FRAIS CARTE FICTIVE',on:true}]};
 const S=(a,b)=>[{n:'PEA',v:a,det:[]},{n:'PEE Fonds',v:b,det:[]}];DB.bm=[];DB.im=[];
 const CH=()=>[{l:'Loyer',v:1000,fixe:true},{l:'Assurance habitation et responsabilité civile',v:38.5,fixe:true},{l:'Courses',v:2000}];
